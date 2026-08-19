@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <title>LLM Observatory</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <main>
+    <h1>LLM Observatory</h1>
+
+    <label for="prompt-id">Benchmark</label>
+    <input
+      id="prompt-id"
+      type="text"
+      value="reasoning-001"
+    >
+
+    <button id="start-probe">
+      Start Consumer Probe
+    </button>
+
+    <p id="status">
+      No active probe.
+    </p>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
