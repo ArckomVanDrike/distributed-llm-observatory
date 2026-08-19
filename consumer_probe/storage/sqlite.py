@@ -49,6 +49,9 @@ class ConsumerProbeSQLiteStore:
                     benchmark_version TEXT NOT NULL,
                     prompt_id TEXT NOT NULL,
 
+                    scheduled_at_utc TEXT,
+                    schedule_offset_ms REAL,
+
                     started_at_utc TEXT NOT NULL,
                     first_output_at_utc TEXT,
                     completed_at_utc TEXT,
@@ -64,6 +67,25 @@ class ConsumerProbeSQLiteStore:
 
                     payload_json TEXT NOT NULL
                 )
+                """
+            )
+
+            self._ensure_column(
+                connection,
+                "scheduled_at_utc",
+                "TEXT",
+            )
+
+            self._ensure_column(
+                connection,
+                "schedule_offset_ms",
+                "REAL",
+            )
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_consumer_probe_schedule
+                ON consumer_probes(scheduled_at_utc)
                 """
             )
 
@@ -107,6 +129,27 @@ class ConsumerProbeSQLiteStore:
                 """
             )
 
+    @staticmethod
+    def _ensure_column(
+        connection: sqlite3.Connection,
+        column_name: str,
+        definition: str,
+    ) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(consumer_probes)"
+            ).fetchall()
+        }
+
+        if column_name in columns:
+            return
+
+        connection.execute(
+            f"ALTER TABLE consumer_probes "
+            f"ADD COLUMN {column_name} {definition}"
+        )
+
     def append(self, record: ConsumerProbeRecord) -> bool:
         """
         Persist one observation.
@@ -127,6 +170,8 @@ class ConsumerProbeSQLiteStore:
                         model_label,
                         benchmark_version,
                         prompt_id,
+                        scheduled_at_utc,
+                        schedule_offset_ms,
                         started_at_utc,
                         first_output_at_utc,
                         completed_at_utc,
@@ -140,7 +185,8 @@ class ConsumerProbeSQLiteStore:
                     )
                     VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?
                     )
                     """,
                     (
@@ -153,6 +199,12 @@ class ConsumerProbeSQLiteStore:
                         record.model_label,
                         record.benchmark_version,
                         record.prompt_id,
+                        (
+                            record.scheduled_at_utc.isoformat()
+                            if record.scheduled_at_utc
+                            else None
+                        ),
+                        record.schedule_offset_ms,
                         record.started_at_utc.isoformat(),
                         (
                             record.first_output_at_utc.isoformat()

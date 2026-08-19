@@ -26,6 +26,9 @@ class BrowserProbeRecord(BaseModel):
     prompt_id: str = Field(min_length=1)
     benchmark_version: str = Field(min_length=1)
 
+    scheduled_at_utc: datetime | None = None
+    schedule_offset_ms: float | None = None
+
     platform: ConsumerPlatform
     page_hostname: str = Field(min_length=1)
 
@@ -55,6 +58,42 @@ class BrowserProbeRecord(BaseModel):
 
     @model_validator(mode="after")
     def validate_temporal_consistency(self) -> BrowserProbeRecord:
+        if self.scheduled_at_utc is None:
+            if self.schedule_offset_ms is not None:
+                raise ValueError(
+                    "schedule_offset_ms requires "
+                    "scheduled_at_utc."
+                )
+        else:
+            if self.schedule_offset_ms is None:
+                raise ValueError(
+                    "schedule_offset_ms is required when "
+                    "scheduled_at_utc is present."
+                )
+
+            if (
+                self.started_at_utc.tzinfo is None
+                or self.scheduled_at_utc.tzinfo is None
+            ):
+                raise ValueError(
+                    "Schedule provenance timestamps must "
+                    "be timezone-aware."
+                )
+
+            expected_offset = (
+                self.started_at_utc
+                - self.scheduled_at_utc
+            ).total_seconds() * 1000
+
+            if abs(
+                expected_offset
+                - self.schedule_offset_ms
+            ) > 1:
+                raise ValueError(
+                    "schedule_offset_ms is inconsistent "
+                    "with scheduled and started timestamps."
+                )
+
         expected_total = self.completed_at_ms - self.started_at_ms
 
         if expected_total < 0:
@@ -210,6 +249,8 @@ def normalize_export(
             benchmark_version=record.benchmark_version,
             prompt_id=record.prompt_id,
             input_mode=ProbeInputMode.MANUAL,
+            scheduled_at_utc=record.scheduled_at_utc,
+            schedule_offset_ms=record.schedule_offset_ms,
             started_at_utc=record.started_at_utc,
             first_output_at_utc=record.first_output_at_utc,
             completed_at_utc=record.completed_at_utc,

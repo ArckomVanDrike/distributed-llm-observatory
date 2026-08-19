@@ -9,6 +9,7 @@ const BRIDGE_BASE_URL =
 
 let bridgePromptId = null;
 let bridgePromptText = null;
+let bridgeScheduledAtUtc = null;
 
 const ALLOWED_HOSTS = new Set([
   "chatgpt.com",
@@ -258,6 +259,9 @@ async function refreshBridgeRecommendation() {
       bridgePromptText =
         payload.item.prompt;
 
+      bridgeScheduledAtUtc =
+        payload.item.scheduled_at_utc;
+
       showBenchmarkPreview(
         payload.item.prompt
       );
@@ -283,6 +287,9 @@ async function refreshBridgeRecommendation() {
       bridgePromptText =
         payload.item.prompt;
 
+      bridgeScheduledAtUtc =
+        payload.item.scheduled_at_utc;
+
       showBenchmarkPreview(
         payload.item.prompt
       );
@@ -306,6 +313,7 @@ async function refreshBridgeRecommendation() {
     if (payload.status === "none") {
       bridgePromptId = null;
       bridgePromptText = null;
+      bridgeScheduledAtUtc = null;
 
       showBenchmarkPreview(null);
 
@@ -367,6 +375,7 @@ async function refreshLocalSummary() {
 function mountProbeOverlay(
   promptId,
   promptText,
+  scheduledAtUtc,
   historyKey,
   lastProbeKey,
   maxHistory
@@ -527,6 +536,15 @@ function mountProbeOverlay(
         prompt_id: promptId,
         benchmark_version: "0.1",
 
+        scheduled_at_utc:
+          scheduledAtUtc ?? null,
+
+        schedule_offset_ms:
+          scheduledAtUtc === null
+            ? null
+            : startedAt
+              - Date.parse(scheduledAtUtc),
+
         platform: detectPlatform(hostname),
         page_hostname: hostname,
 
@@ -686,9 +704,17 @@ startButton.addEventListener(
         );
       }
 
+      const usesScheduledPrompt =
+        promptId === bridgePromptId;
+
       const promptText =
-        promptId === bridgePromptId
+        usesScheduledPrompt
           ? bridgePromptText
+          : null;
+
+      const scheduledAtUtc =
+        usesScheduledPrompt
+          ? bridgeScheduledAtUtc
           : null;
 
       await ext.scripting.executeScript({
@@ -699,6 +725,7 @@ startButton.addEventListener(
         args: [
           promptId,
           promptText,
+          scheduledAtUtc,
           HISTORY_KEY,
           LAST_PROBE_KEY,
           MAX_LOCAL_HISTORY

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ConsumerPlatform(str, Enum):
@@ -39,6 +39,9 @@ class ConsumerProbeRecord(BaseModel):
 
     input_mode: ProbeInputMode = ProbeInputMode.MANUAL
 
+    scheduled_at_utc: datetime | None = None
+    schedule_offset_ms: float | None = None
+
     started_at_utc: datetime
     first_output_at_utc: datetime | None = None
     completed_at_utc: datetime | None = None
@@ -60,6 +63,50 @@ class ConsumerProbeRecord(BaseModel):
 
     response_capture_enabled: bool = False
     sharing_allowed: bool = False
+
+    @model_validator(mode="after")
+    def validate_schedule_provenance(
+        self,
+    ) -> ConsumerProbeRecord:
+        if self.scheduled_at_utc is None:
+            if self.schedule_offset_ms is not None:
+                raise ValueError(
+                    "schedule_offset_ms requires "
+                    "scheduled_at_utc."
+                )
+
+            return self
+
+        if self.schedule_offset_ms is None:
+            raise ValueError(
+                "schedule_offset_ms is required when "
+                "scheduled_at_utc is present."
+            )
+
+        if (
+            self.started_at_utc.tzinfo is None
+            or self.scheduled_at_utc.tzinfo is None
+        ):
+            raise ValueError(
+                "Schedule provenance timestamps must "
+                "be timezone-aware."
+            )
+
+        expected_offset = (
+            self.started_at_utc
+            - self.scheduled_at_utc
+        ).total_seconds() * 1000
+
+        if abs(
+            expected_offset
+            - self.schedule_offset_ms
+        ) > 1:
+            raise ValueError(
+                "schedule_offset_ms is inconsistent "
+                "with scheduled and started timestamps."
+            )
+
+        return self
 
 
 class ConsumerProbeEnvelope(BaseModel):
