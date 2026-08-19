@@ -55,4 +55,5 @@ include = [
     "schemas*",
     "analysis*",
     "server*",
+    "consumer_probe*",
 ]
