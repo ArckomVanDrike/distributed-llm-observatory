@@ -23,5 +23,11 @@
       "id": "consumer-probe@distributed-llm-observatory",
       "strict_min_version": "109.0"
     }
-  }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:8765"
+  },
+  "optional_host_permissions": [
+    "http://127.0.0.1/*"
+  ]
 }

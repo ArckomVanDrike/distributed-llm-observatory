@@ -4,6 +4,9 @@ const HISTORY_KEY = "dllo_probe_history";
 const LAST_PROBE_KEY = "dllo_last_probe";
 const MAX_LOCAL_HISTORY = 2000;
 
+const BRIDGE_BASE_URL =
+  "http://127.0.0.1:8765";
+
 const ALLOWED_HOSTS = new Set([
   "chatgpt.com",
   "claude.ai",
@@ -17,12 +20,246 @@ const promptInput = document.getElementById("prompt-id");
 const sampleCount = document.getElementById("sample-count");
 const lastMeasurement = document.getElementById("last-measurement");
 
+const connectBridgeButton =
+  document.createElement("button");
+
+connectBridgeButton.id = "connect-bridge";
+connectBridgeButton.textContent =
+  "Connect DLLO Bridge";
+
+startButton.parentElement.insertBefore(
+  connectBridgeButton,
+  startButton
+);
+
 
 function hostnameFromUrl(urlString) {
   try {
     return new URL(urlString).hostname;
   } catch {
     return null;
+  }
+}
+
+
+function platformFromHostname(hostname) {
+  if (hostname === "chatgpt.com") {
+    return "chatgpt";
+  }
+
+  if (hostname === "claude.ai") {
+    return "claude";
+  }
+
+  if (hostname === "gemini.google.com") {
+    return "gemini";
+  }
+
+  return null;
+}
+
+
+async function hasBridgePermission() {
+  return ext.permissions.contains({
+    origins: [
+      "http://127.0.0.1/*"
+    ]
+  });
+}
+
+
+async function requestBridgePermission() {
+  try {
+    const granted =
+      await ext.permissions.request({
+        origins: [
+          "http://127.0.0.1/*"
+        ]
+      });
+
+    if (!granted) {
+      statusElement.textContent =
+        "DLLO Bridge permission was not granted.";
+      return;
+    }
+
+    connectBridgeButton.hidden = true;
+
+    statusElement.textContent =
+      "DLLO Bridge connected.";
+
+    await refreshBridgeRecommendation();
+  } catch (error) {
+    console.error(
+      "DLLO bridge permission request failed",
+      error
+    );
+
+    statusElement.textContent =
+      `Bridge permission error: ${
+        error?.message ?? String(error)
+      }`;
+  }
+}
+
+
+async function refreshBridgeRecommendation() {
+  let bridgeStage = "startup";
+
+  try {
+    const permitted =
+      await hasBridgePermission();
+
+    if (!permitted) {
+      connectBridgeButton.hidden = false;
+
+      statusElement.textContent =
+        "Bridge disconnected — connect to enable scheduling.";
+
+      return;
+    }
+
+    connectBridgeButton.hidden = true;
+    let loopbackPermission = "unknown";
+
+    try {
+      const permission =
+        await navigator.permissions.query({
+          name: "loopback-network"
+        });
+
+      loopbackPermission =
+        permission.state;
+    } catch (error) {
+      console.debug(
+        "DLLO loopback permission query failed",
+        error
+      );
+    }
+
+    console.log(
+      "DLLO loopback permission:",
+      loopbackPermission
+    );
+
+    const tabs = await ext.tabs.query({
+      active: true,
+      currentWindow: true
+    });
+
+    const tab = tabs[0];
+
+    if (!tab?.url) {
+      throw new Error(
+        "No active browser tab."
+      );
+    }
+
+    const hostname =
+      hostnameFromUrl(tab.url);
+
+    if (!ALLOWED_HOSTS.has(hostname)) {
+      statusElement.textContent =
+        "Bridge idle — unsupported site.";
+      return;
+    }
+
+    const activePlatform =
+      platformFromHostname(hostname);
+
+    bridgeStage = "background";
+
+    const bridgeResponse =
+      await ext.runtime.sendMessage({
+        type: "dllo-bridge-next"
+      });
+
+    if (!bridgeResponse?.ok) {
+      const errorName =
+        bridgeResponse?.error?.name
+        ?? "BridgeError";
+
+      const errorMessage =
+        bridgeResponse?.error?.message
+        ?? "Background bridge request failed.";
+
+      throw new Error(
+        `${errorName}: ${errorMessage}`
+      );
+    }
+
+    const payload =
+      bridgeResponse.payload;
+
+    if (payload.platform !== activePlatform) {
+      statusElement.textContent =
+        `Bridge configured for ${
+          payload.platform
+        }; active site is ${activePlatform}.`;
+
+      return;
+    }
+
+    if (
+      payload.status === "due" &&
+      payload.item?.prompt_id
+    ) {
+      promptInput.value =
+        payload.item.prompt_id;
+
+      statusElement.textContent =
+        `Due now · ${
+          payload.item.prompt_id
+        }`;
+
+      return;
+    }
+
+    if (
+      payload.status === "upcoming" &&
+      payload.item?.prompt_id
+    ) {
+      promptInput.value =
+        payload.item.prompt_id;
+
+      const minutes = Math.max(
+        0,
+        Math.round(
+          payload.item.starts_in_ms
+          / 60000
+        )
+      );
+
+      statusElement.textContent =
+        `Upcoming · ${
+          payload.item.prompt_id
+        } · ${minutes} min`;
+
+      return;
+    }
+
+    if (payload.status === "none") {
+      statusElement.textContent =
+        "No scheduled probe remaining today.";
+
+      return;
+    }
+
+    throw new Error(
+      "Unexpected bridge response."
+    );
+  } catch (error) {
+    console.debug(
+      "DLLO localhost bridge unavailable",
+      error
+    );
+
+    statusElement.textContent =
+      `Bridge error [${bridgeStage}]: ${
+        error?.name ?? "Error"
+      } · ${
+        error?.message ?? String(error)
+      }`;
   }
 }
 
@@ -311,6 +548,12 @@ function mountProbeOverlay(
 }
 
 
+connectBridgeButton.addEventListener(
+  "click",
+  requestBridgePermission
+);
+
+
 startButton.addEventListener(
   "click",
   async () => {
@@ -453,3 +696,6 @@ exportButton.addEventListener(
 
 
 void refreshLocalSummary();
+
+
+void refreshBridgeRecommendation();

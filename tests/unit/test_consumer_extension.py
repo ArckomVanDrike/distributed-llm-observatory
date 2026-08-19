@@ -14,10 +14,16 @@ def test_extension_uses_manifest_v3():
     assert manifest["manifest_version"] == 3
 
 
-def test_extension_has_no_permanent_host_permissions():
+def test_extension_bridge_permission_is_optional_and_local_only():
     manifest = load_manifest()
 
     assert "host_permissions" not in manifest
+
+    assert manifest.get(
+        "optional_host_permissions"
+    ) == [
+        "http://127.0.0.1/*"
+    ]
 
 
 def test_extension_uses_active_tab():
