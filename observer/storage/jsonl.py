@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from observer.storage.base import ObservationStore
 from schemas.record import ObservationRecord
 
 
@@ -11,7 +12,7 @@ class ObservationStoreError(Exception):
     """Raised when local observation storage cannot be read safely."""
 
 
-class JSONLObservationStore:
+class JSONLObservationStore(ObservationStore):
     """
     Append-only local storage for Observatory observations.
 
