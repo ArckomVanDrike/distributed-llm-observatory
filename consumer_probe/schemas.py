@@ -25,6 +25,7 @@ class ConsumerProbeRecord(BaseModel):
 
     observer_id: str = Field(min_length=1)
     region_code: str = Field(min_length=2)
+    observer_timezone: str | None = None
 
     platform: ConsumerPlatform
     account_tier: str | None = None

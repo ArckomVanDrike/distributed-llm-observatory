@@ -141,3 +141,30 @@ def test_rejects_response_when_capture_disabled(tmp_path: Path):
 
     with pytest.raises(ConsumerProbeImportError):
         load_export(path)
+
+
+def test_import_preserves_observer_timezone(tmp_path: Path):
+    path = tmp_path / "export.json"
+    write_export(path, [make_record()])
+
+    records = import_export(
+        path,
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+        observer_timezone="America/Santiago",
+    )
+
+    assert records[0].observer_timezone == "America/Santiago"
+
+
+def test_import_rejects_invalid_observer_timezone(tmp_path: Path):
+    path = tmp_path / "export.json"
+    write_export(path, [make_record()])
+
+    with pytest.raises(ConsumerProbeImportError):
+        import_export(
+            path,
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            observer_timezone="Planet/Mars",
+        )

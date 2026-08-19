@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
@@ -176,6 +177,7 @@ def normalize_export(
     *,
     observer_id: str,
     region_code: str,
+    observer_timezone: str | None = None,
 ) -> list[ConsumerProbeRecord]:
     if not observer_id.strip():
         raise ConsumerProbeImportError(
@@ -187,12 +189,21 @@ def normalize_export(
             "region_code cannot be empty."
         )
 
+    if observer_timezone is not None:
+        try:
+            ZoneInfo(observer_timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ConsumerProbeImportError(
+                f"Invalid observer timezone: {observer_timezone}"
+            ) from exc
+
     return [
         ConsumerProbeRecord(
             schema_version=record.schema_version,
             probe_id=record.probe_id,
             observer_id=observer_id,
             region_code=region_code,
+            observer_timezone=observer_timezone,
             platform=record.platform,
             page_hostname=record.page_hostname,
             measurement_mode=record.measurement_mode,
@@ -224,6 +235,7 @@ def import_export(
     *,
     observer_id: str,
     region_code: str,
+    observer_timezone: str | None = None,
 ) -> list[ConsumerProbeRecord]:
     export = load_export(path)
 
@@ -231,4 +243,5 @@ def import_export(
         export,
         observer_id=observer_id,
         region_code=region_code,
+        observer_timezone=observer_timezone,
     )
