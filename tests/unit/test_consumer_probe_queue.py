@@ -201,3 +201,81 @@ def test_blank_observer_id_is_rejected():
             observer_id="   ",
             prompt_ids=PROMPTS,
         )
+
+
+def test_seven_prompts_six_slots_rotate_fairly():
+    start = date(2026, 8, 19)
+
+    scheduled_counts = {
+        prompt_id: 0
+        for prompt_id in PROMPTS
+    }
+
+    omitted_counts = {
+        prompt_id: 0
+        for prompt_id in PROMPTS
+    }
+
+    from datetime import timedelta
+
+    for day_offset in range(7):
+        queue = build_daily_queue(
+            start + timedelta(days=day_offset),
+            observer_id="observer-a",
+            prompt_ids=PROMPTS,
+        )
+
+        scheduled = {
+            item.prompt_id
+            for item in queue
+        }
+
+        omitted = set(PROMPTS) - scheduled
+
+        assert len(scheduled) == 6
+        assert len(omitted) == 1
+
+        for prompt_id in scheduled:
+            scheduled_counts[prompt_id] += 1
+
+        for prompt_id in omitted:
+            omitted_counts[prompt_id] += 1
+
+    assert set(
+        scheduled_counts.values()
+    ) == {6}
+
+    assert set(
+        omitted_counts.values()
+    ) == {1}
+
+
+def test_rotation_is_fair_with_fewer_slots():
+    start = date(2026, 8, 19)
+
+    policy = SamplingPolicy(
+        bucket_hours=8,
+        samples_per_bucket=1,
+    )
+
+    counts = {
+        prompt_id: 0
+        for prompt_id in PROMPTS
+    }
+
+    from datetime import timedelta
+
+    for day_offset in range(7):
+        queue = build_daily_queue(
+            start + timedelta(days=day_offset),
+            observer_id="observer-a",
+            prompt_ids=PROMPTS,
+            sampling_policy=policy,
+        )
+
+        assert len(queue) == 3
+
+        for item in queue:
+            counts[item.prompt_id] += 1
+
+    assert set(counts.values()) == {3}

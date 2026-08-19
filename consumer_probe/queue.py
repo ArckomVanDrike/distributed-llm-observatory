@@ -43,32 +43,28 @@ def validate_prompt_ids(
         )
 
 
-def prompt_order_key(
+def prompt_base_order_key(
     *,
     observer_id: str,
-    sampling_date: date,
     prompt_id: str,
 ) -> bytes:
     """
-    Return a deterministic ordering key.
+    Return a stable observer-specific prompt ordering key.
 
-    The order changes between observers and dates while remaining
-    perfectly reproducible for the same inputs.
+    The date is deliberately excluded. Daily variation is handled by
+    deterministic rotation so prompt coverage remains fair over time.
     """
     payload = (
-        f"{observer_id}|"
-        f"{sampling_date.isoformat()}|"
-        f"{prompt_id}"
+        f"{observer_id}|{prompt_id}"
     ).encode()
 
     return hashlib.sha256(payload).digest()
 
 
-def order_prompts(
+def stable_prompt_order(
     prompt_ids: list[str],
     *,
     observer_id: str,
-    sampling_date: date,
 ) -> list[str]:
     validate_prompt_ids(prompt_ids)
 
@@ -82,11 +78,51 @@ def order_prompts(
             prompt_id.strip()
             for prompt_id in prompt_ids
         ),
-        key=lambda prompt_id: prompt_order_key(
+        key=lambda prompt_id: prompt_base_order_key(
             observer_id=observer_id,
-            sampling_date=sampling_date,
             prompt_id=prompt_id,
         ),
+    )
+
+
+def rotation_offset(
+    sampling_date: date,
+    prompt_count: int,
+) -> int:
+    if prompt_count <= 0:
+        raise ValueError(
+            "prompt_count must be greater than zero."
+        )
+
+    return sampling_date.toordinal() % prompt_count
+
+
+def order_prompts(
+    prompt_ids: list[str],
+    *,
+    observer_id: str,
+    sampling_date: date,
+) -> list[str]:
+    """
+    Return the fair deterministic prompt order for one day.
+
+    A stable observer-specific base ordering is rotated by one position
+    per calendar day. Over a complete cycle every prompt therefore
+    receives equal access to the available daily slots.
+    """
+    base_order = stable_prompt_order(
+        prompt_ids,
+        observer_id=observer_id,
+    )
+
+    offset = rotation_offset(
+        sampling_date,
+        len(base_order),
+    )
+
+    return (
+        base_order[offset:]
+        + base_order[:offset]
     )
 
 
@@ -105,7 +141,8 @@ def build_daily_queue(
     - at most one benchmark is assigned to each sampling slot
     - no prompt is repeated during the same daily queue
     - queue order is deterministic
-    - different observers/dates receive different prompt ordering
+    - different observers receive different base ordering
+    - daily rotation provides fair long-term prompt coverage
     - excess prompts are deferred rather than creating request bursts
     """
     schedule = build_daily_schedule(
