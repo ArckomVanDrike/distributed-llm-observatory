@@ -30,6 +30,9 @@ class ConsumerProbeRecord(BaseModel):
     account_tier: str | None = None
     model_label: str | None = None
 
+    page_hostname: str | None = None
+    measurement_mode: str = "consumer-ui-manual-v0.1"
+
     benchmark_version: str = Field(min_length=1)
     prompt_id: str = Field(min_length=1)
 
@@ -39,8 +42,14 @@ class ConsumerProbeRecord(BaseModel):
     first_output_at_utc: datetime | None = None
     completed_at_utc: datetime | None = None
 
-    time_to_first_output_ms: float | None = Field(default=None, ge=0)
-    total_latency_ms: float | None = Field(default=None, ge=0)
+    time_to_first_output_ms: float | None = Field(
+        default=None,
+        ge=0,
+    )
+    total_latency_ms: float | None = Field(
+        default=None,
+        ge=0,
+    )
 
     response_text: str | None = None
 
