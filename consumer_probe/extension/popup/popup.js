@@ -7,6 +7,9 @@ const MAX_LOCAL_HISTORY = 2000;
 const BRIDGE_BASE_URL =
   "http://127.0.0.1:8765";
 
+let bridgePromptId = null;
+let bridgePromptText = null;
+
 const ALLOWED_HOSTS = new Set([
   "chatgpt.com",
   "claude.ai",
@@ -19,6 +22,30 @@ const statusElement = document.getElementById("status");
 const promptInput = document.getElementById("prompt-id");
 const sampleCount = document.getElementById("sample-count");
 const lastMeasurement = document.getElementById("last-measurement");
+
+const benchmarkPreview =
+  document.createElement("div");
+
+benchmarkPreview.id = "benchmark-preview";
+benchmarkPreview.hidden = true;
+
+Object.assign(benchmarkPreview.style, {
+  marginTop: "8px",
+  marginBottom: "10px",
+  padding: "10px",
+  maxHeight: "150px",
+  overflowY: "auto",
+  whiteSpace: "pre-wrap",
+  background: "#1f2937",
+  borderRadius: "6px",
+  fontSize: "12px",
+  lineHeight: "1.4"
+});
+
+promptInput.parentElement.insertBefore(
+  benchmarkPreview,
+  startButton
+);
 
 const connectBridgeButton =
   document.createElement("button");
@@ -56,6 +83,22 @@ function platformFromHostname(hostname) {
   }
 
   return null;
+}
+
+
+function showBenchmarkPreview(
+  promptText
+) {
+  if (!promptText) {
+    benchmarkPreview.textContent = "";
+    benchmarkPreview.hidden = true;
+    return;
+  }
+
+  benchmarkPreview.textContent =
+    promptText;
+
+  benchmarkPreview.hidden = false;
 }
 
 
@@ -115,6 +158,8 @@ async function refreshBridgeRecommendation() {
 
       statusElement.textContent =
         "Bridge disconnected — connect to enable scheduling.";
+
+      showBenchmarkPreview(null);
 
       return;
     }
@@ -207,6 +252,16 @@ async function refreshBridgeRecommendation() {
       promptInput.value =
         payload.item.prompt_id;
 
+      bridgePromptId =
+        payload.item.prompt_id;
+
+      bridgePromptText =
+        payload.item.prompt;
+
+      showBenchmarkPreview(
+        payload.item.prompt
+      );
+
       statusElement.textContent =
         `Due now · ${
           payload.item.prompt_id
@@ -221,6 +276,16 @@ async function refreshBridgeRecommendation() {
     ) {
       promptInput.value =
         payload.item.prompt_id;
+
+      bridgePromptId =
+        payload.item.prompt_id;
+
+      bridgePromptText =
+        payload.item.prompt;
+
+      showBenchmarkPreview(
+        payload.item.prompt
+      );
 
       const minutes = Math.max(
         0,
@@ -239,6 +304,11 @@ async function refreshBridgeRecommendation() {
     }
 
     if (payload.status === "none") {
+      bridgePromptId = null;
+      bridgePromptText = null;
+
+      showBenchmarkPreview(null);
+
       statusElement.textContent =
         "No scheduled probe remaining today.";
 
@@ -296,6 +366,7 @@ async function refreshLocalSummary() {
 
 function mountProbeOverlay(
   promptId,
+  promptText,
   historyKey,
   lastProbeKey,
   maxHistory
@@ -359,6 +430,25 @@ function mountProbeOverlay(
     `Benchmark: ${promptId}`;
   benchmark.style.fontSize = "12px";
   benchmark.style.marginBottom = "8px";
+
+  const promptPreview =
+    document.createElement("div");
+
+  if (promptText) {
+    promptPreview.textContent = promptText;
+
+    Object.assign(promptPreview.style, {
+      marginBottom: "10px",
+      padding: "8px",
+      maxHeight: "140px",
+      overflowY: "auto",
+      whiteSpace: "pre-wrap",
+      background: "#1f2937",
+      borderRadius: "6px",
+      fontSize: "12px",
+      lineHeight: "1.4"
+    });
+  }
 
   const status = document.createElement("div");
   status.textContent = "Armed — ready.";
@@ -536,7 +626,14 @@ function mountProbeOverlay(
 
   overlay.append(
     title,
-    benchmark,
+    benchmark
+  );
+
+  if (promptText) {
+    overlay.append(promptPreview);
+  }
+
+  overlay.append(
     status,
     start,
     first,
@@ -589,6 +686,11 @@ startButton.addEventListener(
         );
       }
 
+      const promptText =
+        promptId === bridgePromptId
+          ? bridgePromptText
+          : null;
+
       await ext.scripting.executeScript({
         target: {
           tabId: tab.id
@@ -596,6 +698,7 @@ startButton.addEventListener(
         func: mountProbeOverlay,
         args: [
           promptId,
+          promptText,
           HISTORY_KEY,
           LAST_PROBE_KEY,
           MAX_LOCAL_HISTORY
