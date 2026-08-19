@@ -13,8 +13,10 @@ from consumer_probe.storage.sqlite import (
 from observer.cli import (
     build_parser,
     consumer_detect,
+    consumer_schedule,
     consumer_summary,
     parse_candidate_start,
+    parse_sampling_date,
 )
 
 
@@ -250,3 +252,100 @@ def test_consumer_import_is_idempotent(
     assert "Inserted:   0" in second_output
     assert "Duplicates: 1" in second_output
     assert "DB total:   1" in second_output
+
+
+
+def test_parser_exposes_consumer_schedule():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-schedule",
+            "--date",
+            "2026-08-19",
+            "--observer-id",
+            "observer-test",
+        ]
+    )
+
+    assert args.command == "consumer-schedule"
+    assert args.sampling_date == "2026-08-19"
+    assert args.observer_id == "observer-test"
+
+
+def test_parse_sampling_date_accepts_iso_date():
+    value = parse_sampling_date(
+        "2026-08-19"
+    )
+
+    assert value.isoformat() == "2026-08-19"
+
+
+def test_parse_sampling_date_rejects_invalid_date():
+    with pytest.raises(
+        ValueError,
+        match="YYYY-MM-DD",
+    ):
+        parse_sampling_date(
+            "19-08-2026"
+        )
+
+
+def test_consumer_schedule_uses_prompt_bank(
+    tmp_path: Path,
+    capsys,
+):
+    prompt_path = (
+        tmp_path
+        / "reasoning"
+        / "reasoning-001.json"
+    )
+
+    prompt_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    prompt_path.write_text(
+        """
+        {
+          "prompt_id": "reasoning-001",
+          "benchmark_version": "0.1",
+          "category": "reasoning",
+          "difficulty": "medium",
+          "prompt": "Return the number nine.",
+          "expected_characteristics": [
+            "Returns 9."
+          ],
+          "scoring_method": "observatory_rubric_v0.1",
+          "enabled": true
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-schedule",
+            "--date",
+            "2026-08-19",
+            "--observer-id",
+            "observer-test",
+            "--benchmark-version",
+            "0.1",
+            "--prompt-bank",
+            str(tmp_path),
+        ]
+    )
+
+    result = consumer_schedule(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "2026-08-19" in output
+    assert "observer-test" in output
+    assert "Scheduled items:   1" in output
+    assert "reasoning-001" in output
+    assert "[reasoning]" in output

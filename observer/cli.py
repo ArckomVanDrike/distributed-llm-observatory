@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from consumer_probe.analytics import summarize
@@ -12,6 +12,7 @@ from consumer_probe.importer import (
     ConsumerProbeImportError,
     import_export,
 )
+from consumer_probe.sampling import SamplingPolicy
 from consumer_probe.schemas import ConsumerPlatform
 from consumer_probe.storage.sqlite import (
     ConsumerProbeSQLiteStore,
@@ -19,6 +20,10 @@ from consumer_probe.storage.sqlite import (
 )
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
+from observer.core.consumer_schedule import (
+    ConsumerScheduleError,
+    build_prompt_bank_schedule,
+)
 from observer.core.prompt_bank import PromptBank, PromptBankError
 from observer.core.recording import build_observation_record
 from observer.providers.mock import MockProvider
@@ -212,6 +217,66 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=20,
         help="Minimum candidate and baseline sample count",
+    )
+
+    # -----------------------------------------------------
+    # Consumer Probe daily schedule
+    # -----------------------------------------------------
+
+    schedule_parser = subparsers.add_parser(
+        "consumer-schedule",
+        help="Build the daily Consumer Probe benchmark schedule",
+    )
+
+    schedule_parser.add_argument(
+        "--date",
+        dest="sampling_date",
+        help=(
+            "UTC sampling date in YYYY-MM-DD format. "
+            "Defaults to the current UTC date."
+        ),
+    )
+
+    schedule_parser.add_argument(
+        "--observer-id",
+        help=(
+            "Observer identifier. Defaults to "
+            "OBSERVATORY_ID when omitted."
+        ),
+    )
+
+    schedule_parser.add_argument(
+        "--benchmark-version",
+        default="0.1",
+        help="Benchmark version",
+    )
+
+    schedule_parser.add_argument(
+        "--prompt-bank",
+        type=Path,
+        default=Path("benchmark/prompts"),
+        help="Benchmark prompt bank directory",
+    )
+
+    schedule_parser.add_argument(
+        "--bucket-hours",
+        type=int,
+        default=4,
+        help="UTC sampling bucket size",
+    )
+
+    schedule_parser.add_argument(
+        "--samples-per-bucket",
+        type=int,
+        default=1,
+        help="Sampling slots per UTC bucket",
+    )
+
+    schedule_parser.add_argument(
+        "--edge-guard-minutes",
+        type=int,
+        default=15,
+        help="Minutes excluded from each bucket edge",
     )
 
     return parser
@@ -571,6 +636,92 @@ def consumer_detect(
         return 2
 
 
+def parse_sampling_date(
+    raw_value: str | None,
+) -> date:
+    if raw_value is None:
+        return datetime.now(
+            timezone.utc
+        ).date()
+
+    try:
+        return date.fromisoformat(
+            raw_value.strip()
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "date must use YYYY-MM-DD format."
+        ) from exc
+
+
+def consumer_schedule(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        sampling_date = parse_sampling_date(
+            args.sampling_date
+        )
+
+        observer_id = args.observer_id
+
+        if not observer_id:
+            config = ObserverConfig.from_environment()
+            observer_id = config.observer_id
+
+        policy = SamplingPolicy(
+            bucket_hours=args.bucket_hours,
+            samples_per_bucket=args.samples_per_bucket,
+            edge_guard_minutes=args.edge_guard_minutes,
+        )
+
+        schedule = build_prompt_bank_schedule(
+            sampling_date,
+            observer_id=observer_id,
+            benchmark_version=args.benchmark_version,
+            prompt_bank_path=args.prompt_bank,
+            sampling_policy=policy,
+        )
+
+        print("=== DLLO DAILY CONSUMER SCHEDULE ===")
+        print(
+            f"Date:              "
+            f"{schedule.sampling_date}"
+        )
+        print(
+            f"Observer:          "
+            f"{schedule.observer_id}"
+        )
+        print(
+            f"Benchmark version: "
+            f"{schedule.benchmark_version}"
+        )
+        print(
+            f"Scheduled items:   "
+            f"{len(schedule.items)}"
+        )
+
+        for item in schedule.items:
+            print(
+                f"{item.scheduled_at_utc.isoformat()} "
+                f"-> {item.benchmark.prompt_id} "
+                f"[{item.benchmark.category.value}]"
+            )
+
+        return 0
+
+    except (
+        ConsumerScheduleError,
+        ObserverConfigError,
+        PromptBankError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -586,6 +737,9 @@ def main() -> int:
 
     if args.command == "consumer-detect":
         return consumer_detect(args)
+
+    if args.command == "consumer-schedule":
+        return consumer_schedule(args)
 
     parser.print_help()
     return 1
