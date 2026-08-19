@@ -1,5 +1,5 @@
 body {
-  width: 300px;
+  width: 320px;
   margin: 0;
   padding: 16px;
   font-family: system-ui, sans-serif;
@@ -26,12 +26,27 @@ input {
 
 button {
   width: 100%;
+  margin-bottom: 8px;
   padding: 9px;
   cursor: pointer;
+}
+
+#local-data {
+  margin: 10px 0;
+  padding: 10px;
+  background: #1f2937;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+#last-measurement {
+  margin-top: 5px;
+  color: #d1d5db;
 }
 
 #status {
   margin-bottom: 0;
   font-size: 12px;
   color: #d1d5db;
+  overflow-wrap: anywhere;
 }

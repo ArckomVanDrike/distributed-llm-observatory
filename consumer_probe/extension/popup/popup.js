@@ -1,15 +1,77 @@
 const ext = globalThis.browser ?? globalThis.chrome;
 
+const HISTORY_KEY = "dllo_probe_history";
+const LAST_PROBE_KEY = "dllo_last_probe";
+const MAX_LOCAL_HISTORY = 2000;
+
+const ALLOWED_HOSTS = new Set([
+  "chatgpt.com",
+  "claude.ai",
+  "gemini.google.com"
+]);
+
 const startButton = document.getElementById("start-probe");
+const exportButton = document.getElementById("export-json");
 const statusElement = document.getElementById("status");
 const promptInput = document.getElementById("prompt-id");
+const sampleCount = document.getElementById("sample-count");
+const lastMeasurement = document.getElementById("last-measurement");
 
-function mountProbeOverlay(promptId) {
-  const extensionApi = globalThis.browser ?? globalThis.chrome;
+
+function hostnameFromUrl(urlString) {
+  try {
+    return new URL(urlString).hostname;
+  } catch {
+    return null;
+  }
+}
+
+
+async function refreshLocalSummary() {
+  const data = await ext.storage.local.get([
+    HISTORY_KEY,
+    LAST_PROBE_KEY
+  ]);
+
+  const history = data[HISTORY_KEY] ?? [];
+  const lastProbe = data[LAST_PROBE_KEY] ?? null;
+
+  sampleCount.textContent = String(history.length);
+
+  if (!lastProbe) {
+    lastMeasurement.textContent =
+      "No measurements yet.";
+    return;
+  }
+
+  const totalSeconds =
+    lastProbe.total_latency_ms / 1000;
+
+  const ttfo =
+    lastProbe.time_to_first_output_ms === null
+      ? "n/a"
+      : `${lastProbe.time_to_first_output_ms} ms`;
+
+  lastMeasurement.textContent =
+    `Last: ${totalSeconds.toFixed(2)} s · TTFO ${ttfo}`;
+}
+
+
+function mountProbeOverlay(
+  promptId,
+  historyKey,
+  lastProbeKey,
+  maxHistory
+) {
+  const extensionApi =
+    globalThis.browser ?? globalThis.chrome;
+
   const OVERLAY_ID = "dllo-probe-overlay";
 
   document.getElementById(OVERLAY_ID)?.remove();
-  document.getElementById("dllo-diagnostic-marker")?.remove();
+  document.getElementById(
+    "dllo-diagnostic-marker"
+  )?.remove();
 
   let startedAt = null;
   let firstOutputAt = null;
@@ -56,7 +118,8 @@ function mountProbeOverlay(promptId) {
   title.style.marginBottom = "6px";
 
   const benchmark = document.createElement("div");
-  benchmark.textContent = `Benchmark: ${promptId}`;
+  benchmark.textContent =
+    `Benchmark: ${promptId}`;
   benchmark.style.fontSize = "12px";
   benchmark.style.marginBottom = "8px";
 
@@ -65,7 +128,8 @@ function mountProbeOverlay(promptId) {
   status.style.marginBottom = "12px";
 
   function makeButton(label) {
-    const element = document.createElement("button");
+    const element =
+      document.createElement("button");
 
     element.textContent = label;
     element.style.margin = "3px";
@@ -109,95 +173,124 @@ function mountProbeOverlay(promptId) {
     firstOutputAt = Date.now();
 
     status.textContent =
-      `First output: ${firstOutputAt - startedAt} ms`;
+      `First output: ${
+        firstOutputAt - startedAt
+      } ms`;
 
     first.disabled = true;
   });
 
-  complete.addEventListener("click", async () => {
-    if (startedAt === null || completed) {
-      return;
+  complete.addEventListener(
+    "click",
+    async () => {
+      if (startedAt === null || completed) {
+        return;
+      }
+
+      completed = true;
+
+      const completedAt = Date.now();
+      const hostname =
+        window.location.hostname;
+
+      const result = {
+        schema_version: "0.1",
+        probe_id: crypto.randomUUID(),
+
+        prompt_id: promptId,
+        benchmark_version: "0.1",
+
+        platform: detectPlatform(hostname),
+        page_hostname: hostname,
+
+        started_at_ms: startedAt,
+        started_at_utc:
+          new Date(startedAt).toISOString(),
+
+        first_output_at_ms: firstOutputAt,
+        first_output_at_utc:
+          firstOutputAt === null
+            ? null
+            : new Date(
+                firstOutputAt
+              ).toISOString(),
+
+        completed_at_ms: completedAt,
+        completed_at_utc:
+          new Date(
+            completedAt
+          ).toISOString(),
+
+        time_to_first_output_ms:
+          firstOutputAt === null
+            ? null
+            : firstOutputAt - startedAt,
+
+        total_latency_ms:
+          completedAt - startedAt,
+
+        generation_failed: false,
+        interrupted: false,
+        retry_observed: false,
+
+        response_capture_enabled: false,
+        response_text: null,
+
+        measurement_mode:
+          "consumer-ui-manual-v0.1"
+      };
+
+      try {
+        const stored =
+          await extensionApi.storage.local.get(
+            historyKey
+          );
+
+        const history =
+          stored[historyKey] ?? [];
+
+        history.push(result);
+
+        const trimmedHistory =
+          history.slice(-maxHistory);
+
+        await extensionApi.storage.local.set({
+          [lastProbeKey]: result,
+          [historyKey]: trimmedHistory
+        });
+
+        status.textContent =
+          `Saved — sample #${
+            trimmedHistory.length
+          }`;
+
+        console.log(
+          "DLLO observation saved",
+          result
+        );
+
+        first.disabled = true;
+        complete.disabled = true;
+        start.disabled = true;
+
+        setTimeout(() => {
+          overlay.remove();
+        }, 1800);
+      } catch (error) {
+        completed = false;
+
+        status.textContent =
+          `Storage error: ${
+            error?.message ?? String(error)
+          }`;
+
+        console.error(
+          "DLLO storage error",
+          error
+        );
+      }
     }
-
-    completed = true;
-
-    const completedAt = Date.now();
-    const hostname = window.location.hostname;
-
-    const result = {
-      schema_version: "0.1",
-      probe_id: crypto.randomUUID(),
-
-      prompt_id: promptId,
-      benchmark_version: "0.1",
-
-      platform: detectPlatform(hostname),
-      page_hostname: hostname,
-
-      started_at_ms: startedAt,
-      started_at_utc: new Date(startedAt).toISOString(),
-
-      first_output_at_ms: firstOutputAt,
-      first_output_at_utc:
-        firstOutputAt === null
-          ? null
-          : new Date(firstOutputAt).toISOString(),
-
-      completed_at_ms: completedAt,
-      completed_at_utc:
-        new Date(completedAt).toISOString(),
-
-      time_to_first_output_ms:
-        firstOutputAt === null
-          ? null
-          : firstOutputAt - startedAt,
-
-      total_latency_ms:
-        completedAt - startedAt,
-
-      generation_failed: false,
-      interrupted: false,
-      retry_observed: false,
-
-      response_capture_enabled: false,
-      response_text: null,
-
-      measurement_mode:
-        "consumer-ui-manual-v0.1"
-    };
-
-    try {
-      await extensionApi.storage.local.set({
-        dllo_last_probe: result
-      });
-
-      status.textContent =
-        `Saved — Total: ${result.total_latency_ms} ms`;
-
-      console.log(
-        "DLLO observation saved",
-        result
-      );
-
-      first.disabled = true;
-      complete.disabled = true;
-      start.disabled = true;
-
-      setTimeout(() => {
-        overlay.remove();
-      }, 2000);
-    } catch (error) {
-      completed = false;
-
-      status.textContent =
-        `Storage error: ${error?.message ?? String(error)}`;
-
-      console.error(
-        "DLLO storage error",
-        error
-      );
-    }
-  });
+  );
 
   cancel.addEventListener("click", () => {
     completed = true;
@@ -217,46 +310,146 @@ function mountProbeOverlay(promptId) {
   document.body.appendChild(overlay);
 }
 
-startButton.addEventListener("click", async () => {
-  const promptId = promptInput.value.trim();
 
-  if (!promptId) {
-    statusElement.textContent =
-      "Benchmark ID is required.";
-    return;
-  }
+startButton.addEventListener(
+  "click",
+  async () => {
+    const promptId =
+      promptInput.value.trim();
 
-  try {
-    const tabs = await ext.tabs.query({
-      active: true,
-      currentWindow: true
-    });
-
-    const tab = tabs[0];
-
-    if (!tab?.id) {
-      throw new Error("No active tab.");
+    if (!promptId) {
+      statusElement.textContent =
+        "Benchmark ID is required.";
+      return;
     }
 
-    await ext.scripting.executeScript({
-      target: {
-        tabId: tab.id
-      },
-      func: mountProbeOverlay,
-      args: [
-        promptId
-      ]
-    });
+    try {
+      const tabs = await ext.tabs.query({
+        active: true,
+        currentWindow: true
+      });
 
-    statusElement.textContent = "Probe armed.";
+      const tab = tabs[0];
 
-    setTimeout(() => {
-      window.close();
-    }, 300);
-  } catch (error) {
-    console.error(error);
+      if (!tab?.id || !tab.url) {
+        throw new Error(
+          "No active browser tab."
+        );
+      }
 
-    statusElement.textContent =
-      `ERROR: ${error?.message ?? String(error)}`;
+      const hostname =
+        hostnameFromUrl(tab.url);
+
+      if (!ALLOWED_HOSTS.has(hostname)) {
+        throw new Error(
+          "Probe allowed only on ChatGPT, Claude or Gemini."
+        );
+      }
+
+      await ext.scripting.executeScript({
+        target: {
+          tabId: tab.id
+        },
+        func: mountProbeOverlay,
+        args: [
+          promptId,
+          HISTORY_KEY,
+          LAST_PROBE_KEY,
+          MAX_LOCAL_HISTORY
+        ]
+      });
+
+      statusElement.textContent =
+        `Probe armed on ${hostname}.`;
+
+      setTimeout(() => {
+        window.close();
+      }, 300);
+    } catch (error) {
+      console.error(error);
+
+      statusElement.textContent =
+        `ERROR: ${
+          error?.message ?? String(error)
+        }`;
+    }
   }
-});
+);
+
+
+exportButton.addEventListener(
+  "click",
+  async () => {
+    try {
+      const data =
+        await ext.storage.local.get(
+          HISTORY_KEY
+        );
+
+      const records =
+        data[HISTORY_KEY] ?? [];
+
+      if (records.length === 0) {
+        statusElement.textContent =
+          "No samples to export.";
+        return;
+      }
+
+      const payload = {
+        export_schema_version: "0.1",
+        exported_at_utc:
+          new Date().toISOString(),
+        sample_count: records.length,
+        records
+      };
+
+      const blob = new Blob(
+        [
+          JSON.stringify(
+            payload,
+            null,
+            2
+          )
+        ],
+        {
+          type: "application/json"
+        }
+      );
+
+      const url =
+        URL.createObjectURL(blob);
+
+      const anchor =
+        document.createElement("a");
+
+      const stamp =
+        new Date()
+          .toISOString()
+          .replaceAll(":", "-")
+          .replaceAll(".", "-");
+
+      anchor.href = url;
+      anchor.download =
+        `dllo-consumer-probes-${stamp}.json`;
+
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      URL.revokeObjectURL(url);
+
+      statusElement.textContent =
+        `Exported ${records.length} samples.`;
+    } catch (error) {
+      console.error(error);
+
+      statusElement.textContent =
+        `Export error: ${
+          error?.message ?? String(error)
+        }`;
+    }
+  }
+);
+
+
+void refreshLocalSummary();

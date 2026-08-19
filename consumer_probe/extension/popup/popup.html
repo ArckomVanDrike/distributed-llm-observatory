@@ -15,6 +15,7 @@
     <h1>LLM Observatory</h1>
 
     <label for="prompt-id">Benchmark</label>
+
     <input
       id="prompt-id"
       type="text"
@@ -25,8 +26,26 @@
       Start Consumer Probe
     </button>
 
+    <section id="local-data">
+      <div>
+        Local samples:
+        <strong id="sample-count">0</strong>
+      </div>
+
+      <div id="last-measurement">
+        No measurements yet.
+      </div>
+    </section>
+
+    <button
+      id="export-json"
+      type="button"
+    >
+      Export JSON
+    </button>
+
     <p id="status">
-      No active probe.
+      Ready.
     </p>
   </main>
 
