@@ -181,3 +181,123 @@ def summarize(
             else 0.0
         ),
     )
+
+
+@dataclass(frozen=True)
+class ScheduleAdherenceSummary:
+    sample_count: int
+    scheduled_samples: int
+    unscheduled_samples: int
+
+    early_samples: int
+    late_samples: int
+    exact_samples: int
+
+    median_offset_ms: float | None
+    p95_offset_ms: float | None
+
+    median_absolute_offset_ms: float | None
+    p95_absolute_offset_ms: float | None
+
+    tolerance_ms: float
+    within_tolerance_samples: int
+    within_tolerance_rate: float | None
+
+
+def summarize_schedule_adherence(
+    records: list[ConsumerProbeRecord],
+    *,
+    tolerance_ms: float = 300_000,
+) -> ScheduleAdherenceSummary:
+    """
+    Summarize how closely scheduled Consumer Probes followed their slots.
+
+    schedule_offset_ms is signed:
+
+    - negative: probe started before its scheduled slot
+    - zero: probe started exactly on schedule
+    - positive: probe started after its scheduled slot
+
+    Legacy/manual records without schedule provenance are kept in the
+    sample count but excluded from offset statistics.
+    """
+    if tolerance_ms < 0:
+        raise ValueError(
+            "tolerance_ms cannot be negative."
+        )
+
+    offsets = [
+        float(record.schedule_offset_ms)
+        for record in records
+        if record.schedule_offset_ms is not None
+    ]
+
+    absolute_offsets = [
+        abs(offset)
+        for offset in offsets
+    ]
+
+    early_samples = sum(
+        offset < 0
+        for offset in offsets
+    )
+
+    late_samples = sum(
+        offset > 0
+        for offset in offsets
+    )
+
+    exact_samples = sum(
+        offset == 0
+        for offset in offsets
+    )
+
+    within_tolerance_samples = sum(
+        absolute_offset <= tolerance_ms
+        for absolute_offset in absolute_offsets
+    )
+
+    scheduled_samples = len(offsets)
+
+    return ScheduleAdherenceSummary(
+        sample_count=len(records),
+        scheduled_samples=scheduled_samples,
+        unscheduled_samples=(
+            len(records) - scheduled_samples
+        ),
+
+        early_samples=early_samples,
+        late_samples=late_samples,
+        exact_samples=exact_samples,
+
+        median_offset_ms=(
+            median(offsets)
+            if offsets
+            else None
+        ),
+        p95_offset_ms=percentile(
+            offsets,
+            95,
+        ),
+
+        median_absolute_offset_ms=(
+            median(absolute_offsets)
+            if absolute_offsets
+            else None
+        ),
+        p95_absolute_offset_ms=percentile(
+            absolute_offsets,
+            95,
+        ),
+
+        tolerance_ms=tolerance_ms,
+        within_tolerance_samples=(
+            within_tolerance_samples
+        ),
+        within_tolerance_rate=(
+            within_tolerance_samples
+            / scheduled_samples
+            if scheduled_samples
+            else None
+        ),
+    )
