@@ -1,0 +1,16 @@
+{
+  "prompt_id": "coding-001",
+  "benchmark_version": "0.1",
+  "category": "coding",
+  "difficulty": "medium",
+  "prompt": "Write a Python function named deduplicate_preserve_order(values) that returns a new list with duplicate elements removed while preserving the order of first occurrence. Do not modify the input list. Include the function implementation and a brief explanation of its time complexity.",
+  "expected_characteristics": [
+    "Defines a function named deduplicate_preserve_order.",
+    "Removes duplicate elements.",
+    "Preserves the order of first occurrence.",
+    "Does not modify the input list.",
+    "Provides a reasonable time-complexity explanation."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}

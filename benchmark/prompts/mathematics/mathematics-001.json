@@ -1,0 +1,15 @@
+{
+  "prompt_id": "mathematics-001",
+  "benchmark_version": "0.1",
+  "category": "mathematics",
+  "difficulty": "medium",
+  "prompt": "Solve for x: 3(x - 4) + 2 = 2x + 7. Show the algebraic steps and give the final value of x.",
+  "expected_characteristics": [
+    "Expands the left-hand side correctly.",
+    "Rearranges the equation correctly.",
+    "Shows understandable intermediate algebraic steps.",
+    "Concludes that x = 17."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}

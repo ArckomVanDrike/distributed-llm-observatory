@@ -1,0 +1,15 @@
+{
+  "prompt_id": "knowledge-001",
+  "benchmark_version": "0.1",
+  "category": "knowledge",
+  "difficulty": "easy",
+  "prompt": "Explain the difference between RAM and persistent storage in a computer. Your answer should mention volatility, typical purpose, and what normally happens to stored information when power is removed.",
+  "expected_characteristics": [
+    "Explains that RAM is normally volatile working memory.",
+    "Explains that persistent storage retains information without power.",
+    "Distinguishes their typical roles in a computer.",
+    "Avoids claiming that RAM and persistent storage are interchangeable."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}

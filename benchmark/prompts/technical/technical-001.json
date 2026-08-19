@@ -1,0 +1,16 @@
+{
+  "prompt_id": "technical-001",
+  "benchmark_version": "0.1",
+  "category": "technical",
+  "difficulty": "medium",
+  "prompt": "A web client can resolve a server's DNS name and successfully establish a TCP connection to port 443, but the TLS handshake fails immediately because the server certificate is expired. Explain which networking stages have already succeeded, which stage is failing, and why replacing DNS records would not normally fix this specific problem.",
+  "expected_characteristics": [
+    "Recognizes that DNS resolution has succeeded.",
+    "Recognizes that TCP connection establishment has succeeded.",
+    "Identifies the TLS handshake or certificate validation stage as the failure point.",
+    "Explains that an expired certificate is not normally corrected by changing DNS records.",
+    "Keeps DNS, TCP, and TLS responsibilities conceptually distinct."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}

@@ -1,0 +1,17 @@
+{
+  "prompt_id": "writing-001",
+  "benchmark_version": "0.1",
+  "category": "writing",
+  "difficulty": "medium",
+  "prompt": "Write a professional email of no more than 120 words informing a project team that a software release has been postponed by two days because final regression testing is not complete. The tone should be calm and factual, state the new release timing, and avoid blaming any person or team.",
+  "expected_characteristics": [
+    "Uses a professional email style.",
+    "States that the release is postponed by two days.",
+    "Explains that final regression testing is incomplete.",
+    "Uses a calm and factual tone.",
+    "Does not blame an individual or team.",
+    "Stays within 120 words."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}

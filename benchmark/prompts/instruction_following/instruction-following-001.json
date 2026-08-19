@@ -1,0 +1,16 @@
+{
+  "prompt_id": "instruction-following-001",
+  "benchmark_version": "0.1",
+  "category": "instruction_following",
+  "difficulty": "medium",
+  "prompt": "Respond with exactly three lines. Line 1 must contain only the word ALPHA. Line 2 must contain only the integer 42. Line 3 must contain only the lowercase word omega. Do not add punctuation, markdown, explanations, or blank lines.",
+  "expected_characteristics": [
+    "Produces exactly three non-empty lines.",
+    "The first line is exactly ALPHA.",
+    "The second line is exactly 42.",
+    "The third line is exactly omega.",
+    "Adds no extra text, formatting, punctuation, or blank lines."
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}
