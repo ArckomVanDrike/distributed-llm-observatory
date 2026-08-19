@@ -13,6 +13,7 @@ from consumer_probe.storage.sqlite import (
 )
 from observer.cli import (
     build_parser,
+    consumer_bridge,
     consumer_detect,
     consumer_next,
     consumer_schedule,
@@ -632,3 +633,95 @@ def test_consumer_next_json_contract(
 
     assert "=== DLLO" not in output
     assert "Status:" not in output
+
+
+def test_parser_exposes_consumer_bridge():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-bridge",
+            "--platform",
+            "chatgpt",
+            "--observer-id",
+            "observer-test",
+        ]
+    )
+
+    assert args.command == "consumer-bridge"
+    assert args.platform == "chatgpt"
+    assert args.observer_id == "observer-test"
+    assert args.host == "127.0.0.1"
+    assert args.port == 8765
+
+
+def test_consumer_bridge_invokes_server(
+    tmp_path: Path,
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_serve(
+        config,
+        *,
+        host,
+        port,
+    ):
+        captured["config"] = config
+        captured["host"] = host
+        captured["port"] = port
+
+    monkeypatch.setattr(
+        "observer.cli.serve",
+        fake_serve,
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-bridge",
+            "--platform",
+            "chatgpt",
+            "--observer-id",
+            "observer-test",
+            "--benchmark-version",
+            "0.1",
+            "--prompt-bank",
+            str(tmp_path / "prompts"),
+            "--storage",
+            str(tmp_path / "consumer.db"),
+            "--bucket-hours",
+            "4",
+            "--samples-per-bucket",
+            "2",
+            "--edge-guard-minutes",
+            "10",
+            "--grace-minutes",
+            "45",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9876",
+        ]
+    )
+
+    result = consumer_bridge(args)
+
+    assert result == 0
+
+    config = captured["config"]
+
+    assert config.observer_id == "observer-test"
+    assert config.platform == ConsumerPlatform.CHATGPT
+    assert config.benchmark_version == "0.1"
+    assert config.prompt_bank_path == tmp_path / "prompts"
+    assert config.storage_path == tmp_path / "consumer.db"
+
+    assert config.bucket_hours == 4
+    assert config.samples_per_bucket == 2
+    assert config.edge_guard_minutes == 10
+    assert config.grace_minutes == 45
+
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 9876

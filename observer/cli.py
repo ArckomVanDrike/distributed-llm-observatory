@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from consumer_probe.analytics import summarize
+from consumer_probe.bridge import BridgeConfig, serve
 from consumer_probe.comparison import ComparisonPolicy
 from consumer_probe.detection import detect_utc_bucket
 from consumer_probe.due import (
@@ -381,6 +382,94 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Emit machine-readable JSON output",
+    )
+
+    # -----------------------------------------------------
+    # Consumer Probe localhost bridge
+    # -----------------------------------------------------
+
+    bridge_parser = subparsers.add_parser(
+        "consumer-bridge",
+        help="Run the localhost Consumer Probe HTTP bridge",
+    )
+
+    bridge_parser.add_argument(
+        "--platform",
+        required=True,
+        choices=[
+            platform.value
+            for platform in ConsumerPlatform
+        ],
+        help="Consumer platform",
+    )
+
+    bridge_parser.add_argument(
+        "--observer-id",
+        help=(
+            "Observer identifier. Defaults to "
+            "OBSERVATORY_ID when omitted."
+        ),
+    )
+
+    bridge_parser.add_argument(
+        "--benchmark-version",
+        default="0.1",
+        help="Benchmark version",
+    )
+
+    bridge_parser.add_argument(
+        "--prompt-bank",
+        type=Path,
+        default=Path("benchmark/prompts"),
+        help="Benchmark prompt bank directory",
+    )
+
+    bridge_parser.add_argument(
+        "--storage",
+        type=Path,
+        default=DEFAULT_CONSUMER_STORAGE,
+        help="Consumer Probe SQLite database",
+    )
+
+    bridge_parser.add_argument(
+        "--bucket-hours",
+        type=int,
+        default=4,
+        help="UTC sampling bucket size",
+    )
+
+    bridge_parser.add_argument(
+        "--samples-per-bucket",
+        type=int,
+        default=1,
+        help="Sampling slots per UTC bucket",
+    )
+
+    bridge_parser.add_argument(
+        "--edge-guard-minutes",
+        type=int,
+        default=15,
+        help="Minutes excluded from each bucket edge",
+    )
+
+    bridge_parser.add_argument(
+        "--grace-minutes",
+        type=int,
+        default=60,
+        help="Minutes after scheduled time that a probe remains due",
+    )
+
+    bridge_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bridge bind host; localhost only",
+    )
+
+    bridge_parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Bridge TCP port",
     )
 
     return parser
@@ -1128,6 +1217,50 @@ def consumer_next(
         return 2
 
 
+def consumer_bridge(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        observer_id = args.observer_id
+
+        if not observer_id:
+            config = ObserverConfig.from_environment()
+            observer_id = config.observer_id
+
+        bridge_config = BridgeConfig(
+            observer_id=observer_id,
+            platform=ConsumerPlatform(
+                args.platform
+            ),
+            benchmark_version=args.benchmark_version,
+            prompt_bank_path=args.prompt_bank,
+            storage_path=args.storage,
+            bucket_hours=args.bucket_hours,
+            samples_per_bucket=args.samples_per_bucket,
+            edge_guard_minutes=args.edge_guard_minutes,
+            grace_minutes=args.grace_minutes,
+        )
+
+        serve(
+            bridge_config,
+            host=args.host,
+            port=args.port,
+        )
+
+        return 0
+
+    except (
+        ObserverConfigError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1149,6 +1282,9 @@ def main() -> int:
 
     if args.command == "consumer-next":
         return consumer_next(args)
+
+    if args.command == "consumer-bridge":
+        return consumer_bridge(args)
 
     parser.print_help()
     return 1
