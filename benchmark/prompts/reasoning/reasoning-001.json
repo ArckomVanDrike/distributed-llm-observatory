@@ -1,0 +1,14 @@
+{
+  "prompt_id": "reasoning-001",
+  "benchmark_version": "0.1",
+  "category": "reasoning",
+  "difficulty": "easy",
+  "prompt": "A farmer has 17 sheep. All but 9 run away. How many sheep remain?",
+  "expected_characteristics": [
+    "Correctly interprets the phrase 'all but 9'",
+    "Returns 9 as the answer",
+    "Avoids unnecessary reasoning"
+  ],
+  "scoring_method": "observatory_rubric_v0.1",
+  "enabled": true
+}
