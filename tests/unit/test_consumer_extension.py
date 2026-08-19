@@ -34,3 +34,9 @@ def test_extension_uses_service_worker():
     assert manifest["background"]["service_worker"] == (
         "background/service_worker.js"
     )
+
+
+def test_extension_action_uses_popup():
+    manifest = load_manifest()
+
+    assert manifest["action"]["default_popup"] == "popup/popup.html"

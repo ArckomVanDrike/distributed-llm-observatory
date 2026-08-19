@@ -13,6 +13,15 @@
     "default_popup": "popup/popup.html"
   },
   "background": {
+    "scripts": [
+      "background/background.js"
+    ],
     "service_worker": "background/service_worker.js"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "consumer-probe@distributed-llm-observatory",
+      "strict_min_version": "109.0"
+    }
   }
 }
