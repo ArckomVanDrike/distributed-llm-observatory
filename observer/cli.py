@@ -8,6 +8,10 @@ from pathlib import Path
 from consumer_probe.analytics import summarize
 from consumer_probe.comparison import ComparisonPolicy
 from consumer_probe.detection import detect_utc_bucket
+from consumer_probe.due import (
+    find_due_probe,
+    find_next_probe,
+)
 from consumer_probe.importer import (
     ConsumerProbeImportError,
     import_export,
@@ -277,6 +281,99 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=15,
         help="Minutes excluded from each bucket edge",
+    )
+
+    # -----------------------------------------------------
+    # Consumer Probe due / next selector
+    # -----------------------------------------------------
+
+    next_parser = subparsers.add_parser(
+        "consumer-next",
+        help="Show the due or next Consumer Probe benchmark",
+    )
+
+    next_parser.add_argument(
+        "--platform",
+        required=True,
+        choices=[
+            platform.value
+            for platform in ConsumerPlatform
+        ],
+        help="Consumer platform",
+    )
+
+    next_parser.add_argument(
+        "--observer-id",
+        help=(
+            "Observer identifier. Defaults to "
+            "OBSERVATORY_ID when omitted."
+        ),
+    )
+
+    next_parser.add_argument(
+        "--date",
+        dest="sampling_date",
+        help=(
+            "Schedule date in YYYY-MM-DD format. "
+            "Defaults to the UTC date of --now."
+        ),
+    )
+
+    next_parser.add_argument(
+        "--now",
+        dest="now_utc",
+        help=(
+            "Current UTC time override in ISO 8601 format. "
+            "Defaults to the real current UTC time."
+        ),
+    )
+
+    next_parser.add_argument(
+        "--benchmark-version",
+        default="0.1",
+        help="Benchmark version",
+    )
+
+    next_parser.add_argument(
+        "--prompt-bank",
+        type=Path,
+        default=Path("benchmark/prompts"),
+        help="Benchmark prompt bank directory",
+    )
+
+    next_parser.add_argument(
+        "--storage",
+        type=Path,
+        default=DEFAULT_CONSUMER_STORAGE,
+        help="Consumer Probe SQLite database",
+    )
+
+    next_parser.add_argument(
+        "--bucket-hours",
+        type=int,
+        default=4,
+        help="UTC sampling bucket size",
+    )
+
+    next_parser.add_argument(
+        "--samples-per-bucket",
+        type=int,
+        default=1,
+        help="Sampling slots per UTC bucket",
+    )
+
+    next_parser.add_argument(
+        "--edge-guard-minutes",
+        type=int,
+        default=15,
+        help="Minutes excluded from each bucket edge",
+    )
+
+    next_parser.add_argument(
+        "--grace-minutes",
+        type=int,
+        default=60,
+        help="Minutes after scheduled time that a probe remains due",
     )
 
     return parser
@@ -722,6 +819,233 @@ def consumer_schedule(
         return 2
 
 
+def parse_now_utc(
+    raw_value: str | None,
+) -> datetime:
+    if raw_value is None:
+        return datetime.now(timezone.utc)
+
+    normalized = raw_value.strip()
+
+    if normalized.endswith("Z"):
+        normalized = (
+            normalized[:-1]
+            + "+00:00"
+        )
+
+    try:
+        value = datetime.fromisoformat(
+            normalized
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "now must be a valid ISO 8601 datetime."
+        ) from exc
+
+    if value.tzinfo is None:
+        raise ValueError(
+            "now must include a UTC timezone."
+        )
+
+    if value.utcoffset() != timedelta(0):
+        raise ValueError(
+            "now must be expressed in UTC."
+        )
+
+    return value.astimezone(timezone.utc)
+
+
+def completed_prompt_ids_for_day(
+    records,
+    *,
+    observer_id: str,
+    platform: ConsumerPlatform,
+    benchmark_version: str,
+    sampling_date: date,
+) -> set[str]:
+    completed: set[str] = set()
+
+    for record in records:
+        if record.observer_id != observer_id:
+            continue
+
+        if record.platform != platform:
+            continue
+
+        if record.benchmark_version != benchmark_version:
+            continue
+
+        record_date = (
+            record.started_at_utc
+            .astimezone(timezone.utc)
+            .date()
+        )
+
+        if record_date != sampling_date:
+            continue
+
+        if record.generation_failed:
+            continue
+
+        if record.interrupted:
+            continue
+
+        if record.completed_at_utc is None:
+            continue
+
+        completed.add(record.prompt_id)
+
+    return completed
+
+
+def consumer_next(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        now = parse_now_utc(
+            args.now_utc
+        )
+
+        if args.sampling_date is None:
+            sampling_date = now.date()
+        else:
+            sampling_date = parse_sampling_date(
+                args.sampling_date
+            )
+
+        observer_id = args.observer_id
+
+        if not observer_id:
+            config = ObserverConfig.from_environment()
+            observer_id = config.observer_id
+
+        platform = ConsumerPlatform(
+            args.platform
+        )
+
+        policy = SamplingPolicy(
+            bucket_hours=args.bucket_hours,
+            samples_per_bucket=args.samples_per_bucket,
+            edge_guard_minutes=args.edge_guard_minutes,
+        )
+
+        schedule = build_prompt_bank_schedule(
+            sampling_date,
+            observer_id=observer_id,
+            benchmark_version=args.benchmark_version,
+            prompt_bank_path=args.prompt_bank,
+            sampling_policy=policy,
+        )
+
+        store = ConsumerProbeSQLiteStore(
+            args.storage
+        )
+
+        completed = completed_prompt_ids_for_day(
+            store.load_all(),
+            observer_id=observer_id,
+            platform=platform,
+            benchmark_version=args.benchmark_version,
+            sampling_date=sampling_date,
+        )
+
+        due = find_due_probe(
+            schedule,
+            now_utc=now,
+            completed_prompt_ids=completed,
+            grace_minutes=args.grace_minutes,
+        )
+
+        print("=== DLLO CONSUMER NEXT ===")
+        print(f"Now UTC:           {now.isoformat()}")
+        print(f"Schedule date:     {sampling_date}")
+        print(f"Observer:          {observer_id}")
+        print(f"Platform:          {platform.value}")
+        print(f"Completed today:   {len(completed)}")
+
+        if due is not None:
+            item = due.item
+
+            print("Status:            due")
+            print(
+                f"Scheduled:         "
+                f"{item.scheduled_at_utc.isoformat()}"
+            )
+            print(
+                f"Overdue by:        "
+                f"{due.overdue_by.total_seconds() / 60:.1f} min"
+            )
+            print(
+                f"Prompt ID:         "
+                f"{item.benchmark.prompt_id}"
+            )
+            print(
+                f"Category:          "
+                f"{item.benchmark.category.value}"
+            )
+            print()
+            print("Benchmark prompt:")
+            print(item.benchmark.prompt)
+
+            return 0
+
+        upcoming = find_next_probe(
+            schedule,
+            now_utc=now,
+            completed_prompt_ids=completed,
+        )
+
+        if upcoming is not None:
+            starts_in = (
+                upcoming.scheduled_at_utc
+                - now
+            )
+
+            print("Status:            upcoming")
+            print(
+                f"Scheduled:         "
+                f"{upcoming.scheduled_at_utc.isoformat()}"
+            )
+            print(
+                f"Starts in:         "
+                f"{starts_in.total_seconds() / 60:.1f} min"
+            )
+            print(
+                f"Prompt ID:         "
+                f"{upcoming.benchmark.prompt_id}"
+            )
+            print(
+                f"Category:          "
+                f"{upcoming.benchmark.category.value}"
+            )
+            print()
+            print("Benchmark prompt:")
+            print(upcoming.benchmark.prompt)
+
+            return 0
+
+        print("Status:            none")
+        print(
+            "No actionable or upcoming probe "
+            "remains in this schedule."
+        )
+
+        return 0
+
+    except (
+        ConsumerProbeStoreError,
+        ConsumerScheduleError,
+        ObserverConfigError,
+        PromptBankError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -740,6 +1064,9 @@ def main() -> int:
 
     if args.command == "consumer-schedule":
         return consumer_schedule(args)
+
+    if args.command == "consumer-next":
+        return consumer_next(args)
 
     parser.print_help()
     return 1

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -13,9 +13,11 @@ from consumer_probe.storage.sqlite import (
 from observer.cli import (
     build_parser,
     consumer_detect,
+    consumer_next,
     consumer_schedule,
     consumer_summary,
     parse_candidate_start,
+    parse_now_utc,
     parse_sampling_date,
 )
 
@@ -349,3 +351,229 @@ def test_consumer_schedule_uses_prompt_bank(
     assert "Scheduled items:   1" in output
     assert "reasoning-001" in output
     assert "[reasoning]" in output
+
+
+def write_single_prompt_bank(
+    root: Path,
+) -> None:
+    prompt_path = (
+        root
+        / "reasoning"
+        / "reasoning-001.json"
+    )
+
+    prompt_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    prompt_path.write_text(
+        """
+        {
+          "prompt_id": "reasoning-001",
+          "benchmark_version": "0.1",
+          "category": "reasoning",
+          "difficulty": "medium",
+          "prompt": "Return the number nine.",
+          "expected_characteristics": [
+            "Returns 9."
+          ],
+          "scoring_method": "observatory_rubric_v0.1",
+          "enabled": true
+        }
+        """,
+        encoding="utf-8",
+    )
+
+
+def build_next_args(
+    tmp_path: Path,
+    *,
+    now: str,
+):
+    prompt_bank = tmp_path / "prompts"
+    write_single_prompt_bank(prompt_bank)
+
+    parser = build_parser()
+
+    return parser.parse_args(
+        [
+            "consumer-next",
+            "--platform",
+            "chatgpt",
+            "--observer-id",
+            "observer-test",
+            "--date",
+            "2026-08-19",
+            "--now",
+            now,
+            "--prompt-bank",
+            str(prompt_bank),
+            "--storage",
+            str(tmp_path / "consumer.db"),
+        ]
+    )
+
+
+def test_parse_now_utc_accepts_z():
+    value = parse_now_utc(
+        "2026-08-19T10:00:00Z"
+    )
+
+    assert value == datetime(
+        2026,
+        8,
+        19,
+        10,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+
+def test_parse_now_utc_rejects_naive_datetime():
+    with pytest.raises(
+        ValueError,
+        match="include a UTC timezone",
+    ):
+        parse_now_utc(
+            "2026-08-19T10:00:00"
+        )
+
+
+def test_consumer_next_reports_due(
+    tmp_path: Path,
+    capsys,
+):
+    from observer.core.consumer_schedule import (
+        build_prompt_bank_schedule,
+    )
+
+    prompt_bank = tmp_path / "prompts"
+    write_single_prompt_bank(prompt_bank)
+
+    schedule = build_prompt_bank_schedule(
+        date(2026, 8, 19),
+        observer_id="observer-test",
+        benchmark_version="0.1",
+        prompt_bank_path=prompt_bank,
+    )
+
+    scheduled = schedule.items[0].scheduled_at_utc
+
+    args = build_next_args(
+        tmp_path,
+        now=scheduled.isoformat(),
+    )
+
+    result = consumer_next(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Status:            due" in output
+    assert "reasoning-001" in output
+    assert "Return the number nine." in output
+
+
+def test_consumer_next_reports_upcoming(
+    tmp_path: Path,
+    capsys,
+):
+    from observer.core.consumer_schedule import (
+        build_prompt_bank_schedule,
+    )
+
+    prompt_bank = tmp_path / "prompts"
+    write_single_prompt_bank(prompt_bank)
+
+    schedule = build_prompt_bank_schedule(
+        date(2026, 8, 19),
+        observer_id="observer-test",
+        benchmark_version="0.1",
+        prompt_bank_path=prompt_bank,
+    )
+
+    scheduled = schedule.items[0].scheduled_at_utc
+
+    now = (
+        scheduled
+        - timedelta(minutes=30)
+    )
+
+    args = build_next_args(
+        tmp_path,
+        now=now.isoformat(),
+    )
+
+    result = consumer_next(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Status:            upcoming" in output
+    assert "reasoning-001" in output
+
+
+def test_consumer_next_skips_completed_probe(
+    tmp_path: Path,
+    capsys,
+):
+    from observer.core.consumer_schedule import (
+        build_prompt_bank_schedule,
+    )
+
+    prompt_bank = tmp_path / "prompts"
+    write_single_prompt_bank(prompt_bank)
+
+    schedule = build_prompt_bank_schedule(
+        date(2026, 8, 19),
+        observer_id="observer-test",
+        benchmark_version="0.1",
+        prompt_bank_path=prompt_bank,
+    )
+
+    scheduled = schedule.items[0].scheduled_at_utc
+    storage = tmp_path / "consumer.db"
+
+    store = ConsumerProbeSQLiteStore(storage)
+
+    completed = ConsumerProbeRecord(
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+        platform=ConsumerPlatform.CHATGPT,
+        page_hostname="chatgpt.com",
+        benchmark_version="0.1",
+        prompt_id="reasoning-001",
+        started_at_utc=scheduled,
+        first_output_at_utc=scheduled,
+        completed_at_utc=scheduled,
+        time_to_first_output_ms=1000,
+        total_latency_ms=3000,
+    )
+
+    store.append(completed)
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-next",
+            "--platform",
+            "chatgpt",
+            "--observer-id",
+            "observer-test",
+            "--date",
+            "2026-08-19",
+            "--now",
+            scheduled.isoformat(),
+            "--prompt-bank",
+            str(prompt_bank),
+            "--storage",
+            str(storage),
+        ]
+    )
+
+    result = consumer_next(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Completed today:   1" in output
+    assert "Status:            none" in output
