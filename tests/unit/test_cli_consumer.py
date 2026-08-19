@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -577,3 +578,57 @@ def test_consumer_next_skips_completed_probe(
     assert result == 0
     assert "Completed today:   1" in output
     assert "Status:            none" in output
+
+
+def test_consumer_next_json_contract(
+    tmp_path: Path,
+    capsys,
+):
+    from observer.core.consumer_schedule import (
+        build_prompt_bank_schedule,
+    )
+
+    prompt_bank = tmp_path / "prompts"
+    write_single_prompt_bank(prompt_bank)
+
+    schedule = build_prompt_bank_schedule(
+        date(2026, 8, 19),
+        observer_id="observer-test",
+        benchmark_version="0.1",
+        prompt_bank_path=prompt_bank,
+    )
+
+    scheduled = schedule.items[0].scheduled_at_utc
+
+    args = build_next_args(
+        tmp_path,
+        now=scheduled.isoformat(),
+    )
+
+    args.json = True
+
+    result = consumer_next(args)
+
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert result == 0
+
+    assert payload["schema_version"] == "0.1"
+    assert payload["status"] == "due"
+    assert payload["observer_id"] == "observer-test"
+    assert payload["platform"] == "chatgpt"
+    assert payload["benchmark_version"] == "0.1"
+
+    assert payload["completed_today"] == 0
+
+    item = payload["item"]
+
+    assert item is not None
+    assert item["prompt_id"] == "reasoning-001"
+    assert item["category"] == "reasoning"
+    assert item["prompt"] == "Return the number nine."
+    assert item["overdue_by_ms"] == 0
+
+    assert "=== DLLO" not in output
+    assert "Status:" not in output

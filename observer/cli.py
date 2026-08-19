@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -374,6 +375,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=60,
         help="Minutes after scheduled time that a probe remains due",
+    )
+
+    next_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON output",
     )
 
     return parser
@@ -956,6 +963,89 @@ def consumer_next(
             grace_minutes=args.grace_minutes,
         )
 
+        upcoming = None
+
+        if due is None:
+            upcoming = find_next_probe(
+                schedule,
+                now_utc=now,
+                completed_prompt_ids=completed,
+            )
+
+        if due is not None:
+            status = "due"
+            item = due.item
+
+            item_payload = {
+                "scheduled_at_utc": (
+                    item.scheduled_at_utc.isoformat()
+                ),
+                "prompt_id": item.benchmark.prompt_id,
+                "category": (
+                    item.benchmark.category.value
+                ),
+                "prompt": item.benchmark.prompt,
+                "overdue_by_ms": round(
+                    due.overdue_by.total_seconds()
+                    * 1000
+                ),
+            }
+
+        elif upcoming is not None:
+            status = "upcoming"
+            item = upcoming
+
+            starts_in = (
+                item.scheduled_at_utc
+                - now
+            )
+
+            item_payload = {
+                "scheduled_at_utc": (
+                    item.scheduled_at_utc.isoformat()
+                ),
+                "prompt_id": item.benchmark.prompt_id,
+                "category": (
+                    item.benchmark.category.value
+                ),
+                "prompt": item.benchmark.prompt,
+                "starts_in_ms": round(
+                    starts_in.total_seconds()
+                    * 1000
+                ),
+            }
+
+        else:
+            status = "none"
+            item_payload = None
+
+        if args.json:
+            payload = {
+                "schema_version": "0.1",
+                "status": status,
+                "now_utc": now.isoformat(),
+                "schedule_date": (
+                    sampling_date.isoformat()
+                ),
+                "observer_id": observer_id,
+                "platform": platform.value,
+                "benchmark_version": (
+                    args.benchmark_version
+                ),
+                "completed_today": len(completed),
+                "item": item_payload,
+            }
+
+            print(
+                json.dumps(
+                    payload,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+
+            return 0
+
         print("=== DLLO CONSUMER NEXT ===")
         print(f"Now UTC:           {now.isoformat()}")
         print(f"Schedule date:     {sampling_date}")
@@ -964,12 +1054,10 @@ def consumer_next(
         print(f"Completed today:   {len(completed)}")
 
         if due is not None:
-            item = due.item
-
             print("Status:            due")
             print(
                 f"Scheduled:         "
-                f"{item.scheduled_at_utc.isoformat()}"
+                f"{due.item.scheduled_at_utc.isoformat()}"
             )
             print(
                 f"Overdue by:        "
@@ -977,23 +1065,17 @@ def consumer_next(
             )
             print(
                 f"Prompt ID:         "
-                f"{item.benchmark.prompt_id}"
+                f"{due.item.benchmark.prompt_id}"
             )
             print(
                 f"Category:          "
-                f"{item.benchmark.category.value}"
+                f"{due.item.benchmark.category.value}"
             )
             print()
             print("Benchmark prompt:")
-            print(item.benchmark.prompt)
+            print(due.item.benchmark.prompt)
 
             return 0
-
-        upcoming = find_next_probe(
-            schedule,
-            now_utc=now,
-            completed_prompt_ids=completed,
-        )
 
         if upcoming is not None:
             starts_in = (
