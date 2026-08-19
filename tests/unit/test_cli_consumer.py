@@ -172,3 +172,81 @@ def test_consumer_detect_reports_insufficient_data(
     assert "Candidate samples: 1" in output
     assert "Baseline samples:  0" in output
     assert "insufficient_data" in output
+
+
+def test_consumer_import_is_idempotent(
+    tmp_path: Path,
+    capsys,
+):
+    export_path = tmp_path / "export.json"
+    storage_path = tmp_path / "consumer.db"
+
+    export_path.write_text(
+        """
+        {
+          "export_schema_version": "0.1",
+          "exported_at_utc": "2026-08-19T21:17:38.814Z",
+          "sample_count": 1,
+          "records": [
+            {
+              "schema_version": "0.1",
+              "probe_id": "bd8813fb-26bc-42ea-b04c-c4a9d0a5367e",
+              "prompt_id": "reasoning-001",
+              "benchmark_version": "0.1",
+              "platform": "chatgpt",
+              "page_hostname": "chatgpt.com",
+              "started_at_ms": 1755638224881,
+              "started_at_utc": "2026-08-19T21:17:04.881Z",
+              "first_output_at_ms": 1755638227769,
+              "first_output_at_utc": "2026-08-19T21:17:07.769Z",
+              "completed_at_ms": 1755638229123,
+              "completed_at_utc": "2026-08-19T21:17:09.123Z",
+              "time_to_first_output_ms": 2888,
+              "total_latency_ms": 4242,
+              "generation_failed": false,
+              "interrupted": false,
+              "retry_observed": false,
+              "response_capture_enabled": false,
+              "response_text": null,
+              "measurement_mode": "consumer-ui-manual-v0.1"
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "consumer-import",
+            str(export_path),
+            "--storage",
+            str(storage_path),
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--observer-timezone",
+            "America/Santiago",
+        ]
+    )
+
+    from observer.cli import consumer_import
+
+    first_result = consumer_import(args)
+    first_output = capsys.readouterr().out
+
+    second_result = consumer_import(args)
+    second_output = capsys.readouterr().out
+
+    assert first_result == 0
+    assert "Inserted:   1" in first_output
+    assert "Duplicates: 0" in first_output
+    assert "DB total:   1" in first_output
+
+    assert second_result == 0
+    assert "Inserted:   0" in second_output
+    assert "Duplicates: 1" in second_output
+    assert "DB total:   1" in second_output
