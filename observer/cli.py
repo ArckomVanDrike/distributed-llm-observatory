@@ -8,6 +8,7 @@ from pathlib import Path
 
 from consumer_probe.analytics import (
     summarize,
+    summarize_first_output_by_mode,
     summarize_schedule_adherence,
 )
 from consumer_probe.bridge import BridgeConfig, serve
@@ -692,6 +693,11 @@ def consumer_summary(
 
         records = store.load_all()
         stats = summarize(records)
+        first_output_by_mode = (
+            summarize_first_output_by_mode(
+                records
+            )
+        )
         adherence = summarize_schedule_adherence(
             records
         )
@@ -715,14 +721,47 @@ def consumer_summary(
             f"Successful:       "
             f"{stats.successful_samples}"
         )
-        print(
-            f"Median human-observed first output: "
-            f"{format_ms(stats.median_ttfo_ms)}"
-        )
-        print(
-            f"P95 human-observed first output:    "
-            f"{format_ms(stats.p95_ttfo_ms)}"
-        )
+        print()
+        print("=== FIRST OUTPUT BY MEASUREMENT MODE ===")
+
+        if not first_output_by_mode:
+            print("No first-output measurements.")
+        else:
+            for measurement_mode in sorted(
+                first_output_by_mode,
+                key=lambda mode: (
+                    mode is not None,
+                    mode or "",
+                ),
+            ):
+                first_output = first_output_by_mode[
+                    measurement_mode
+                ]
+
+                mode_label = (
+                    measurement_mode
+                    if measurement_mode is not None
+                    else "legacy/unknown"
+                )
+
+                print(
+                    f"--- MODE: {mode_label} ---"
+                )
+                print(
+                    f"Samples:          "
+                    f"{first_output.sample_count}"
+                )
+                print(
+                    f"Median:           "
+                    f"{format_ms(first_output.median_first_output_ms)}"
+                )
+                print(
+                    f"P95:              "
+                    f"{format_ms(first_output.p95_first_output_ms)}"
+                )
+
+        print()
+        print("=== GENERAL PERFORMANCE ===")
         print(
             f"Median latency:   "
             f"{format_ms(stats.median_latency_ms)}"
@@ -978,7 +1017,11 @@ def consumer_detect(
 
         if comparison.ttfo_ratio is not None:
             print(
-                f"Human-observed first-output ratio: "
+                f"First-output measurement mode: "
+                f"{comparison.first_output_measurement_mode}"
+            )
+            print(
+                f"First-output ratio: "
                 f"{comparison.ttfo_ratio:.2f}x"
             )
 

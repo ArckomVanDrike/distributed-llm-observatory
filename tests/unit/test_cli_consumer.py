@@ -28,15 +28,17 @@ from observer.cli import (
 
 def make_record(
     *,
+    day: int = 19,
     hour: int = 21,
     ttfo: float = 1200,
     latency: float = 3000,
     with_telemetry: bool = False,
+    first_output_measurement_mode: str | None = None,
 ) -> ConsumerProbeRecord:
     timestamp = datetime(
         2026,
         8,
-        19,
+        day,
         hour,
         0,
         tzinfo=timezone.utc,
@@ -90,6 +92,9 @@ def make_record(
         first_output_at_utc=timestamp,
         completed_at_utc=timestamp,
         time_to_first_output_ms=ttfo,
+        first_output_measurement_mode=(
+            first_output_measurement_mode
+        ),
         total_latency_ms=latency,
         local_telemetry=telemetry,
     )
@@ -180,11 +185,17 @@ def test_consumer_summary_reads_sqlite(
 
     assert result == 0
     assert "Samples:          1" in output
+
     assert (
-        "Median human-observed first output:"
+        "=== FIRST OUTPUT BY MEASUREMENT MODE ==="
         in output
     )
-    assert "1200.00 ms" in output
+    assert "--- MODE: legacy/unknown ---" in output
+    assert "Samples:          1" in output
+    assert "Median:           1200.00 ms" in output
+    assert "P95:              1200.00 ms" in output
+
+    assert "=== GENERAL PERFORMANCE ===" in output
     assert "3000.00 ms" in output
 
     assert "=== SCHEDULE ADHERENCE ===" in output
@@ -287,6 +298,82 @@ def test_consumer_detect_reports_insufficient_data(
     assert "Candidate samples: 1" in output
     assert "Baseline samples:  0" in output
     assert "insufficient_data" in output
+
+
+
+
+def test_consumer_detect_reports_first_output_measurement_mode(
+    tmp_path: Path,
+    capsys,
+):
+    path = tmp_path / "consumer.db"
+    mode = "human-observed-click-v0.1"
+
+    store = ConsumerProbeSQLiteStore(path)
+
+    for record in (
+        make_record(
+            day=17,
+            ttfo=1000,
+            latency=3000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            day=18,
+            ttfo=1000,
+            latency=3000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            day=19,
+            hour=21,
+            ttfo=2000,
+            latency=3000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            day=19,
+            hour=22,
+            ttfo=2000,
+            latency=3000,
+            first_output_measurement_mode=mode,
+        ),
+    ):
+        store.append(record)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "consumer-detect",
+            "--candidate-start",
+            "2026-08-19T20:00:00Z",
+            "--platform",
+            "chatgpt",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--prompt-id",
+            "reasoning-001",
+            "--min-samples",
+            "2",
+            "--storage",
+            str(path),
+        ]
+    )
+
+    result = consumer_detect(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "First-output measurement mode: "
+        "human-observed-click-v0.1"
+        in output
+    )
+    assert (
+        "First-output ratio: 2.00x"
+        in output
+    )
+    assert "Level:             degraded" in output
 
 
 def test_consumer_import_is_idempotent(
@@ -915,3 +1002,58 @@ def test_consumer_summary_separates_collector_versions(
 
     # A mixed median would be 6 GiB. It must never appear.
     assert "Median peak RSS:  6.00 GiB" not in output
+
+
+def test_consumer_summary_separates_first_output_measurement_modes(
+    tmp_path: Path,
+    capsys,
+):
+    path = tmp_path / "consumer.db"
+
+    store = ConsumerProbeSQLiteStore(path)
+
+    store.append(
+        make_record(
+            ttfo=1000,
+            latency=4000,
+            first_output_measurement_mode=None,
+        )
+    )
+    store.append(
+        make_record(
+            hour=22,
+            ttfo=5000,
+            latency=4000,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        )
+    )
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "consumer-summary",
+            "--storage",
+            str(path),
+        ]
+    )
+
+    result = consumer_summary(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    assert "--- MODE: legacy/unknown ---" in output
+    assert (
+        "--- MODE: human-observed-click-v0.1 ---"
+        in output
+    )
+
+    assert "Median:           1000.00 ms" in output
+    assert "Median:           5000.00 ms" in output
+
+    assert (
+        "Median human-observed first output:"
+        not in output
+    )
