@@ -46,6 +46,10 @@ class BrowserProbeRecord(BaseModel):
         default=None,
         ge=0,
     )
+    first_output_measurement_mode: str | None = Field(
+        default=None,
+        min_length=1,
+    )
     total_latency_ms: float = Field(ge=0)
 
     generation_failed: bool = False
@@ -131,6 +135,12 @@ class BrowserProbeRecord(BaseModel):
             )
 
         if self.first_output_at_ms is None:
+            if self.first_output_measurement_mode is not None:
+                raise ValueError(
+                    "first_output_measurement_mode must be "
+                    "null when first output was not recorded."
+                )
+
             if self.first_output_at_utc is not None:
                 raise ValueError(
                     "first_output_at_utc must be null when "
@@ -280,6 +290,9 @@ def normalize_export(
             completed_at_utc=record.completed_at_utc,
             time_to_first_output_ms=(
                 record.time_to_first_output_ms
+            ),
+            first_output_measurement_mode=(
+                record.first_output_measurement_mode
             ),
             total_latency_ms=record.total_latency_ms,
             response_text=record.response_text,

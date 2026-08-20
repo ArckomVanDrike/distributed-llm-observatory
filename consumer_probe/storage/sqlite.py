@@ -57,6 +57,7 @@ class ConsumerProbeSQLiteStore:
                     completed_at_utc TEXT,
 
                     time_to_first_output_ms REAL,
+                    first_output_measurement_mode TEXT,
                     total_latency_ms REAL,
 
                     generation_failed INTEGER NOT NULL,
@@ -97,6 +98,12 @@ class ConsumerProbeSQLiteStore:
                 connection,
                 "schedule_offset_ms",
                 "REAL",
+            )
+
+            self._ensure_column(
+                connection,
+                "first_output_measurement_mode",
+                "TEXT",
             )
 
             telemetry_columns = {
@@ -239,6 +246,7 @@ class ConsumerProbeSQLiteStore:
                         first_output_at_utc,
                         completed_at_utc,
                         time_to_first_output_ms,
+                        first_output_measurement_mode,
                         total_latency_ms,
                         generation_failed,
                         interrupted,
@@ -265,7 +273,7 @@ class ConsumerProbeSQLiteStore:
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
@@ -296,6 +304,7 @@ class ConsumerProbeSQLiteStore:
                             else None
                         ),
                         record.time_to_first_output_ms,
+                        record.first_output_measurement_mode,
                         record.total_latency_ms,
                         int(record.generation_failed),
                         int(record.interrupted),

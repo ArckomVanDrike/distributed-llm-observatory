@@ -662,6 +662,11 @@ function mountProbeOverlay(
             ? null
             : firstOutputAt - startedAt,
 
+        first_output_measurement_mode:
+          firstOutputAt === null
+            ? null
+            : "human-observed-click-v0.1",
+
         total_latency_ms:
           completedAt - startedAt,
 

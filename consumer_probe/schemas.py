@@ -207,6 +207,10 @@ class ConsumerProbeRecord(BaseModel):
         default=None,
         ge=0,
     )
+    first_output_measurement_mode: str | None = Field(
+        default=None,
+        min_length=1,
+    )
     total_latency_ms: float | None = Field(
         default=None,
         ge=0,
@@ -228,6 +232,18 @@ class ConsumerProbeRecord(BaseModel):
     def validate_schedule_provenance(
         self,
     ) -> ConsumerProbeRecord:
+        if (
+            self.first_output_measurement_mode is not None
+            and (
+                self.first_output_at_utc is None
+                or self.time_to_first_output_ms is None
+            )
+        ):
+            raise ValueError(
+                "first_output_measurement_mode requires "
+                "a recorded first output."
+            )
+
         if (
             self.local_telemetry is not None
             and self.local_telemetry.probe_id

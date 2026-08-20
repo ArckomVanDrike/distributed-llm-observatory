@@ -168,3 +168,53 @@ def test_import_rejects_invalid_observer_timezone(tmp_path: Path):
             region_code="CL-Los-Lagos",
             observer_timezone="Planet/Mars",
         )
+
+
+def test_import_preserves_first_output_measurement_mode(
+    tmp_path: Path,
+):
+    path = tmp_path / "first-output-mode.json"
+
+    record = make_record()
+    record["first_output_measurement_mode"] = (
+        "human-observed-click-v0.1"
+    )
+
+    write_export(path, [record])
+
+    normalized = import_export(
+        path,
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )[0]
+
+    assert (
+        normalized.first_output_measurement_mode
+        == "human-observed-click-v0.1"
+    )
+
+
+def test_first_output_measurement_mode_requires_first_output(
+    tmp_path: Path,
+):
+    path = tmp_path / "invalid-first-output-mode.json"
+
+    record = make_record()
+
+    record["first_output_at_ms"] = None
+    record["first_output_at_utc"] = None
+    record["time_to_first_output_ms"] = None
+    record["first_output_measurement_mode"] = (
+        "human-observed-click-v0.1"
+    )
+
+    write_export(path, [record])
+
+    with pytest.raises(
+        ConsumerProbeImportError,
+    ):
+        import_export(
+            path,
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        )

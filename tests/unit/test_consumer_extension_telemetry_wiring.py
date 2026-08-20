@@ -81,3 +81,22 @@ def test_backgrounds_expose_same_telemetry_contract():
         "/v1/telemetry/cancel",
     ):
         assert route in background
+
+
+def test_browser_record_marks_human_first_output_measurement():
+    source = POPUP.read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "first_output_measurement_mode:"
+        in source
+    )
+    assert (
+        '"human-observed-click-v0.1"'
+        in source
+    )
+    assert (
+        'makeButton("Mark First Output (Human)")'
+        in source
+    )
