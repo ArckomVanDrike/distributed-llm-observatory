@@ -295,6 +295,8 @@ def _read_process_cpu_ticks(
 def _read_browser_totals(
     proc_root: Path,
     process_names: frozenset[str],
+    *,
+    include_pss: bool,
 ) -> tuple[int, int, int | None, int]:
     """
     Aggregate the complete process tree rooted at the browser.
@@ -318,7 +320,6 @@ def _read_browser_totals(
             int | None,
             str | None,
             int,
-            int | None,
             int,
         ],
     ] = {}
@@ -346,10 +347,6 @@ def _read_browser_totals(
             or 0
         )
 
-        pss = _read_process_pss_bytes(
-            process_root
-        )
-
         cpu_ticks = (
             _read_process_cpu_ticks(
                 process_root
@@ -361,7 +358,6 @@ def _read_browser_totals(
             ppid,
             name,
             rss,
-            pss,
             cpu_ticks,
         )
 
@@ -394,7 +390,7 @@ def _read_browser_totals(
 
     rss_bytes = 0
     pss_bytes = 0
-    pss_complete = True
+    pss_complete = include_pss
     cpu_ticks = 0
 
     for pid in browser_pids:
@@ -406,20 +402,30 @@ def _read_browser_totals(
             continue
 
         rss_bytes += process[2]
+        cpu_ticks += process[3]
 
-        process_pss = process[3]
+        if not include_pss:
+            continue
+
+        process_pss = (
+            _read_process_pss_bytes(
+                proc_root / str(pid)
+            )
+        )
 
         if process_pss is None:
             pss_complete = False
         else:
             pss_bytes += process_pss
 
-        cpu_ticks += process[4]
-
     return (
         len(browser_pids),
         rss_bytes,
-        pss_bytes if pss_complete else None,
+        (
+            pss_bytes
+            if pss_complete
+            else None
+        ),
         cpu_ticks,
     )
 
@@ -430,6 +436,7 @@ def capture_local_telemetry(
     process_names: frozenset[str] = (
         DEFAULT_BROWSER_PROCESS_NAMES
     ),
+    include_pss: bool = True,
 ) -> LocalTelemetrySnapshot:
     if not proc_root.exists():
         raise LocalTelemetryUnavailableError(
@@ -444,6 +451,7 @@ def capture_local_telemetry(
     ) = _read_browser_totals(
         proc_root,
         process_names,
+        include_pss=include_pss,
     )
 
     (
@@ -475,6 +483,28 @@ def capture_local_telemetry(
         system_cpu_idle_ticks=(
             system_cpu_idle_ticks
         ),
+    )
+
+
+def capture_fast_local_telemetry(
+) -> LocalTelemetrySnapshot:
+    """
+    Capture low-cost telemetry without reading smaps_rollup.
+    """
+    return capture_local_telemetry(
+        include_pss=False
+    )
+
+
+def capture_pss_local_telemetry(
+) -> LocalTelemetrySnapshot:
+    """
+    Capture telemetry including process-tree PSS.
+
+    PSS is read only for Firefox tree processes.
+    """
+    return capture_local_telemetry(
+        include_pss=True
     )
 
 

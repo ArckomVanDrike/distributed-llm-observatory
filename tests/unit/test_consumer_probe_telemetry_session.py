@@ -193,3 +193,62 @@ def test_sample_interval_must_be_positive():
         TelemetrySession(
             sample_interval_seconds=0,
         )
+
+
+def test_custom_capture_without_pss_lane_allows_long_fast_interval():
+    def capture() -> LocalTelemetrySnapshot:
+        return LocalTelemetrySnapshot(
+            captured_at_utc=datetime(
+                2026,
+                8,
+                20,
+                tzinfo=timezone.utc,
+            ),
+            monotonic_ns=1,
+            browser_process_count=1,
+            browser_rss_bytes=100,
+            browser_pss_bytes=None,
+            browser_cpu_ticks=10,
+            system_memory_available_bytes=1000,
+            system_cpu_total_ticks=100,
+            system_cpu_idle_ticks=50,
+        )
+
+    session = TelemetrySession(
+        sample_interval_seconds=60,
+        pss_interval_seconds=1.5,
+        capture=capture,
+    )
+
+    assert session.pss_capture is None
+
+
+def test_explicit_pss_lane_cannot_be_faster_than_fast_lane():
+    def capture() -> LocalTelemetrySnapshot:
+        return LocalTelemetrySnapshot(
+            captured_at_utc=datetime(
+                2026,
+                8,
+                20,
+                tzinfo=timezone.utc,
+            ),
+            monotonic_ns=1,
+            browser_process_count=1,
+            browser_rss_bytes=100,
+            browser_pss_bytes=None,
+            browser_cpu_ticks=10,
+            system_memory_available_bytes=1000,
+            system_cpu_total_ticks=100,
+            system_cpu_idle_ticks=50,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="pss_interval_seconds",
+    ):
+        TelemetrySession(
+            sample_interval_seconds=2,
+            pss_interval_seconds=1,
+            capture=capture,
+            pss_capture=capture,
+        )

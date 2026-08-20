@@ -9,7 +9,8 @@ from consumer_probe.local_telemetry import (
     LocalTelemetrySample,
     LocalTelemetrySnapshot,
     LocalTelemetryUnavailableError,
-    capture_local_telemetry,
+    capture_fast_local_telemetry,
+    capture_pss_local_telemetry,
     derive_local_telemetry_sample,
 )
 
@@ -22,6 +23,7 @@ class LocalTelemetrySummary:
     peak_browser_process_count: int | None
     peak_browser_rss_bytes: int | None
     peak_browser_pss_bytes: int | None
+    pss_sample_count: int
     peak_browser_cpu_percent: float | None
 
     min_system_memory_available_bytes: int | None
@@ -54,6 +56,7 @@ def summarize_local_telemetry(
             peak_browser_process_count=None,
             peak_browser_rss_bytes=None,
             peak_browser_pss_bytes=None,
+            pss_sample_count=0,
             peak_browser_cpu_percent=None,
             min_system_memory_available_bytes=None,
             peak_system_cpu_percent=None,
@@ -70,11 +73,6 @@ def summarize_local_telemetry(
         for sample in samples
         if sample.browser_pss_bytes is not None
     ]
-
-    complete_browser_pss = (
-        len(browser_pss_values)
-        == len(samples)
-    )
 
     system_cpu_values = [
         sample.system_cpu_percent
@@ -95,8 +93,11 @@ def summarize_local_telemetry(
         ),
         peak_browser_pss_bytes=(
             max(browser_pss_values)
-            if complete_browser_pss
+            if browser_pss_values
             else None
+        ),
+        pss_sample_count=len(
+            browser_pss_values
         ),
         peak_browser_cpu_percent=(
             max(browser_cpu_values)
@@ -127,10 +128,15 @@ class TelemetrySession:
         self,
         *,
         sample_interval_seconds: float = 0.25,
+        pss_interval_seconds: float = 1.5,
         capture: Callable[
             [],
             LocalTelemetrySnapshot,
-        ] = capture_local_telemetry,
+        ] | None = None,
+        pss_capture: Callable[
+            [],
+            LocalTelemetrySnapshot,
+        ] | None = None,
         clock_ticks_per_second: int | None = None,
     ) -> None:
         if sample_interval_seconds <= 0:
@@ -138,10 +144,46 @@ class TelemetrySession:
                 "sample_interval_seconds must be positive."
             )
 
+        if pss_interval_seconds <= 0:
+            raise ValueError(
+                "pss_interval_seconds must be positive."
+            )
+
+        pss_sampling_enabled = (
+            capture is None
+            or pss_capture is not None
+        )
+
+        if (
+            pss_sampling_enabled
+            and pss_interval_seconds
+            < sample_interval_seconds
+        ):
+            raise ValueError(
+                "pss_interval_seconds cannot be shorter "
+                "than sample_interval_seconds."
+            )
+
         self.sample_interval_seconds = (
             sample_interval_seconds
         )
-        self.capture = capture
+        self.pss_interval_seconds = (
+            pss_interval_seconds
+        )
+
+        if capture is None:
+            self.capture = (
+                capture_fast_local_telemetry
+            )
+            self.pss_capture = (
+                pss_capture
+                if pss_capture is not None
+                else capture_pss_local_telemetry
+            )
+        else:
+            self.capture = capture
+            self.pss_capture = pss_capture
+
         self.clock_ticks_per_second = (
             clock_ticks_per_second
         )
@@ -153,6 +195,10 @@ class TelemetrySession:
         self._initial_monotonic_ns: int | None = None
         self._previous_snapshot: (
             LocalTelemetrySnapshot | None
+        ) = None
+
+        self._last_pss_monotonic_ns: (
+            int | None
         ) = None
 
         self._samples: list[
@@ -187,6 +233,9 @@ class TelemetrySession:
             initial.monotonic_ns
         )
         self._previous_snapshot = initial
+        self._last_pss_monotonic_ns = (
+            initial.monotonic_ns
+        )
 
         self._thread = threading.Thread(
             target=self._run,
@@ -204,6 +253,28 @@ class TelemetrySession:
             )
 
         current = self.capture()
+
+        last_pss = (
+            self._last_pss_monotonic_ns
+        )
+
+        if (
+            self.pss_capture is not None
+            and last_pss is not None
+            and (
+                current.monotonic_ns
+                - last_pss
+            )
+            >= int(
+                self.pss_interval_seconds
+                * 1_000_000_000
+            )
+        ):
+            current = self.pss_capture()
+
+            self._last_pss_monotonic_ns = (
+                current.monotonic_ns
+            )
 
         sample = derive_local_telemetry_sample(
             previous,
