@@ -6,7 +6,10 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from consumer_probe.analytics import summarize
+from consumer_probe.analytics import (
+    summarize,
+    summarize_schedule_adherence,
+)
 from consumer_probe.bridge import BridgeConfig, serve
 from consumer_probe.comparison import ComparisonPolicy
 from consumer_probe.detection import detect_utc_bucket
@@ -634,6 +637,15 @@ def format_ms(
     return f"{value:.2f} ms"
 
 
+def format_rate(
+    value: float | None,
+) -> str:
+    if value is None:
+        return "n/a"
+
+    return f"{value:.2%}"
+
+
 def consumer_summary(
     args: argparse.Namespace,
 ) -> int:
@@ -644,6 +656,9 @@ def consumer_summary(
 
         records = store.load_all()
         stats = summarize(records)
+        adherence = summarize_schedule_adherence(
+            records
+        )
 
         print("=== DLLO CONSUMER SUMMARY ===")
         print(
@@ -681,6 +696,38 @@ def consumer_summary(
         print(
             f"Interrupted rate: "
             f"{stats.interruption_rate:.2%}"
+        )
+
+        print()
+        print("=== SCHEDULE ADHERENCE ===")
+        print(
+            f"Scheduled:        "
+            f"{adherence.scheduled_samples}"
+        )
+        print(
+            f"Unscheduled:      "
+            f"{adherence.unscheduled_samples}"
+        )
+        print(
+            f"Median offset:    "
+            f"{format_ms(adherence.median_offset_ms)}"
+        )
+        print(
+            f"P95 offset:       "
+            f"{format_ms(adherence.p95_offset_ms)}"
+        )
+        print(
+            f"Median abs offset:"
+            f" "
+            f"{format_ms(adherence.median_absolute_offset_ms)}"
+        )
+        print(
+            f"P95 abs offset:   "
+            f"{format_ms(adherence.p95_absolute_offset_ms)}"
+        )
+        print(
+            f"Within +/-5 min:  "
+            f"{format_rate(adherence.within_tolerance_rate)}"
         )
 
         return 0

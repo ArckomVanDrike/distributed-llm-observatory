@@ -143,6 +143,15 @@ def test_consumer_summary_reads_sqlite(
     assert "1200.00 ms" in output
     assert "3000.00 ms" in output
 
+    assert "=== SCHEDULE ADHERENCE ===" in output
+    assert "Scheduled:        0" in output
+    assert "Unscheduled:      1" in output
+    assert "Median offset:    n/a" in output
+    assert "P95 offset:       n/a" in output
+    assert "Median abs offset: n/a" in output
+    assert "P95 abs offset:   n/a" in output
+    assert "Within +/-5 min:  n/a" in output
+
 
 def test_consumer_detect_reports_insufficient_data(
     tmp_path: Path,
