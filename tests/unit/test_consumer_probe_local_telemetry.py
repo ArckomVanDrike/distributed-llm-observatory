@@ -269,3 +269,182 @@ def test_non_monotonic_snapshots_are_rejected():
             snapshot,
             snapshot,
         )
+
+
+def test_capture_includes_firefox_descendants(
+    tmp_path: Path,
+):
+    proc_root = make_proc_root(
+        tmp_path
+    )
+
+    make_process(
+        proc_root,
+        pid=100,
+        name="firefox",
+        rss_kb=1000,
+        user_ticks=100,
+        system_ticks=20,
+    )
+
+    make_process(
+        proc_root,
+        pid=101,
+        name="Web Content",
+        rss_kb=2000,
+        user_ticks=50,
+        system_ticks=10,
+    )
+
+    make_process(
+        proc_root,
+        pid=102,
+        name="Socket Process",
+        rss_kb=500,
+        user_ticks=25,
+        system_ticks=5,
+    )
+
+    make_process(
+        proc_root,
+        pid=200,
+        name="python",
+        rss_kb=9000,
+        user_ticks=900,
+        system_ticks=900,
+    )
+
+    # Rewrite PPIDs in the synthetic stat files.
+    def set_ppid(
+        pid: int,
+        ppid: int,
+    ) -> None:
+        path = (
+            proc_root
+            / str(pid)
+            / "stat"
+        )
+
+        raw = path.read_text(
+            encoding="utf-8"
+        )
+
+        closing = raw.rfind(")")
+        prefix = raw[: closing + 1]
+        fields = raw[
+            closing + 1:
+        ].split()
+
+        # fields[0] = state
+        # fields[1] = ppid
+        fields[1] = str(ppid)
+
+        path.write_text(
+            prefix
+            + " "
+            + " ".join(fields),
+            encoding="utf-8",
+        )
+
+    set_ppid(100, 1)
+    set_ppid(101, 100)
+    set_ppid(102, 101)
+    set_ppid(200, 1)
+
+    snapshot = capture_local_telemetry(
+        proc_root=proc_root
+    )
+
+    assert (
+        snapshot.browser_process_count
+        == 3
+    )
+
+    assert (
+        snapshot.browser_rss_bytes
+        == 3500 * 1024
+    )
+
+    assert (
+        snapshot.browser_cpu_ticks
+        == 210
+    )
+
+
+def test_capture_excludes_unrelated_process_tree(
+    tmp_path: Path,
+):
+    proc_root = make_proc_root(
+        tmp_path
+    )
+
+    make_process(
+        proc_root,
+        pid=100,
+        name="firefox",
+        rss_kb=1000,
+        user_ticks=10,
+        system_ticks=5,
+    )
+
+    make_process(
+        proc_root,
+        pid=200,
+        name="python",
+        rss_kb=5000,
+        user_ticks=100,
+        system_ticks=100,
+    )
+
+    make_process(
+        proc_root,
+        pid=201,
+        name="worker",
+        rss_kb=7000,
+        user_ticks=200,
+        system_ticks=200,
+    )
+
+    def set_ppid(
+        pid: int,
+        ppid: int,
+    ) -> None:
+        path = (
+            proc_root
+            / str(pid)
+            / "stat"
+        )
+
+        raw = path.read_text(
+            encoding="utf-8"
+        )
+
+        closing = raw.rfind(")")
+        prefix = raw[: closing + 1]
+        fields = raw[
+            closing + 1:
+        ].split()
+
+        fields[1] = str(ppid)
+
+        path.write_text(
+            prefix
+            + " "
+            + " ".join(fields),
+            encoding="utf-8",
+        )
+
+    set_ppid(100, 1)
+    set_ppid(200, 1)
+    set_ppid(201, 200)
+
+    snapshot = capture_local_telemetry(
+        proc_root=proc_root
+    )
+
+    assert snapshot.browser_process_count == 1
+
+    assert (
+        snapshot.browser_rss_bytes
+        == 1000 * 1024
+    )

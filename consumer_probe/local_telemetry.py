@@ -182,9 +182,9 @@ def _read_process_rss_bytes(
     return None
 
 
-def _read_process_cpu_ticks(
+def _read_process_stat_fields(
     process_root: Path,
-) -> int | None:
+) -> list[str] | None:
     try:
         raw = (
             process_root
@@ -204,9 +204,39 @@ def _read_process_cpu_ticks(
     if closing_parenthesis < 0:
         return None
 
-    fields = raw[
+    return raw[
         closing_parenthesis + 1:
     ].split()
+
+
+def _read_process_ppid(
+    process_root: Path,
+) -> int | None:
+    fields = _read_process_stat_fields(
+        process_root
+    )
+
+    # After removing pid and "(comm)",
+    # fields[0] is /proc stat field 3 (state)
+    # fields[1] is field 4 (ppid).
+    if fields is None or len(fields) <= 1:
+        return None
+
+    try:
+        return int(fields[1])
+    except ValueError:
+        return None
+
+
+def _read_process_cpu_ticks(
+    process_root: Path,
+) -> int | None:
+    fields = _read_process_stat_fields(
+        process_root
+    )
+
+    if fields is None:
+        return None
 
     # After removing pid and "(comm)",
     # fields[0] is Linux /proc stat field 3.
@@ -229,10 +259,13 @@ def _read_browser_totals(
     proc_root: Path,
     process_names: frozenset[str],
 ) -> tuple[int, int, int]:
-    process_count = 0
-    rss_bytes = 0
-    cpu_ticks = 0
+    """
+    Aggregate the complete process tree rooted at the browser.
 
+    Firefox uses multiple child processes whose ``comm`` value may
+    differ from ``firefox``. Root processes are identified by name,
+    then all descendants are followed through /proc PPID relations.
+    """
     try:
         entries = list(
             proc_root.iterdir()
@@ -242,39 +275,96 @@ def _read_browser_totals(
             f"Unable to enumerate {proc_root}."
         ) from exc
 
+    process_table: dict[
+        int,
+        tuple[
+            int | None,
+            str | None,
+            int,
+            int,
+        ],
+    ] = {}
+
+    root_pids: set[int] = set()
+
     for process_root in entries:
         if not process_root.name.isdigit():
             continue
+
+        pid = int(process_root.name)
 
         name = _read_process_name(
             process_root
         )
 
-        if name not in process_names:
-            continue
+        ppid = _read_process_ppid(
+            process_root
+        )
 
-        process_count += 1
-
-        process_rss = (
+        rss = (
             _read_process_rss_bytes(
                 process_root
             )
+            or 0
         )
 
-        if process_rss is not None:
-            rss_bytes += process_rss
-
-        process_cpu = (
+        cpu_ticks = (
             _read_process_cpu_ticks(
                 process_root
             )
+            or 0
         )
 
-        if process_cpu is not None:
-            cpu_ticks += process_cpu
+        process_table[pid] = (
+            ppid,
+            name,
+            rss,
+            cpu_ticks,
+        )
+
+        if name in process_names:
+            root_pids.add(pid)
+
+    if not root_pids:
+        return (0, 0, 0)
+
+    browser_pids = set(
+        root_pids
+    )
+
+    changed = True
+
+    while changed:
+        changed = False
+
+        for pid, process in process_table.items():
+            ppid = process[0]
+
+            if (
+                pid in browser_pids
+                or ppid not in browser_pids
+            ):
+                continue
+
+            browser_pids.add(pid)
+            changed = True
+
+    rss_bytes = 0
+    cpu_ticks = 0
+
+    for pid in browser_pids:
+        process = process_table.get(
+            pid
+        )
+
+        if process is None:
+            continue
+
+        rss_bytes += process[2]
+        cpu_ticks += process[3]
 
     return (
-        process_count,
+        len(browser_pids),
         rss_bytes,
         cpu_ticks,
     )
