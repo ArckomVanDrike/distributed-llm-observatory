@@ -65,6 +65,13 @@ class ConsumerProbeSQLiteStore:
 
                     measurement_mode TEXT NOT NULL,
 
+                    telemetry_schema_version TEXT,
+                    telemetry_collector_version TEXT,
+                    telemetry_browser_scope TEXT,
+                    telemetry_memory_method TEXT,
+                    telemetry_fast_interval_target_ms REAL,
+                    telemetry_pss_interval_target_ms REAL,
+
                     telemetry_sample_count INTEGER,
                     telemetry_duration_ms REAL,
                     telemetry_peak_browser_process_count INTEGER,
@@ -93,6 +100,12 @@ class ConsumerProbeSQLiteStore:
             )
 
             telemetry_columns = {
+                "telemetry_schema_version": "TEXT",
+                "telemetry_collector_version": "TEXT",
+                "telemetry_browser_scope": "TEXT",
+                "telemetry_memory_method": "TEXT",
+                "telemetry_fast_interval_target_ms": "REAL",
+                "telemetry_pss_interval_target_ms": "REAL",
                 "telemetry_sample_count": "INTEGER",
                 "telemetry_duration_ms": "REAL",
                 "telemetry_peak_browser_process_count": "INTEGER",
@@ -113,6 +126,15 @@ class ConsumerProbeSQLiteStore:
                     column_name,
                     definition,
                 )
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_consumer_probe_telemetry_collector
+                ON consumer_probes(
+                    telemetry_collector_version
+                )
+                """
+            )
 
             connection.execute(
                 """
@@ -222,6 +244,12 @@ class ConsumerProbeSQLiteStore:
                         interrupted,
                         retry_observed,
                         measurement_mode,
+                        telemetry_schema_version,
+                        telemetry_collector_version,
+                        telemetry_browser_scope,
+                        telemetry_memory_method,
+                        telemetry_fast_interval_target_ms,
+                        telemetry_pss_interval_target_ms,
                         telemetry_sample_count,
                         telemetry_duration_ms,
                         telemetry_peak_browser_process_count,
@@ -236,7 +264,8 @@ class ConsumerProbeSQLiteStore:
                     VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
@@ -272,6 +301,42 @@ class ConsumerProbeSQLiteStore:
                         int(record.interrupted),
                         int(record.retry_observed),
                         record.measurement_mode,
+                        (
+                            record.local_telemetry
+                            .telemetry_schema_version
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .collector_version
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .browser_scope
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .memory_method
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .fast_interval_target_ms
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .pss_interval_target_ms
+                            if record.local_telemetry
+                            else None
+                        ),
                         (
                             record.local_telemetry.sample_count
                             if record.local_telemetry

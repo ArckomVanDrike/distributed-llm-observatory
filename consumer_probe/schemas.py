@@ -20,7 +20,7 @@ class ProbeInputMode(str, Enum):
 
 
 class LocalTelemetryRecord(BaseModel):
-    telemetry_schema_version: str = "0.1"
+    telemetry_schema_version: str = "0.2"
     probe_id: UUID
 
     started_at_utc: datetime
@@ -28,6 +28,19 @@ class LocalTelemetryRecord(BaseModel):
 
     sample_count: int = Field(ge=0)
     duration_ms: float = Field(ge=0)
+
+    collector_version: str | None = None
+    browser_scope: str | None = None
+    memory_method: str | None = None
+
+    fast_interval_target_ms: float | None = Field(
+        default=None,
+        gt=0,
+    )
+    pss_interval_target_ms: float | None = Field(
+        default=None,
+        gt=0,
+    )
 
     peak_browser_process_count: int | None = Field(
         default=None,
@@ -79,6 +92,57 @@ class LocalTelemetryRecord(BaseModel):
             raise ValueError(
                 "Local telemetry stop cannot "
                 "precede start."
+            )
+
+        provenance_values = (
+            self.collector_version,
+            self.browser_scope,
+            self.memory_method,
+            self.fast_interval_target_ms,
+        )
+
+        if (
+            self.telemetry_schema_version == "0.2"
+            and not all(
+                value is not None
+                for value in provenance_values
+            )
+        ):
+            raise ValueError(
+                "Telemetry schema 0.2 requires "
+                "complete collector provenance."
+            )
+
+        if any(
+            value is not None
+            for value in provenance_values
+        ) and not all(
+            value is not None
+            for value in provenance_values
+        ):
+            raise ValueError(
+                "Local telemetry provenance must "
+                "be complete when present."
+            )
+
+        if (
+            self.pss_interval_target_ms is not None
+            and self.fast_interval_target_ms is None
+        ):
+            raise ValueError(
+                "pss_interval_target_ms requires "
+                "fast_interval_target_ms."
+            )
+
+        if (
+            self.pss_interval_target_ms is not None
+            and self.fast_interval_target_ms is not None
+            and self.pss_interval_target_ms
+            < self.fast_interval_target_ms
+        ):
+            raise ValueError(
+                "pss_interval_target_ms cannot be "
+                "shorter than fast_interval_target_ms."
             )
 
         if (

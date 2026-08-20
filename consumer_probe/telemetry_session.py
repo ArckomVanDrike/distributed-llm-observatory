@@ -31,12 +31,23 @@ class LocalTelemetrySummary:
 
 
 @dataclass(frozen=True)
+class LocalTelemetryProvenance:
+    collector_version: str | None
+    browser_scope: str | None
+    memory_method: str | None
+
+    fast_interval_target_ms: float
+    pss_interval_target_ms: float | None
+
+
+@dataclass(frozen=True)
 class TelemetrySessionResult:
     started_at_utc: datetime
     stopped_at_utc: datetime
 
     samples: tuple[LocalTelemetrySample, ...]
     summary: LocalTelemetrySummary
+    provenance: LocalTelemetryProvenance
 
 
 def summarize_local_telemetry(
@@ -149,6 +160,10 @@ class TelemetrySession:
                 "pss_interval_seconds must be positive."
             )
 
+        using_default_collector = (
+            capture is None
+        )
+
         pss_sampling_enabled = (
             capture is None
             or pss_capture is not None
@@ -186,6 +201,36 @@ class TelemetrySession:
 
         self.clock_ticks_per_second = (
             clock_ticks_per_second
+        )
+
+        self.provenance = (
+            LocalTelemetryProvenance(
+                collector_version=(
+                    "linux-proc-firefox-tree-fastslow-v0.1"
+                    if using_default_collector
+                    else None
+                ),
+                browser_scope=(
+                    "firefox-process-tree"
+                    if using_default_collector
+                    else None
+                ),
+                memory_method=(
+                    "rss+pss"
+                    if using_default_collector
+                    else None
+                ),
+                fast_interval_target_ms=(
+                    sample_interval_seconds
+                    * 1000
+                ),
+                pss_interval_target_ms=(
+                    pss_interval_seconds
+                    * 1000
+                    if pss_sampling_enabled
+                    else None
+                ),
+            )
         )
 
         self._stop_event = threading.Event()
@@ -350,4 +395,5 @@ class TelemetrySession:
                 list(samples),
                 duration_ms=duration_ms,
             ),
+            provenance=self.provenance,
         )

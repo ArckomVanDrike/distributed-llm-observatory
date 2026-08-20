@@ -340,8 +340,20 @@ def test_telemetry_stop_returns_local_metrics(
 
         assert (
             payload["telemetry_schema_version"]
-            == "0.1"
+            == "0.2"
         )
+
+        assert (
+            payload["collector_version"]
+            == "linux-proc-firefox-tree-fastslow-v0.1"
+        )
+        assert (
+            payload["browser_scope"]
+            == "firefox-process-tree"
+        )
+        assert payload["memory_method"] == "rss+pss"
+        assert payload["fast_interval_target_ms"] == 250
+        assert payload["pss_interval_target_ms"] == 1500
 
         assert payload["sample_count"] >= 1
 

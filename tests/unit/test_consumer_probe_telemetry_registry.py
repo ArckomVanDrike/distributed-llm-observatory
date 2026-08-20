@@ -13,6 +13,7 @@ from consumer_probe.telemetry_registry import (
     normalize_probe_id,
 )
 from consumer_probe.telemetry_session import (
+    LocalTelemetryProvenance,
     LocalTelemetrySummary,
     TelemetrySessionResult,
 )
@@ -63,6 +64,17 @@ class FakeTelemetrySession:
                 peak_browser_cpu_percent=42,
                 min_system_memory_available_bytes=5678,
                 peak_system_cpu_percent=21,
+            ),
+            provenance=LocalTelemetryProvenance(
+                collector_version=(
+                    "test-collector-v0.1"
+                ),
+                browser_scope=(
+                    "test-browser-tree"
+                ),
+                memory_method="rss+pss",
+                fast_interval_target_ms=250,
+                pss_interval_target_ms=1500,
             ),
         )
 
@@ -133,7 +145,20 @@ def test_stop_returns_telemetry_summary():
     )
 
     assert result["probe_id"] == probe_id
+    assert result["telemetry_schema_version"] == "0.2"
     assert result["sample_count"] == 1
+
+    assert (
+        result["collector_version"]
+        == "test-collector-v0.1"
+    )
+    assert (
+        result["browser_scope"]
+        == "test-browser-tree"
+    )
+    assert result["memory_method"] == "rss+pss"
+    assert result["fast_interval_target_ms"] == 250
+    assert result["pss_interval_target_ms"] == 1500
 
     assert (
         result["peak_browser_rss_bytes"]

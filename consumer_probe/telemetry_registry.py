@@ -32,9 +32,10 @@ def telemetry_result_payload(
     result: TelemetrySessionResult,
 ) -> dict:
     summary = result.summary
+    provenance = result.provenance
 
     return {
-        "telemetry_schema_version": "0.1",
+        "telemetry_schema_version": "0.2",
         "probe_id": probe_id,
         "started_at_utc": (
             result.started_at_utc.isoformat()
@@ -44,6 +45,21 @@ def telemetry_result_payload(
         ),
         "sample_count": summary.sample_count,
         "duration_ms": summary.duration_ms,
+        "collector_version": (
+            provenance.collector_version
+        ),
+        "browser_scope": (
+            provenance.browser_scope
+        ),
+        "memory_method": (
+            provenance.memory_method
+        ),
+        "fast_interval_target_ms": (
+            provenance.fast_interval_target_ms
+        ),
+        "pss_interval_target_ms": (
+            provenance.pss_interval_target_ms
+        ),
         "peak_browser_process_count": (
             summary.peak_browser_process_count
         ),
@@ -116,7 +132,7 @@ class TelemetrySessionRegistry:
             ] = session
 
         return {
-            "telemetry_schema_version": "0.1",
+            "telemetry_schema_version": "0.2",
             "probe_id": normalized,
             "status": "running",
         }
@@ -173,7 +189,7 @@ class TelemetrySessionRegistry:
         session.stop()
 
         return {
-            "telemetry_schema_version": "0.1",
+            "telemetry_schema_version": "0.2",
             "probe_id": normalized,
             "status": "cancelled",
         }

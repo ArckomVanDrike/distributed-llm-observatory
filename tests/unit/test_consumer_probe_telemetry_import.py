@@ -249,3 +249,146 @@ def test_legacy_pss_peak_without_sample_count_imports(
     )
 
     assert telemetry.pss_sample_count is None
+
+
+def add_v02_provenance(record: dict) -> None:
+    telemetry = record["local_telemetry"]
+
+    telemetry["telemetry_schema_version"] = "0.2"
+    telemetry["collector_version"] = (
+        "linux-proc-firefox-tree-fastslow-v0.1"
+    )
+    telemetry["browser_scope"] = (
+        "firefox-process-tree"
+    )
+    telemetry["memory_method"] = "rss+pss"
+    telemetry["fast_interval_target_ms"] = 250
+    telemetry["pss_interval_target_ms"] = 1500
+
+
+def test_v02_import_preserves_collector_provenance(
+    tmp_path: Path,
+):
+    path = tmp_path / "telemetry-v02.json"
+    record = make_record()
+
+    add_v02_provenance(record)
+    write_export(path, record)
+
+    normalized = import_export(
+        path,
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )[0]
+
+    telemetry = normalized.local_telemetry
+
+    assert telemetry is not None
+    assert telemetry.telemetry_schema_version == "0.2"
+
+    assert (
+        telemetry.collector_version
+        == "linux-proc-firefox-tree-fastslow-v0.1"
+    )
+    assert (
+        telemetry.browser_scope
+        == "firefox-process-tree"
+    )
+    assert telemetry.memory_method == "rss+pss"
+    assert telemetry.fast_interval_target_ms == 250
+    assert telemetry.pss_interval_target_ms == 1500
+
+
+def test_v01_import_without_provenance_remains_valid(
+    tmp_path: Path,
+):
+    path = tmp_path / "telemetry-v01.json"
+    record = make_record()
+
+    write_export(path, record)
+
+    normalized = import_export(
+        path,
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )[0]
+
+    telemetry = normalized.local_telemetry
+
+    assert telemetry is not None
+    assert telemetry.telemetry_schema_version == "0.1"
+    assert telemetry.collector_version is None
+    assert telemetry.browser_scope is None
+    assert telemetry.memory_method is None
+    assert telemetry.fast_interval_target_ms is None
+    assert telemetry.pss_interval_target_ms is None
+
+
+def test_partial_telemetry_provenance_is_rejected(
+    tmp_path: Path,
+):
+    path = tmp_path / "invalid-provenance.json"
+    record = make_record()
+
+    add_v02_provenance(record)
+
+    record["local_telemetry"].pop(
+        "browser_scope"
+    )
+
+    write_export(path, record)
+
+    with pytest.raises(
+        ConsumerProbeImportError,
+    ):
+        import_export(
+            path,
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        )
+
+
+def test_pss_target_cannot_be_shorter_than_fast_target(
+    tmp_path: Path,
+):
+    path = tmp_path / "invalid-intervals.json"
+    record = make_record()
+
+    add_v02_provenance(record)
+
+    record["local_telemetry"][
+        "pss_interval_target_ms"
+    ] = 100
+
+    write_export(path, record)
+
+    with pytest.raises(
+        ConsumerProbeImportError,
+    ):
+        import_export(
+            path,
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        )
+
+
+def test_v02_requires_collector_provenance(
+    tmp_path: Path,
+):
+    path = tmp_path / "missing-provenance.json"
+    record = make_record()
+
+    record["local_telemetry"][
+        "telemetry_schema_version"
+    ] = "0.2"
+
+    write_export(path, record)
+
+    with pytest.raises(
+        ConsumerProbeImportError,
+    ):
+        import_export(
+            path,
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        )

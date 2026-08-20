@@ -56,6 +56,13 @@ def make_record(
             ),
             sample_count=4,
             duration_ms=1000,
+            collector_version=(
+                "linux-proc-firefox-tree-fastslow-v0.1"
+            ),
+            browser_scope="firefox-process-tree",
+            memory_method="rss+pss",
+            fast_interval_target_ms=250,
+            pss_interval_target_ms=1500,
             peak_browser_process_count=15,
             peak_browser_rss_bytes=(
                 3 * 1024 * 1024 * 1024

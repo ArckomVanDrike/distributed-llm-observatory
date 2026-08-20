@@ -252,3 +252,19 @@ def test_explicit_pss_lane_cannot_be_faster_than_fast_lane():
             capture=capture,
             pss_capture=capture,
         )
+
+
+def test_default_collector_reports_stable_provenance():
+    session = TelemetrySession()
+
+    provenance = session.provenance
+
+    assert (
+        provenance.collector_version
+        == "linux-proc-firefox-tree-fastslow-v0.1"
+    )
+    assert provenance.browser_scope == "firefox-process-tree"
+    assert provenance.memory_method == "rss+pss"
+
+    assert provenance.fast_interval_target_ms == 250
+    assert provenance.pss_interval_target_ms == 1500
