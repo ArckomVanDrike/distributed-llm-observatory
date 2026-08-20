@@ -65,6 +65,16 @@ class ConsumerProbeSQLiteStore:
 
                     measurement_mode TEXT NOT NULL,
 
+                    telemetry_sample_count INTEGER,
+                    telemetry_duration_ms REAL,
+                    telemetry_peak_browser_process_count INTEGER,
+                    telemetry_peak_browser_rss_bytes INTEGER,
+                    telemetry_peak_browser_pss_bytes INTEGER,
+                    telemetry_pss_sample_count INTEGER,
+                    telemetry_peak_browser_cpu_percent REAL,
+                    telemetry_min_system_memory_available_bytes INTEGER,
+                    telemetry_peak_system_cpu_percent REAL,
+
                     payload_json TEXT NOT NULL
                 )
                 """
@@ -80,6 +90,37 @@ class ConsumerProbeSQLiteStore:
                 connection,
                 "schedule_offset_ms",
                 "REAL",
+            )
+
+            telemetry_columns = {
+                "telemetry_sample_count": "INTEGER",
+                "telemetry_duration_ms": "REAL",
+                "telemetry_peak_browser_process_count": "INTEGER",
+                "telemetry_peak_browser_rss_bytes": "INTEGER",
+                "telemetry_peak_browser_pss_bytes": "INTEGER",
+                "telemetry_pss_sample_count": "INTEGER",
+                "telemetry_peak_browser_cpu_percent": "REAL",
+                "telemetry_min_system_memory_available_bytes": "INTEGER",
+                "telemetry_peak_system_cpu_percent": "REAL",
+            }
+
+            for (
+                column_name,
+                definition,
+            ) in telemetry_columns.items():
+                self._ensure_column(
+                    connection,
+                    column_name,
+                    definition,
+                )
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_consumer_probe_telemetry_pss
+                ON consumer_probes(
+                    telemetry_peak_browser_pss_bytes
+                )
+                """
             )
 
             connection.execute(
@@ -181,12 +222,21 @@ class ConsumerProbeSQLiteStore:
                         interrupted,
                         retry_observed,
                         measurement_mode,
+                        telemetry_sample_count,
+                        telemetry_duration_ms,
+                        telemetry_peak_browser_process_count,
+                        telemetry_peak_browser_rss_bytes,
+                        telemetry_peak_browser_pss_bytes,
+                        telemetry_pss_sample_count,
+                        telemetry_peak_browser_cpu_percent,
+                        telemetry_min_system_memory_available_bytes,
+                        telemetry_peak_system_cpu_percent,
                         payload_json
                     )
                     VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
@@ -222,6 +272,58 @@ class ConsumerProbeSQLiteStore:
                         int(record.interrupted),
                         int(record.retry_observed),
                         record.measurement_mode,
+                        (
+                            record.local_telemetry.sample_count
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry.duration_ms
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .peak_browser_process_count
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .peak_browser_rss_bytes
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .peak_browser_pss_bytes
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .pss_sample_count
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .peak_browser_cpu_percent
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .min_system_memory_available_bytes
+                            if record.local_telemetry
+                            else None
+                        ),
+                        (
+                            record.local_telemetry
+                            .peak_system_cpu_percent
+                            if record.local_telemetry
+                            else None
+                        ),
                         record.model_dump_json(),
                     ),
                 )

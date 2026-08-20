@@ -19,6 +19,99 @@ class ProbeInputMode(str, Enum):
     ASSISTED = "assisted"
 
 
+class LocalTelemetryRecord(BaseModel):
+    telemetry_schema_version: str = "0.1"
+    probe_id: UUID
+
+    started_at_utc: datetime
+    stopped_at_utc: datetime
+
+    sample_count: int = Field(ge=0)
+    duration_ms: float = Field(ge=0)
+
+    peak_browser_process_count: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    peak_browser_rss_bytes: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    peak_browser_pss_bytes: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    pss_sample_count: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    peak_browser_cpu_percent: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    min_system_memory_available_bytes: int | None = Field(
+        default=None,
+        ge=0,
+    )
+    peak_system_cpu_percent: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    @model_validator(mode="after")
+    def validate_local_telemetry(
+        self,
+    ) -> LocalTelemetryRecord:
+        if (
+            self.started_at_utc.tzinfo is None
+            or self.stopped_at_utc.tzinfo is None
+        ):
+            raise ValueError(
+                "Local telemetry timestamps must "
+                "be timezone-aware."
+            )
+
+        if (
+            self.stopped_at_utc
+            < self.started_at_utc
+        ):
+            raise ValueError(
+                "Local telemetry stop cannot "
+                "precede start."
+            )
+
+        if (
+            self.pss_sample_count is not None
+            and self.pss_sample_count > self.sample_count
+        ):
+            raise ValueError(
+                "pss_sample_count cannot exceed "
+                "sample_count."
+            )
+
+        if (
+            self.pss_sample_count is not None
+            and self.pss_sample_count > 0
+            and self.peak_browser_pss_bytes is None
+        ):
+            raise ValueError(
+                "Positive pss_sample_count requires "
+                "peak_browser_pss_bytes."
+            )
+
+        if (
+            self.pss_sample_count == 0
+            and self.peak_browser_pss_bytes is not None
+        ):
+            raise ValueError(
+                "pss_sample_count cannot be zero when "
+                "peak_browser_pss_bytes is present."
+            )
+
+        return self
+
+
 class ConsumerProbeRecord(BaseModel):
     schema_version: str = "0.1"
     probe_id: UUID = Field(default_factory=uuid4)
@@ -64,10 +157,33 @@ class ConsumerProbeRecord(BaseModel):
     response_capture_enabled: bool = False
     sharing_allowed: bool = False
 
+    local_telemetry: LocalTelemetryRecord | None = None
+    local_telemetry_error: str | None = None
+
     @model_validator(mode="after")
     def validate_schedule_provenance(
         self,
     ) -> ConsumerProbeRecord:
+        if (
+            self.local_telemetry is not None
+            and self.local_telemetry.probe_id
+            != self.probe_id
+        ):
+            raise ValueError(
+                "local_telemetry probe_id must match "
+                "Consumer Probe probe_id."
+            )
+
+        if (
+            self.local_telemetry is not None
+            and self.local_telemetry_error is not None
+        ):
+            raise ValueError(
+                "local_telemetry and "
+                "local_telemetry_error cannot both "
+                "be present."
+            )
+
         if self.scheduled_at_utc is None:
             if self.schedule_offset_ms is not None:
                 raise ValueError(

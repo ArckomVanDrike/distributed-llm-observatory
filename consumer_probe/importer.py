@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 from consumer_probe.schemas import (
     ConsumerPlatform,
     ConsumerProbeRecord,
+    LocalTelemetryRecord,
     ProbeInputMode,
 )
 
@@ -56,8 +57,31 @@ class BrowserProbeRecord(BaseModel):
 
     measurement_mode: str = Field(min_length=1)
 
+    local_telemetry: LocalTelemetryRecord | None = None
+    local_telemetry_error: str | None = None
+
     @model_validator(mode="after")
     def validate_temporal_consistency(self) -> BrowserProbeRecord:
+        if (
+            self.local_telemetry is not None
+            and self.local_telemetry.probe_id
+            != self.probe_id
+        ):
+            raise ValueError(
+                "local_telemetry probe_id must match "
+                "browser probe_id."
+            )
+
+        if (
+            self.local_telemetry is not None
+            and self.local_telemetry_error is not None
+        ):
+            raise ValueError(
+                "local_telemetry and "
+                "local_telemetry_error cannot both "
+                "be present."
+            )
+
         if self.scheduled_at_utc is None:
             if self.schedule_offset_ms is not None:
                 raise ValueError(
@@ -266,6 +290,10 @@ def normalize_export(
                 record.response_capture_enabled
             ),
             sharing_allowed=False,
+            local_telemetry=record.local_telemetry,
+            local_telemetry_error=(
+                record.local_telemetry_error
+            ),
         )
         for record in export.records
     ]
