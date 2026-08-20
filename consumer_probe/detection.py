@@ -7,7 +7,10 @@ from consumer_probe.aggregation import (
     AggregatedProbeGroup,
     AggregationKey,
 )
-from consumer_probe.analytics import summarize
+from consumer_probe.analytics import (
+    summarize,
+    summarize_first_output_by_mode,
+)
 from consumer_probe.baseline import (
     HistoricalBaseline,
     build_historical_baseline,
@@ -139,6 +142,11 @@ def detect_utc_bucket(
             bucket_hours,
         ),
         analytics=summarize(candidate_records),
+        first_output_by_mode=(
+            summarize_first_output_by_mode(
+                candidate_records
+            )
+        ),
     )
 
     baseline = build_historical_baseline(

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from consumer_probe.analytics import (
+    FirstOutputMeasurementSummary,
     ProbeAnalyticsSummary,
     summarize,
+    summarize_first_output_by_mode,
 )
 from consumer_probe.schemas import ConsumerProbeRecord
 from consumer_probe.temporal import (
@@ -28,6 +30,11 @@ class AggregatedProbeGroup:
     key: AggregationKey
     bucket_label: str
     analytics: ProbeAnalyticsSummary
+
+    first_output_by_mode: dict[
+        str | None,
+        FirstOutputMeasurementSummary,
+    ] = field(default_factory=dict)
 
 
 def aggregate_by_region_and_utc(
@@ -91,6 +98,11 @@ def aggregate_by_region_and_utc(
                 ),
                 analytics=summarize(
                     groups[key]
+                ),
+                first_output_by_mode=(
+                    summarize_first_output_by_mode(
+                        groups[key]
+                    )
                 ),
             )
         )

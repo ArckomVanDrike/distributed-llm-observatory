@@ -4,7 +4,10 @@ from consumer_probe.aggregation import (
     AggregatedProbeGroup,
     AggregationKey,
 )
-from consumer_probe.analytics import ProbeAnalyticsSummary
+from consumer_probe.analytics import (
+    FirstOutputMeasurementSummary,
+    ProbeAnalyticsSummary,
+)
 from consumer_probe.comparison import (
     AnomalyLevel,
     ComparisonPolicy,
@@ -50,6 +53,8 @@ def make_group(
     latency=2000,
     failure_rate=0.0,
     retry_rate=0.0,
+    first_output_mode=None,
+    first_output_samples=None,
 ):
     return AggregatedProbeGroup(
         key=AggregationKey(
@@ -66,6 +71,28 @@ def make_group(
             latency=latency,
             failure_rate=failure_rate,
             retry_rate=retry_rate,
+        ),
+        first_output_by_mode=(
+            {
+                first_output_mode:
+                    FirstOutputMeasurementSummary(
+                        measurement_mode=first_output_mode,
+                        sample_count=(
+                            first_output_samples
+                            if first_output_samples
+                            is not None
+                            else samples
+                        ),
+                        mean_first_output_ms=ttfo,
+                        median_first_output_ms=ttfo,
+                        p95_first_output_ms=ttfo,
+                    )
+            }
+            if (
+                first_output_mode is not None
+                or first_output_samples is not None
+            )
+            else {}
         ),
     )
 
@@ -223,3 +250,115 @@ def test_different_prompts_are_rejected():
             candidate,
             baseline,
         )
+
+
+def test_first_output_ratio_requires_matching_explicit_mode():
+    mode = "human-observed-click-v0.1"
+
+    baseline = make_group(
+        ttfo=1000,
+        latency=2000,
+        first_output_mode=mode,
+    )
+
+    candidate = make_group(
+        ttfo=2000,
+        latency=2000,
+        first_output_mode=mode,
+    )
+
+    result = compare_groups(
+        candidate,
+        baseline,
+    )
+
+    assert result.ttfo_ratio == pytest.approx(2.0)
+    assert result.first_output_measurement_mode == mode
+
+    # First-output alone can trigger degradation when the
+    # provenance is compatible and sufficiently sampled.
+    assert result.level == AnomalyLevel.DEGRADED
+
+
+def test_first_output_ratio_rejects_different_modes():
+    baseline = make_group(
+        ttfo=1000,
+        latency=2000,
+        first_output_mode=(
+            "human-observed-click-v0.1"
+        ),
+    )
+
+    candidate = make_group(
+        ttfo=3000,
+        latency=2000,
+        first_output_mode=(
+            "future-api-first-token-v0.1"
+        ),
+    )
+
+    result = compare_groups(
+        candidate,
+        baseline,
+    )
+
+    assert result.ttfo_ratio is None
+    assert result.first_output_measurement_mode is None
+    assert result.level == AnomalyLevel.NORMAL
+
+
+def test_first_output_ratio_does_not_use_legacy_unknown_mode():
+    baseline = make_group(
+        ttfo=1000,
+        latency=2000,
+        first_output_mode=None,
+        first_output_samples=20,
+    )
+
+    candidate = make_group(
+        ttfo=5000,
+        latency=2000,
+        first_output_mode=None,
+        first_output_samples=20,
+    )
+
+    result = compare_groups(
+        candidate,
+        baseline,
+    )
+
+    assert result.ttfo_ratio is None
+    assert result.first_output_measurement_mode is None
+    assert result.level == AnomalyLevel.NORMAL
+
+
+def test_first_output_ratio_requires_enough_mode_specific_samples():
+    mode = "human-observed-click-v0.1"
+
+    baseline = make_group(
+        samples=20,
+        ttfo=1000,
+        latency=2000,
+        first_output_mode=mode,
+        first_output_samples=5,
+    )
+
+    candidate = make_group(
+        samples=20,
+        ttfo=5000,
+        latency=2000,
+        first_output_mode=mode,
+        first_output_samples=5,
+    )
+
+    result = compare_groups(
+        candidate,
+        baseline,
+    )
+
+    assert result.first_output_measurement_mode == mode
+    assert result.ttfo_ratio is None
+
+    # Total probe count is sufficient, but the compatible
+    # first-output subset is not, so it cannot trigger anomaly.
+    assert result.level == AnomalyLevel.NORMAL

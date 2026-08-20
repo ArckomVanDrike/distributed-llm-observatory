@@ -7,7 +7,10 @@ from consumer_probe.aggregation import (
     AggregatedProbeGroup,
     AggregationKey,
 )
-from consumer_probe.analytics import summarize
+from consumer_probe.analytics import (
+    summarize,
+    summarize_first_output_by_mode,
+)
 from consumer_probe.schemas import ConsumerProbeRecord
 from consumer_probe.temporal import (
     bucket_start_hour,
@@ -114,6 +117,11 @@ def build_historical_baseline(
             bucket_hours,
         ),
         analytics=summarize(matched),
+        first_output_by_mode=(
+            summarize_first_output_by_mode(
+                matched
+            )
+        ),
     )
 
     return HistoricalBaseline(

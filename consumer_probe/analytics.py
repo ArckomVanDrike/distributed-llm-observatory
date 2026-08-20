@@ -29,6 +29,16 @@ class ProbeAnalyticsSummary:
     interruption_rate: float
 
 
+@dataclass(frozen=True)
+class FirstOutputMeasurementSummary:
+    measurement_mode: str | None
+    sample_count: int
+
+    mean_first_output_ms: float
+    median_first_output_ms: float
+    p95_first_output_ms: float
+
+
 def percentile(
     values: list[float],
     percentile_value: float,
@@ -74,6 +84,56 @@ def percentile(
         )
         * fraction
     )
+
+
+def summarize_first_output_by_mode(
+    records: list[ConsumerProbeRecord],
+) -> dict[
+    str | None,
+    FirstOutputMeasurementSummary,
+]:
+    """
+    Summarize first-output observations independently by
+    measurement provenance.
+
+    Legacy records without provenance remain under the None key
+    and are never mixed with explicitly versioned measurement modes.
+    Failed and interrupted probes are excluded, matching the existing
+    latency-summary semantics.
+    """
+    grouped: dict[
+        str | None,
+        list[float],
+    ] = {}
+
+    for record in records:
+        if (
+            record.generation_failed
+            or record.interrupted
+            or record.time_to_first_output_ms is None
+        ):
+            continue
+
+        grouped.setdefault(
+            record.first_output_measurement_mode,
+            [],
+        ).append(
+            float(record.time_to_first_output_ms)
+        )
+
+    return {
+        measurement_mode: FirstOutputMeasurementSummary(
+            measurement_mode=measurement_mode,
+            sample_count=len(values),
+            mean_first_output_ms=mean(values),
+            median_first_output_ms=median(values),
+            p95_first_output_ms=(
+                percentile(values, 95)
+                or 0.0
+            ),
+        )
+        for measurement_mode, values in grouped.items()
+    }
 
 
 def summarize(

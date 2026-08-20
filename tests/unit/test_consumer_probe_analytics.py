@@ -5,6 +5,7 @@ import pytest
 from consumer_probe.analytics import (
     percentile,
     summarize,
+    summarize_first_output_by_mode,
 )
 from consumer_probe.schemas import (
     ConsumerPlatform,
@@ -19,6 +20,7 @@ def make_record(
     failed=False,
     retry=False,
     interrupted=False,
+    first_output_measurement_mode=None,
 ):
     now = datetime.now(timezone.utc)
 
@@ -33,6 +35,9 @@ def make_record(
         first_output_at_utc=now,
         completed_at_utc=now,
         time_to_first_output_ms=ttfo,
+        first_output_measurement_mode=(
+            first_output_measurement_mode
+        ),
         total_latency_ms=latency,
         generation_failed=failed,
         retry_observed=retry,
@@ -145,3 +150,100 @@ def test_empty_summary_is_safe():
 
     assert summary.failure_rate == 0
     assert summary.retry_rate == 0
+
+
+def test_first_output_summary_separates_measurement_modes():
+    records = [
+        make_record(
+            ttfo=1000,
+            first_output_measurement_mode=None,
+        ),
+        make_record(
+            ttfo=3000,
+            first_output_measurement_mode=None,
+        ),
+        make_record(
+            ttfo=100,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        ),
+        make_record(
+            ttfo=300,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        ),
+    ]
+
+    summaries = summarize_first_output_by_mode(
+        records
+    )
+
+    assert set(summaries) == {
+        None,
+        "human-observed-click-v0.1",
+    }
+
+    legacy = summaries[None]
+    human = summaries[
+        "human-observed-click-v0.1"
+    ]
+
+    assert legacy.sample_count == 2
+    assert legacy.median_first_output_ms == 2000
+
+    assert human.sample_count == 2
+    assert human.median_first_output_ms == 200
+
+
+def test_first_output_summary_excludes_failed_and_interrupted():
+    records = [
+        make_record(
+            ttfo=100,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        ),
+        make_record(
+            ttfo=9000,
+            failed=True,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        ),
+        make_record(
+            ttfo=8000,
+            interrupted=True,
+            first_output_measurement_mode=(
+                "human-observed-click-v0.1"
+            ),
+        ),
+    ]
+
+    summaries = summarize_first_output_by_mode(
+        records
+    )
+
+    summary = summaries[
+        "human-observed-click-v0.1"
+    ]
+
+    assert summary.sample_count == 1
+    assert summary.mean_first_output_ms == 100
+    assert summary.median_first_output_ms == 100
+    assert summary.p95_first_output_ms == 100
+
+
+def test_first_output_summary_ignores_missing_measurements():
+    records = [
+        make_record(
+            ttfo=None,
+        ),
+    ]
+
+    summaries = summarize_first_output_by_mode(
+        records
+    )
+
+    assert summaries == {}

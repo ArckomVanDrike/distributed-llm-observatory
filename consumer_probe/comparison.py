@@ -40,6 +40,7 @@ class GroupComparison:
     baseline_samples: int
 
     ttfo_ratio: float | None
+    first_output_measurement_mode: str | None
     latency_ratio: float | None
 
     failure_rate_delta: float
@@ -59,6 +60,67 @@ def metric_ratio(
         return None
 
     return candidate / baseline
+
+
+def comparable_first_output_ratio(
+    candidate: AggregatedProbeGroup,
+    baseline: AggregatedProbeGroup,
+    *,
+    min_samples_per_group: int,
+) -> tuple[str | None, float | None]:
+    """
+    Compare first-output measurements only when provenance is explicit
+    and compatible.
+
+    Legacy measurements with unknown provenance are excluded. When
+    multiple explicit modes are shared, no arbitrary mode is selected.
+    """
+    candidate_modes = {
+        mode: summary
+        for mode, summary
+        in candidate.first_output_by_mode.items()
+        if mode is not None
+    }
+
+    baseline_modes = {
+        mode: summary
+        for mode, summary
+        in baseline.first_output_by_mode.items()
+        if mode is not None
+    }
+
+    shared_modes = (
+        set(candidate_modes)
+        & set(baseline_modes)
+    )
+
+    if len(shared_modes) != 1:
+        return None, None
+
+    measurement_mode = next(iter(shared_modes))
+
+    candidate_summary = candidate_modes[
+        measurement_mode
+    ]
+    baseline_summary = baseline_modes[
+        measurement_mode
+    ]
+
+    if (
+        candidate_summary.sample_count
+        < min_samples_per_group
+        or baseline_summary.sample_count
+        < min_samples_per_group
+    ):
+        return measurement_mode, None
+
+    return (
+        measurement_mode,
+        metric_ratio(
+            candidate_summary.median_first_output_ms,
+            baseline_summary.median_first_output_ms,
+        ),
+    )
 
 
 def validate_comparable_groups(
@@ -115,9 +177,15 @@ def compare_groups(
     candidate_samples = candidate_stats.sample_count
     baseline_samples = baseline_stats.sample_count
 
-    ttfo_ratio = metric_ratio(
-        candidate_stats.median_ttfo_ms,
-        baseline_stats.median_ttfo_ms,
+    (
+        first_output_measurement_mode,
+        ttfo_ratio,
+    ) = comparable_first_output_ratio(
+        candidate,
+        baseline,
+        min_samples_per_group=(
+            policy.min_samples_per_group
+        ),
     )
 
     latency_ratio = metric_ratio(
@@ -146,6 +214,9 @@ def compare_groups(
             candidate_samples=candidate_samples,
             baseline_samples=baseline_samples,
             ttfo_ratio=ttfo_ratio,
+            first_output_measurement_mode=(
+                first_output_measurement_mode
+            ),
             latency_ratio=latency_ratio,
             failure_rate_delta=failure_delta,
             retry_rate_delta=retry_delta,
@@ -176,6 +247,9 @@ def compare_groups(
             candidate_samples=candidate_samples,
             baseline_samples=baseline_samples,
             ttfo_ratio=ttfo_ratio,
+            first_output_measurement_mode=(
+                first_output_measurement_mode
+            ),
             latency_ratio=latency_ratio,
             failure_rate_delta=failure_delta,
             retry_rate_delta=retry_delta,
@@ -205,6 +279,9 @@ def compare_groups(
             candidate_samples=candidate_samples,
             baseline_samples=baseline_samples,
             ttfo_ratio=ttfo_ratio,
+            first_output_measurement_mode=(
+                first_output_measurement_mode
+            ),
             latency_ratio=latency_ratio,
             failure_rate_delta=failure_delta,
             retry_rate_delta=retry_delta,
@@ -219,6 +296,9 @@ def compare_groups(
         candidate_samples=candidate_samples,
         baseline_samples=baseline_samples,
         ttfo_ratio=ttfo_ratio,
+        first_output_measurement_mode=(
+            first_output_measurement_mode
+        ),
         latency_ratio=latency_ratio,
         failure_rate_delta=failure_delta,
         retry_rate_delta=retry_delta,

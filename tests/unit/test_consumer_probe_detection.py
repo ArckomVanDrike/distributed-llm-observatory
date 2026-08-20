@@ -20,6 +20,7 @@ def make_record(
     latency: float = 3000,
     ttfo: float = 1000,
     region: str = "CL-Los-Lagos",
+    first_output_measurement_mode: str | None = None,
 ) -> ConsumerProbeRecord:
     timestamp = datetime(
         2026,
@@ -41,6 +42,9 @@ def make_record(
         first_output_at_utc=timestamp,
         completed_at_utc=timestamp,
         time_to_first_output_ms=ttfo,
+        first_output_measurement_mode=(
+            first_output_measurement_mode
+        ),
         total_latency_ms=latency,
     )
 
@@ -186,3 +190,107 @@ def test_non_utc_candidate_start_is_rejected():
             benchmark_version="0.1",
             prompt_id="reasoning-001",
         )
+
+
+def test_detection_compares_matching_first_output_mode():
+    mode = "human-observed-click-v0.1"
+
+    records = [
+        make_record(
+            17,
+            latency=2000,
+            ttfo=1000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            18,
+            latency=2000,
+            ttfo=1000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            19,
+            latency=2000,
+            ttfo=2000,
+            first_output_measurement_mode=mode,
+        ),
+        make_record(
+            19,
+            hour=22,
+            latency=2000,
+            ttfo=2000,
+            first_output_measurement_mode=mode,
+        ),
+    ]
+
+    result = detect(
+        records,
+        policy=ComparisonPolicy(
+            min_samples_per_group=2,
+        ),
+    )
+
+    assert (
+        result.comparison.first_output_measurement_mode
+        == mode
+    )
+    assert result.comparison.ttfo_ratio == pytest.approx(
+        2.0
+    )
+    assert (
+        result.comparison.level
+        == AnomalyLevel.DEGRADED
+    )
+
+
+def test_detection_does_not_compare_different_first_output_modes():
+    baseline_mode = "human-observed-click-v0.1"
+    candidate_mode = "future-first-output-v0.1"
+
+    records = [
+        make_record(
+            17,
+            latency=2000,
+            ttfo=1000,
+            first_output_measurement_mode=baseline_mode,
+        ),
+        make_record(
+            18,
+            latency=2000,
+            ttfo=1000,
+            first_output_measurement_mode=baseline_mode,
+        ),
+        make_record(
+            19,
+            latency=2000,
+            ttfo=5000,
+            first_output_measurement_mode=candidate_mode,
+        ),
+        make_record(
+            19,
+            hour=22,
+            latency=2000,
+            ttfo=5000,
+            first_output_measurement_mode=candidate_mode,
+        ),
+    ]
+
+    result = detect(
+        records,
+        policy=ComparisonPolicy(
+            min_samples_per_group=2,
+        ),
+    )
+
+    assert result.comparison.ttfo_ratio is None
+    assert (
+        result.comparison.first_output_measurement_mode
+        is None
+    )
+
+    # Equal total latency means the incompatible first-output
+    # measurements cannot create a false degradation signal.
+    assert result.comparison.latency_ratio == pytest.approx(
+        1.0
+    )
+    assert result.comparison.level == AnomalyLevel.NORMAL
