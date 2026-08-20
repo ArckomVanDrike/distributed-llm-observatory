@@ -27,6 +27,9 @@ from consumer_probe.storage.sqlite import (
     ConsumerProbeSQLiteStore,
     ConsumerProbeStoreError,
 )
+from consumer_probe.telemetry_analytics import (
+    summarize_local_telemetry_records,
+)
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
 from observer.core.consumer_schedule import (
@@ -646,6 +649,38 @@ def format_rate(
     return f"{value:.2%}"
 
 
+def format_percent(
+    value: float | None,
+) -> str:
+    if value is None:
+        return "n/a"
+
+    return f"{value:.2f}%"
+
+
+def format_bytes(
+    value: float | int | None,
+) -> str:
+    if value is None:
+        return "n/a"
+
+    mib = float(value) / 1024 / 1024
+
+    if mib >= 1024:
+        return f"{mib / 1024:.2f} GiB"
+
+    return f"{mib:.2f} MiB"
+
+
+def format_hz(
+    value: float | None,
+) -> str:
+    if value is None:
+        return "n/a"
+
+    return f"{value:.2f} Hz"
+
+
 def consumer_summary(
     args: argparse.Namespace,
 ) -> int:
@@ -658,6 +693,11 @@ def consumer_summary(
         stats = summarize(records)
         adherence = summarize_schedule_adherence(
             records
+        )
+        host_telemetry = (
+            summarize_local_telemetry_records(
+                records
+            )
         )
 
         print("=== DLLO CONSUMER SUMMARY ===")
@@ -728,6 +768,65 @@ def consumer_summary(
         print(
             f"Within +/-5 min:  "
             f"{format_rate(adherence.within_tolerance_rate)}"
+        )
+
+        print()
+        print("=== LOCAL HOST TELEMETRY ===")
+        print(
+            f"Instrumented:     "
+            f"{host_telemetry.telemetry_records}"
+        )
+        print(
+            f"Telemetry errors: "
+            f"{host_telemetry.telemetry_error_records}"
+        )
+        print(
+            f"Uninstrumented:   "
+            f"{host_telemetry.uninstrumented_records}"
+        )
+        print(
+            f"PSS records:      "
+            f"{host_telemetry.pss_records}"
+        )
+        print(
+            f"Median peak RSS:  "
+            f"{format_bytes(host_telemetry.median_peak_browser_rss_bytes)}"
+        )
+        print(
+            f"P95 peak RSS:     "
+            f"{format_bytes(host_telemetry.p95_peak_browser_rss_bytes)}"
+        )
+        print(
+            f"Median peak PSS:  "
+            f"{format_bytes(host_telemetry.median_peak_browser_pss_bytes)}"
+        )
+        print(
+            f"P95 peak PSS:     "
+            f"{format_bytes(host_telemetry.p95_peak_browser_pss_bytes)}"
+        )
+        print(
+            f"Median peak CPU:  "
+            f"{format_percent(host_telemetry.median_peak_browser_cpu_percent)}"
+        )
+        print(
+            f"P95 peak CPU:     "
+            f"{format_percent(host_telemetry.p95_peak_browser_cpu_percent)}"
+        )
+        print(
+            f"Fast sampling:    "
+            f"{format_hz(host_telemetry.median_fast_sampling_hz)}"
+        )
+        print(
+            f"PSS sampling:     "
+            f"{format_hz(host_telemetry.median_pss_sampling_hz)}"
+        )
+        min_system_ram = format_bytes(
+            host_telemetry.minimum_system_memory_available_bytes
+        )
+
+        print(
+            f"Min system RAM:   "
+            f"{min_system_ram}"
         )
 
         return 0

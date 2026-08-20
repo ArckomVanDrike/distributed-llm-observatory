@@ -1,12 +1,14 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from consumer_probe.schemas import (
     ConsumerPlatform,
     ConsumerProbeRecord,
+    LocalTelemetryRecord,
 )
 from consumer_probe.storage.sqlite import (
     ConsumerProbeSQLiteStore,
@@ -29,6 +31,7 @@ def make_record(
     hour: int = 21,
     ttfo: float = 1200,
     latency: float = 3000,
+    with_telemetry: bool = False,
 ) -> ConsumerProbeRecord:
     timestamp = datetime(
         2026,
@@ -39,7 +42,37 @@ def make_record(
         tzinfo=timezone.utc,
     )
 
+    probe_id = uuid4()
+
+    telemetry = None
+
+    if with_telemetry:
+        telemetry = LocalTelemetryRecord(
+            probe_id=probe_id,
+            started_at_utc=timestamp,
+            stopped_at_utc=(
+                timestamp
+                + timedelta(seconds=1)
+            ),
+            sample_count=4,
+            duration_ms=1000,
+            peak_browser_process_count=15,
+            peak_browser_rss_bytes=(
+                3 * 1024 * 1024 * 1024
+            ),
+            peak_browser_pss_bytes=(
+                2 * 1024 * 1024 * 1024
+            ),
+            pss_sample_count=1,
+            peak_browser_cpu_percent=125,
+            min_system_memory_available_bytes=(
+                6 * 1024 * 1024 * 1024
+            ),
+            peak_system_cpu_percent=75,
+        )
+
     return ConsumerProbeRecord(
+        probe_id=probe_id,
         observer_id="observer-test",
         region_code="CL-Los-Lagos",
         platform=ConsumerPlatform.CHATGPT,
@@ -51,6 +84,7 @@ def make_record(
         completed_at_utc=timestamp,
         time_to_first_output_ms=ttfo,
         total_latency_ms=latency,
+        local_telemetry=telemetry,
     )
 
 
@@ -151,6 +185,62 @@ def test_consumer_summary_reads_sqlite(
     assert "Median abs offset: n/a" in output
     assert "P95 abs offset:   n/a" in output
     assert "Within +/-5 min:  n/a" in output
+
+    assert "=== LOCAL HOST TELEMETRY ===" in output
+    assert "Instrumented:     0" in output
+    assert "Telemetry errors: 0" in output
+    assert "Uninstrumented:   1" in output
+    assert "PSS records:      0" in output
+    assert "Median peak PSS:  n/a" in output
+
+
+def test_consumer_summary_reports_local_host_telemetry(
+    tmp_path: Path,
+    capsys,
+):
+    path = tmp_path / "consumer.db"
+
+    store = ConsumerProbeSQLiteStore(path)
+    store.append(
+        make_record(
+            with_telemetry=True,
+        )
+    )
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "consumer-summary",
+            "--storage",
+            str(path),
+        ]
+    )
+
+    result = consumer_summary(args)
+
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    assert "=== LOCAL HOST TELEMETRY ===" in output
+    assert "Instrumented:     1" in output
+    assert "Telemetry errors: 0" in output
+    assert "Uninstrumented:   0" in output
+    assert "PSS records:      1" in output
+
+    assert "Median peak RSS:  3.00 GiB" in output
+    assert "P95 peak RSS:     3.00 GiB" in output
+
+    assert "Median peak PSS:  2.00 GiB" in output
+    assert "P95 peak PSS:     2.00 GiB" in output
+
+    assert "Median peak CPU:  125.00%" in output
+    assert "P95 peak CPU:     125.00%" in output
+
+    assert "Fast sampling:    4.00 Hz" in output
+    assert "PSS sampling:     1.00 Hz" in output
+
+    assert "Min system RAM:   6.00 GiB" in output
 
 
 def test_consumer_detect_reports_insufficient_data(
