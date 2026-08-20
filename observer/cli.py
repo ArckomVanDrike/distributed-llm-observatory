@@ -28,6 +28,7 @@ from consumer_probe.storage.sqlite import (
     ConsumerProbeStoreError,
 )
 from consumer_probe.telemetry_analytics import (
+    summarize_local_telemetry_by_collector,
     summarize_local_telemetry_records,
 )
 from observer.core.benchmark_runner import BenchmarkRunner
@@ -699,6 +700,11 @@ def consumer_summary(
                 records
             )
         )
+        telemetry_by_collector = (
+            summarize_local_telemetry_by_collector(
+                records
+            )
+        )
 
         print("=== DLLO CONSUMER SUMMARY ===")
         print(
@@ -785,49 +791,82 @@ def consumer_summary(
             f"{host_telemetry.uninstrumented_records}"
         )
         print(
-            f"PSS records:      "
-            f"{host_telemetry.pss_records}"
-        )
-        print(
-            f"Median peak RSS:  "
-            f"{format_bytes(host_telemetry.median_peak_browser_rss_bytes)}"
-        )
-        print(
-            f"P95 peak RSS:     "
-            f"{format_bytes(host_telemetry.p95_peak_browser_rss_bytes)}"
-        )
-        print(
-            f"Median peak PSS:  "
-            f"{format_bytes(host_telemetry.median_peak_browser_pss_bytes)}"
-        )
-        print(
-            f"P95 peak PSS:     "
-            f"{format_bytes(host_telemetry.p95_peak_browser_pss_bytes)}"
-        )
-        print(
-            f"Median peak CPU:  "
-            f"{format_percent(host_telemetry.median_peak_browser_cpu_percent)}"
-        )
-        print(
-            f"P95 peak CPU:     "
-            f"{format_percent(host_telemetry.p95_peak_browser_cpu_percent)}"
-        )
-        print(
-            f"Fast sampling:    "
-            f"{format_hz(host_telemetry.median_fast_sampling_hz)}"
-        )
-        print(
-            f"PSS sampling:     "
-            f"{format_hz(host_telemetry.median_pss_sampling_hz)}"
-        )
-        min_system_ram = format_bytes(
-            host_telemetry.minimum_system_memory_available_bytes
+            f"Collectors:       "
+            f"{len(telemetry_by_collector)}"
         )
 
-        print(
-            f"Min system RAM:   "
-            f"{min_system_ram}"
+        collector_versions = sorted(
+            telemetry_by_collector,
+            key=lambda value: (
+                value is None,
+                value or "",
+            ),
         )
+
+        for collector_version in collector_versions:
+            collector = telemetry_by_collector[
+                collector_version
+            ]
+
+            label = (
+                collector_version
+                if collector_version is not None
+                else "legacy/unknown"
+            )
+
+            print()
+            print(
+                f"--- COLLECTOR: {label} ---"
+            )
+            print(
+                f"Samples:          "
+                f"{collector.telemetry_records}"
+            )
+            print(
+                f"PSS records:      "
+                f"{collector.pss_records}"
+            )
+            print(
+                f"Median peak RSS:  "
+                f"{format_bytes(collector.median_peak_browser_rss_bytes)}"
+            )
+            print(
+                f"P95 peak RSS:     "
+                f"{format_bytes(collector.p95_peak_browser_rss_bytes)}"
+            )
+            print(
+                f"Median peak PSS:  "
+                f"{format_bytes(collector.median_peak_browser_pss_bytes)}"
+            )
+            print(
+                f"P95 peak PSS:     "
+                f"{format_bytes(collector.p95_peak_browser_pss_bytes)}"
+            )
+            print(
+                f"Median peak CPU:  "
+                f"{format_percent(collector.median_peak_browser_cpu_percent)}"
+            )
+            print(
+                f"P95 peak CPU:     "
+                f"{format_percent(collector.p95_peak_browser_cpu_percent)}"
+            )
+            print(
+                f"Fast sampling:    "
+                f"{format_hz(collector.median_fast_sampling_hz)}"
+            )
+            print(
+                f"PSS sampling:     "
+                f"{format_hz(collector.median_pss_sampling_hz)}"
+            )
+
+            min_system_ram = format_bytes(
+                collector.minimum_system_memory_available_bytes
+            )
+
+            print(
+                f"Min system RAM:   "
+                f"{min_system_ram}"
+            )
 
         return 0
 

@@ -197,8 +197,8 @@ def test_consumer_summary_reads_sqlite(
     assert "Instrumented:     0" in output
     assert "Telemetry errors: 0" in output
     assert "Uninstrumented:   1" in output
-    assert "PSS records:      0" in output
-    assert "Median peak PSS:  n/a" in output
+    assert "Collectors:       0" in output
+    assert "--- COLLECTOR:" not in output
 
 
 def test_consumer_summary_reports_local_host_telemetry(
@@ -831,3 +831,84 @@ def test_consumer_bridge_invokes_server(
 
     assert captured["host"] == "127.0.0.1"
     assert captured["port"] == 9876
+
+
+def test_consumer_summary_separates_collector_versions(
+    tmp_path: Path,
+    capsys,
+):
+    path = tmp_path / "consumer.db"
+
+    current = make_record(
+        with_telemetry=True,
+    )
+    alternate = make_record(
+        with_telemetry=True,
+    )
+
+    assert current.local_telemetry is not None
+    assert alternate.local_telemetry is not None
+
+    alternate.local_telemetry.collector_version = (
+        "synthetic-collector-v0.2"
+    )
+    alternate.local_telemetry.peak_browser_rss_bytes = (
+        9 * 1024 * 1024 * 1024
+    )
+    alternate.local_telemetry.peak_browser_pss_bytes = (
+        6 * 1024 * 1024 * 1024
+    )
+
+    store = ConsumerProbeSQLiteStore(path)
+    store.append(current)
+    store.append(alternate)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "consumer-summary",
+            "--storage",
+            str(path),
+        ]
+    )
+
+    result = consumer_summary(args)
+
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Collectors:       2" in output
+
+    current_header = (
+        "--- COLLECTOR: "
+        "linux-proc-firefox-tree-fastslow-v0.1 ---"
+    )
+    alternate_header = (
+        "--- COLLECTOR: "
+        "synthetic-collector-v0.2 ---"
+    )
+
+    assert current_header in output
+    assert alternate_header in output
+
+    current_block = output.split(
+        current_header,
+        1,
+    )[1].split(
+        alternate_header,
+        1,
+    )[0]
+
+    alternate_block = output.split(
+        alternate_header,
+        1,
+    )[1]
+
+    assert "Samples:          1" in current_block
+    assert "Median peak RSS:  3.00 GiB" in current_block
+
+    assert "Samples:          1" in alternate_block
+    assert "Median peak RSS:  9.00 GiB" in alternate_block
+
+    # A mixed median would be 6 GiB. It must never appear.
+    assert "Median peak RSS:  6.00 GiB" not in output

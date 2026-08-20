@@ -182,3 +182,56 @@ def summarize_local_telemetry_records(
             else None
         ),
     )
+
+
+def summarize_local_telemetry_for_collector(
+    records: list[ConsumerProbeRecord],
+    collector_version: str | None,
+) -> LocalTelemetryAnalyticsSummary:
+    """
+    Summarize only instrumented records produced by one collector.
+
+    collector_version=None selects legacy telemetry for which collector
+    provenance is unavailable.
+    """
+    selected = [
+        record
+        for record in records
+        if (
+            record.local_telemetry is not None
+            and record.local_telemetry.collector_version
+            == collector_version
+        )
+    ]
+
+    return summarize_local_telemetry_records(
+        selected
+    )
+
+
+def summarize_local_telemetry_by_collector(
+    records: list[ConsumerProbeRecord],
+) -> dict[
+    str | None,
+    LocalTelemetryAnalyticsSummary,
+]:
+    """
+    Build independent telemetry summaries for each collector version.
+
+    Legacy telemetry without collector provenance is kept under the
+    None key and is never mixed with versioned collectors.
+    """
+    collector_versions = {
+        record.local_telemetry.collector_version
+        for record in records
+        if record.local_telemetry is not None
+    }
+
+    return {
+        collector_version:
+            summarize_local_telemetry_for_collector(
+                records,
+                collector_version,
+            )
+        for collector_version in collector_versions
+    }

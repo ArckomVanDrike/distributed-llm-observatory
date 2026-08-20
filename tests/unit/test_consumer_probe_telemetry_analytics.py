@@ -9,6 +9,8 @@ from consumer_probe.schemas import (
     LocalTelemetryRecord,
 )
 from consumer_probe.telemetry_analytics import (
+    summarize_local_telemetry_by_collector,
+    summarize_local_telemetry_for_collector,
     summarize_local_telemetry_records,
 )
 
@@ -254,3 +256,127 @@ def test_legacy_only_dataset_returns_empty_metrics():
 
     assert summary.median_fast_sampling_hz is None
     assert summary.median_pss_sampling_hz is None
+
+
+def test_collector_summary_does_not_mix_versions():
+    collector_a = (
+        "linux-proc-firefox-tree-fastslow-v0.1"
+    )
+    collector_b = "synthetic-collector-v0.2"
+
+    record_a = make_record(
+        rss=1000,
+    )
+
+    record_b = make_record(
+        rss=9000,
+    )
+
+    assert record_b.local_telemetry is not None
+
+    record_b.local_telemetry.collector_version = (
+        collector_b
+    )
+
+    summary = (
+        summarize_local_telemetry_for_collector(
+            [record_a, record_b],
+            collector_a,
+        )
+    )
+
+    assert summary.record_count == 1
+    assert summary.telemetry_records == 1
+    assert (
+        summary.median_peak_browser_rss_bytes
+        == 1000
+    )
+
+
+def test_collector_breakdown_separates_versions():
+    collector_a = (
+        "linux-proc-firefox-tree-fastslow-v0.1"
+    )
+    collector_b = "synthetic-collector-v0.2"
+
+    record_a = make_record(
+        rss=1000,
+    )
+
+    record_b = make_record(
+        rss=9000,
+    )
+
+    assert record_b.local_telemetry is not None
+
+    record_b.local_telemetry.collector_version = (
+        collector_b
+    )
+
+    breakdown = (
+        summarize_local_telemetry_by_collector(
+            [record_a, record_b]
+        )
+    )
+
+    assert set(breakdown) == {
+        collector_a,
+        collector_b,
+    }
+
+    assert (
+        breakdown[
+            collector_a
+        ].median_peak_browser_rss_bytes
+        == 1000
+    )
+
+    assert (
+        breakdown[
+            collector_b
+        ].median_peak_browser_rss_bytes
+        == 9000
+    )
+
+
+def test_collector_breakdown_keeps_legacy_separate():
+    current = make_record(
+        rss=1000,
+    )
+
+    legacy = make_record(
+        rss=5000,
+    )
+
+    assert legacy.local_telemetry is not None
+
+    legacy.local_telemetry.telemetry_schema_version = (
+        "0.1"
+    )
+    legacy.local_telemetry.collector_version = None
+    legacy.local_telemetry.browser_scope = None
+    legacy.local_telemetry.memory_method = None
+    legacy.local_telemetry.fast_interval_target_ms = None
+    legacy.local_telemetry.pss_interval_target_ms = None
+
+    breakdown = (
+        summarize_local_telemetry_by_collector(
+            [current, legacy]
+        )
+    )
+
+    assert None in breakdown
+
+    assert (
+        breakdown[
+            None
+        ].median_peak_browser_rss_bytes
+        == 5000
+    )
+
+    assert (
+        breakdown[
+            "linux-proc-firefox-tree-fastslow-v0.1"
+        ].median_peak_browser_rss_bytes
+        == 1000
+    )
