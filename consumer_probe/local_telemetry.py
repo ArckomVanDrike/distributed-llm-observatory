@@ -23,6 +23,7 @@ class LocalTelemetrySnapshot:
 
     browser_process_count: int
     browser_rss_bytes: int
+    browser_pss_bytes: int | None
     browser_cpu_ticks: int
 
     system_memory_available_bytes: int
@@ -37,6 +38,7 @@ class LocalTelemetrySample:
 
     browser_process_count: int
     browser_rss_bytes: int
+    browser_pss_bytes: int | None
     browser_cpu_percent: float | None
 
     system_memory_available_bytes: int
@@ -228,6 +230,41 @@ def _read_process_ppid(
         return None
 
 
+def _read_process_pss_bytes(
+    process_root: Path,
+) -> int | None:
+    try:
+        lines = (
+            process_root
+            .joinpath("smaps_rollup")
+            .read_text(
+                encoding="utf-8"
+            )
+            .splitlines()
+        )
+    except (
+        OSError,
+        UnicodeDecodeError,
+    ):
+        return None
+
+    for line in lines:
+        if not line.startswith("Pss:"):
+            continue
+
+        parts = line.split()
+
+        if len(parts) < 2:
+            return None
+
+        try:
+            return int(parts[1]) * 1024
+        except ValueError:
+            return None
+
+    return None
+
+
 def _read_process_cpu_ticks(
     process_root: Path,
 ) -> int | None:
@@ -258,7 +295,7 @@ def _read_process_cpu_ticks(
 def _read_browser_totals(
     proc_root: Path,
     process_names: frozenset[str],
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int | None, int]:
     """
     Aggregate the complete process tree rooted at the browser.
 
@@ -281,6 +318,7 @@ def _read_browser_totals(
             int | None,
             str | None,
             int,
+            int | None,
             int,
         ],
     ] = {}
@@ -308,6 +346,10 @@ def _read_browser_totals(
             or 0
         )
 
+        pss = _read_process_pss_bytes(
+            process_root
+        )
+
         cpu_ticks = (
             _read_process_cpu_ticks(
                 process_root
@@ -319,6 +361,7 @@ def _read_browser_totals(
             ppid,
             name,
             rss,
+            pss,
             cpu_ticks,
         )
 
@@ -326,7 +369,7 @@ def _read_browser_totals(
             root_pids.add(pid)
 
     if not root_pids:
-        return (0, 0, 0)
+        return (0, 0, None, 0)
 
     browser_pids = set(
         root_pids
@@ -350,6 +393,8 @@ def _read_browser_totals(
             changed = True
 
     rss_bytes = 0
+    pss_bytes = 0
+    pss_complete = True
     cpu_ticks = 0
 
     for pid in browser_pids:
@@ -361,11 +406,20 @@ def _read_browser_totals(
             continue
 
         rss_bytes += process[2]
-        cpu_ticks += process[3]
+
+        process_pss = process[3]
+
+        if process_pss is None:
+            pss_complete = False
+        else:
+            pss_bytes += process_pss
+
+        cpu_ticks += process[4]
 
     return (
         len(browser_pids),
         rss_bytes,
+        pss_bytes if pss_complete else None,
         cpu_ticks,
     )
 
@@ -385,6 +439,7 @@ def capture_local_telemetry(
     (
         browser_process_count,
         browser_rss_bytes,
+        browser_pss_bytes,
         browser_cpu_ticks,
     ) = _read_browser_totals(
         proc_root,
@@ -407,6 +462,7 @@ def capture_local_telemetry(
             browser_process_count
         ),
         browser_rss_bytes=browser_rss_bytes,
+        browser_pss_bytes=browser_pss_bytes,
         browser_cpu_ticks=browser_cpu_ticks,
         system_memory_available_bytes=(
             _read_available_memory(
@@ -504,6 +560,9 @@ def derive_local_telemetry_sample(
         ),
         browser_rss_bytes=(
             current.browser_rss_bytes
+        ),
+        browser_pss_bytes=(
+            current.browser_pss_bytes
         ),
         browser_cpu_percent=(
             browser_cpu_percent

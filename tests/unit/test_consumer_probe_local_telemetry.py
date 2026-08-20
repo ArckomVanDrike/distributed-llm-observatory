@@ -18,6 +18,7 @@ def make_process(
     rss_kb: int,
     user_ticks: int,
     system_ticks: int,
+    pss_kb: int | None = None,
 ) -> None:
     root = proc_root / str(pid)
     root.mkdir()
@@ -32,6 +33,13 @@ def make_process(
         f"VmRSS:\t{rss_kb} kB\n",
         encoding="utf-8",
     )
+
+    if pss_kb is not None:
+        (root / "smaps_rollup").write_text(
+            f"Rss:\t{rss_kb} kB\n"
+            f"Pss:\t{pss_kb} kB\n",
+            encoding="utf-8",
+        )
 
     fields = [
         str(pid),
@@ -163,6 +171,7 @@ def test_derive_calculates_browser_cpu():
         monotonic_ns=1_000_000_000,
         browser_process_count=5,
         browser_rss_bytes=100,
+        browser_pss_bytes=None,
         browser_cpu_ticks=100,
         system_memory_available_bytes=1000,
         system_cpu_total_ticks=1000,
@@ -174,6 +183,7 @@ def test_derive_calculates_browser_cpu():
         monotonic_ns=2_000_000_000,
         browser_process_count=5,
         browser_rss_bytes=200,
+        browser_pss_bytes=None,
         browser_cpu_ticks=150,
         system_memory_available_bytes=900,
         system_cpu_total_ticks=1100,
@@ -213,6 +223,7 @@ def test_browser_cpu_can_exceed_100_percent():
         monotonic_ns=0,
         browser_process_count=4,
         browser_rss_bytes=0,
+        browser_pss_bytes=None,
         browser_cpu_ticks=0,
         system_memory_available_bytes=0,
         system_cpu_total_ticks=0,
@@ -224,6 +235,7 @@ def test_browser_cpu_can_exceed_100_percent():
         monotonic_ns=1_000_000_000,
         browser_process_count=4,
         browser_rss_bytes=0,
+        browser_pss_bytes=None,
         browser_cpu_ticks=250,
         system_memory_available_bytes=0,
         system_cpu_total_ticks=100,
@@ -255,6 +267,7 @@ def test_non_monotonic_snapshots_are_rejected():
         monotonic_ns=100,
         browser_process_count=0,
         browser_rss_bytes=0,
+        browser_pss_bytes=None,
         browser_cpu_ticks=0,
         system_memory_available_bytes=0,
         system_cpu_total_ticks=0,
@@ -448,3 +461,74 @@ def test_capture_excludes_unrelated_process_tree(
         snapshot.browser_rss_bytes
         == 1000 * 1024
     )
+
+
+def test_capture_aggregates_complete_browser_pss(
+    tmp_path: Path,
+):
+    proc_root = make_proc_root(
+        tmp_path
+    )
+
+    make_process(
+        proc_root,
+        pid=100,
+        name="firefox",
+        rss_kb=1000,
+        pss_kb=700,
+        user_ticks=10,
+        system_ticks=5,
+    )
+
+    make_process(
+        proc_root,
+        pid=101,
+        name="firefox",
+        rss_kb=2000,
+        pss_kb=1300,
+        user_ticks=20,
+        system_ticks=10,
+    )
+
+    snapshot = capture_local_telemetry(
+        proc_root=proc_root
+    )
+
+    assert (
+        snapshot.browser_pss_bytes
+        == 2000 * 1024
+    )
+
+
+def test_capture_rejects_partial_browser_pss(
+    tmp_path: Path,
+):
+    proc_root = make_proc_root(
+        tmp_path
+    )
+
+    make_process(
+        proc_root,
+        pid=100,
+        name="firefox",
+        rss_kb=1000,
+        pss_kb=700,
+        user_ticks=10,
+        system_ticks=5,
+    )
+
+    # Deliberately has no smaps_rollup/PSS.
+    make_process(
+        proc_root,
+        pid=101,
+        name="firefox",
+        rss_kb=2000,
+        user_ticks=20,
+        system_ticks=10,
+    )
+
+    snapshot = capture_local_telemetry(
+        proc_root=proc_root
+    )
+
+    assert snapshot.browser_pss_bytes is None

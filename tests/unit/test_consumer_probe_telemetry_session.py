@@ -30,6 +30,7 @@ def make_sample(
         interval_ms=250,
         browser_process_count=processes,
         browser_rss_bytes=rss,
+        browser_pss_bytes=None,
         browser_cpu_percent=browser_cpu,
         system_memory_available_bytes=(
             memory_available
@@ -127,6 +128,7 @@ def test_session_collects_and_summarizes_samples():
             browser_rss_bytes=(
                 captured * 100
             ),
+            browser_pss_bytes=None,
             browser_cpu_ticks=(
                 captured * 50
             ),

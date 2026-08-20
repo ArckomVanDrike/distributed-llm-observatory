@@ -43,6 +43,7 @@ class FakeTelemetrySession:
             interval_ms=250,
             browser_process_count=5,
             browser_rss_bytes=1234,
+            browser_pss_bytes=None,
             browser_cpu_percent=42,
             system_memory_available_bytes=5678,
             system_cpu_percent=21,
