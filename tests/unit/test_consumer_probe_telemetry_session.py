@@ -30,7 +30,7 @@ def make_sample(
         interval_ms=250,
         browser_process_count=processes,
         browser_rss_bytes=rss,
-        browser_pss_bytes=None,
+        browser_pss_bytes=rss // 2,
         browser_cpu_percent=browser_cpu,
         system_memory_available_bytes=(
             memory_available
@@ -75,6 +75,7 @@ def test_summary_tracks_local_resource_peaks():
         == 6
     )
     assert summary.peak_browser_rss_bytes == 250
+    assert summary.peak_browser_pss_bytes == 125
     assert summary.peak_browser_cpu_percent == 80
 
     assert (
@@ -93,6 +94,7 @@ def test_empty_summary_preserves_duration():
     assert summary.sample_count == 0
     assert summary.duration_ms == 125
     assert summary.peak_browser_rss_bytes is None
+    assert summary.peak_browser_pss_bytes is None
     assert summary.peak_browser_cpu_percent is None
 
 

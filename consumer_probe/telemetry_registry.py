@@ -50,6 +50,9 @@ def telemetry_result_payload(
         "peak_browser_rss_bytes": (
             summary.peak_browser_rss_bytes
         ),
+        "peak_browser_pss_bytes": (
+            summary.peak_browser_pss_bytes
+        ),
         "peak_browser_cpu_percent": (
             summary.peak_browser_cpu_percent
         ),

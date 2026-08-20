@@ -21,6 +21,7 @@ class LocalTelemetrySummary:
 
     peak_browser_process_count: int | None
     peak_browser_rss_bytes: int | None
+    peak_browser_pss_bytes: int | None
     peak_browser_cpu_percent: float | None
 
     min_system_memory_available_bytes: int | None
@@ -52,6 +53,7 @@ def summarize_local_telemetry(
             duration_ms=duration_ms,
             peak_browser_process_count=None,
             peak_browser_rss_bytes=None,
+            peak_browser_pss_bytes=None,
             peak_browser_cpu_percent=None,
             min_system_memory_available_bytes=None,
             peak_system_cpu_percent=None,
@@ -62,6 +64,17 @@ def summarize_local_telemetry(
         for sample in samples
         if sample.browser_cpu_percent is not None
     ]
+
+    browser_pss_values = [
+        sample.browser_pss_bytes
+        for sample in samples
+        if sample.browser_pss_bytes is not None
+    ]
+
+    complete_browser_pss = (
+        len(browser_pss_values)
+        == len(samples)
+    )
 
     system_cpu_values = [
         sample.system_cpu_percent
@@ -79,6 +92,11 @@ def summarize_local_telemetry(
         peak_browser_rss_bytes=max(
             sample.browser_rss_bytes
             for sample in samples
+        ),
+        peak_browser_pss_bytes=(
+            max(browser_pss_values)
+            if complete_browser_pss
+            else None
         ),
         peak_browser_cpu_percent=(
             max(browser_cpu_values)

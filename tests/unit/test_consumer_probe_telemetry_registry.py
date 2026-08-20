@@ -58,6 +58,7 @@ class FakeTelemetrySession:
                 duration_ms=250,
                 peak_browser_process_count=5,
                 peak_browser_rss_bytes=1234,
+                peak_browser_pss_bytes=900,
                 peak_browser_cpu_percent=42,
                 min_system_memory_available_bytes=5678,
                 peak_system_cpu_percent=21,
@@ -136,6 +137,11 @@ def test_stop_returns_telemetry_summary():
     assert (
         result["peak_browser_rss_bytes"]
         == 1234
+    )
+
+    assert (
+        result["peak_browser_pss_bytes"]
+        == 900
     )
 
     assert (
