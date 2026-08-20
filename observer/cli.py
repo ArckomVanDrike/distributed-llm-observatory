@@ -716,11 +716,11 @@ def consumer_summary(
             f"{stats.successful_samples}"
         )
         print(
-            f"Median TTFO:      "
+            f"Median human-observed first output: "
             f"{format_ms(stats.median_ttfo_ms)}"
         )
         print(
-            f"P95 TTFO:         "
+            f"P95 human-observed first output:    "
             f"{format_ms(stats.p95_ttfo_ms)}"
         )
         print(
@@ -978,7 +978,7 @@ def consumer_detect(
 
         if comparison.ttfo_ratio is not None:
             print(
-                f"TTFO ratio:        "
+                f"Human-observed first-output ratio: "
                 f"{comparison.ttfo_ratio:.2f}x"
             )
 

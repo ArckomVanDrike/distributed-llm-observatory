@@ -368,7 +368,7 @@ async function refreshLocalSummary() {
       : `${lastProbe.time_to_first_output_ms} ms`;
 
   lastMeasurement.textContent =
-    `Last: ${totalSeconds.toFixed(2)} s · TTFO ${ttfo}`;
+    `Last: ${totalSeconds.toFixed(2)} s · Human-observed first output ${ttfo}`;
 }
 
 
@@ -482,7 +482,7 @@ function mountProbeOverlay(
   }
 
   const start = makeButton("Start Timer");
-  const first = makeButton("First Output");
+  const first = makeButton("Mark First Output (Human)");
   const complete = makeButton("Complete");
   const cancel = makeButton("Cancel");
 

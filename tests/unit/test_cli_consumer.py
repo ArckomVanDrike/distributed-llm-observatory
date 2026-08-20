@@ -180,7 +180,10 @@ def test_consumer_summary_reads_sqlite(
 
     assert result == 0
     assert "Samples:          1" in output
-    assert "Median TTFO:" in output
+    assert (
+        "Median human-observed first output:"
+        in output
+    )
     assert "1200.00 ms" in output
     assert "3000.00 ms" in output
 
