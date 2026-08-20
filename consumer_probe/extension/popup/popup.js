@@ -394,6 +394,12 @@ function mountProbeOverlay(
   let firstOutputAt = null;
   let completed = false;
 
+  let probeId = null;
+  let telemetryStartPromise = null;
+  let telemetryFinalized = false;
+  let localTelemetry = null;
+  let localTelemetryError = null;
+
   function detectPlatform(hostname) {
     if (hostname === "chatgpt.com") {
       return "chatgpt";
@@ -488,7 +494,36 @@ function mountProbeOverlay(
       return;
     }
 
+    probeId = crypto.randomUUID();
     startedAt = Date.now();
+
+    telemetryStartPromise =
+      extensionApi.runtime.sendMessage({
+        type: "dllo-telemetry-start",
+        probe_id: probeId
+      });
+
+    void telemetryStartPromise
+      .then((response) => {
+        if (
+          !completed &&
+          !response?.ok
+        ) {
+          status.textContent =
+            "Running… · local telemetry unavailable";
+        }
+      })
+      .catch((error) => {
+        if (!completed) {
+          status.textContent =
+            "Running… · local telemetry unavailable";
+        }
+
+        console.warn(
+          "DLLO telemetry start failed",
+          error
+        );
+      });
 
     status.textContent = "Running…";
 
@@ -496,6 +531,57 @@ function mountProbeOverlay(
     first.disabled = false;
     complete.disabled = false;
   });
+
+  async function stopLocalTelemetry() {
+    if (telemetryFinalized) {
+      return;
+    }
+
+    telemetryFinalized = true;
+
+    if (
+      probeId === null ||
+      telemetryStartPromise === null
+    ) {
+      return;
+    }
+
+    try {
+      const startResponse =
+        await telemetryStartPromise;
+
+      if (!startResponse?.ok) {
+        localTelemetryError =
+          startResponse?.error?.message ??
+          "Local telemetry did not start.";
+        return;
+      }
+
+      const stopResponse =
+        await extensionApi.runtime.sendMessage({
+          type: "dllo-telemetry-stop",
+          probe_id: probeId
+        });
+
+      if (!stopResponse?.ok) {
+        localTelemetryError =
+          stopResponse?.error?.message ??
+          "Local telemetry could not be stopped.";
+        return;
+      }
+
+      localTelemetry =
+        stopResponse.payload ?? null;
+    } catch (error) {
+      localTelemetryError =
+        error?.message ?? String(error);
+
+      console.warn(
+        "DLLO telemetry stop failed",
+        error
+      );
+    }
+  }
 
   first.addEventListener("click", () => {
     if (
@@ -529,9 +615,14 @@ function mountProbeOverlay(
       const hostname =
         window.location.hostname;
 
+      status.textContent =
+        "Stopping local telemetry…";
+
+      await stopLocalTelemetry();
+
       const result = {
         schema_version: "0.1",
-        probe_id: crypto.randomUUID(),
+        probe_id: probeId,
 
         prompt_id: promptId,
         benchmark_version: "0.1",
@@ -582,7 +673,13 @@ function mountProbeOverlay(
         response_text: null,
 
         measurement_mode:
-          "consumer-ui-manual-v0.1"
+          "consumer-ui-manual-v0.1",
+
+        local_telemetry:
+          localTelemetry,
+
+        local_telemetry_error:
+          localTelemetryError
       };
 
       try {
@@ -640,6 +737,34 @@ function mountProbeOverlay(
   cancel.addEventListener("click", () => {
     completed = true;
     overlay.remove();
+
+    if (
+      telemetryFinalized ||
+      probeId === null ||
+      telemetryStartPromise === null
+    ) {
+      return;
+    }
+
+    telemetryFinalized = true;
+
+    void telemetryStartPromise
+      .then(async (startResponse) => {
+        if (!startResponse?.ok) {
+          return;
+        }
+
+        await extensionApi.runtime.sendMessage({
+          type: "dllo-telemetry-cancel",
+          probe_id: probeId
+        });
+      })
+      .catch((error) => {
+        console.warn(
+          "DLLO telemetry cancel failed",
+          error
+        );
+      });
   });
 
   overlay.append(

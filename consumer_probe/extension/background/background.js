@@ -41,21 +41,81 @@ ext.storage.onChanged.addListener(
 void logLastProbe();
 
 
+const BRIDGE_BASE_URL =
+  "http://127.0.0.1:8765";
+
+async function hasBridgePermission() {
+  return ext.permissions.contains({
+    origins: [
+      "http://127.0.0.1/*"
+    ]
+  });
+}
+
+async function bridgeJson(
+  route,
+  {
+    method = "GET",
+    body = null
+  } = {}
+) {
+  const options = {
+    method,
+    cache: "no-store"
+  };
+
+  if (body !== null) {
+    options.headers = {
+      "Content-Type": "application/json"
+    };
+
+    options.body =
+      JSON.stringify(body);
+  }
+
+  const response = await fetch(
+    `${BRIDGE_BASE_URL}${route}`,
+    options
+  );
+
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      payload?.message ??
+      `Bridge returned ${response.status}.`
+    );
+
+    error.name =
+      payload?.error ?? "BridgeError";
+
+    throw error;
+  }
+
+  return payload;
+}
+
 ext.runtime.onMessage.addListener(
   async (message) => {
-    if (message?.type !== "dllo-bridge-next") {
+    const supportedTypes = new Set([
+      "dllo-bridge-next",
+      "dllo-telemetry-start",
+      "dllo-telemetry-stop",
+      "dllo-telemetry-cancel"
+    ]);
+
+    if (!supportedTypes.has(message?.type)) {
       return undefined;
     }
 
     try {
-      const hasBridgePermission =
-        await ext.permissions.contains({
-          origins: [
-            "http://127.0.0.1/*"
-          ]
-        });
-
-      if (!hasBridgePermission) {
+      if (!(await hasBridgePermission())) {
         return {
           ok: false,
           error: {
@@ -66,38 +126,45 @@ ext.runtime.onMessage.addListener(
         };
       }
 
-      const healthResponse = await fetch(
-        "http://127.0.0.1:8765/health",
-        {
-          cache: "no-store"
-        }
-      );
+      if (message.type === "dllo-bridge-next") {
+        await bridgeJson("/health");
 
-      if (!healthResponse.ok) {
+        const payload =
+          await bridgeJson("/v1/next");
+
+        return {
+          ok: true,
+          payload
+        };
+      }
+
+      if (
+        typeof message.probe_id !== "string" ||
+        !message.probe_id
+      ) {
         throw new Error(
-          `Bridge health returned ${
-            healthResponse.status
-          }.`
+          "probe_id is required."
         );
       }
 
-      const nextResponse = await fetch(
-        "http://127.0.0.1:8765/v1/next",
+      const routes = {
+        "dllo-telemetry-start":
+          "/v1/telemetry/start",
+        "dllo-telemetry-stop":
+          "/v1/telemetry/stop",
+        "dllo-telemetry-cancel":
+          "/v1/telemetry/cancel"
+      };
+
+      const payload = await bridgeJson(
+        routes[message.type],
         {
-          cache: "no-store"
+          method: "POST",
+          body: {
+            probe_id: message.probe_id
+          }
         }
       );
-
-      if (!nextResponse.ok) {
-        throw new Error(
-          `Bridge next returned ${
-            nextResponse.status
-          }.`
-        );
-      }
-
-      const payload =
-        await nextResponse.json();
 
       return {
         ok: true,
@@ -105,7 +172,7 @@ ext.runtime.onMessage.addListener(
       };
     } catch (error) {
       console.error(
-        "DLLO bridge background fetch failed",
+        "DLLO bridge background request failed",
         error
       );
 
