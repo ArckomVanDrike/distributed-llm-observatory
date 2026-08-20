@@ -222,3 +222,142 @@ def test_bridge_rejects_non_local_bind(
             host="0.0.0.0",
             port=8765,
         )
+
+
+def post_json(
+    url: str,
+    payload: dict,
+):
+    from urllib.request import Request
+
+    body = json.dumps(
+        payload
+    ).encode("utf-8")
+
+    return urlopen(
+        Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type":
+                    "application/json",
+            },
+            method="POST",
+        ),
+        timeout=2,
+    )
+
+
+def test_telemetry_start_and_cancel_endpoints(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    server, thread = run_test_server(
+        config
+    )
+
+    probe_id = (
+        "19aa650b-76ea-4e8e-"
+        "bf4e-10188989935b"
+    )
+
+    try:
+        host, port = server.server_address
+        base = f"http://{host}:{port}"
+
+        with post_json(
+            f"{base}/v1/telemetry/start",
+            {
+                "probe_id": probe_id,
+            },
+        ) as response:
+            payload = json.load(
+                response
+            )
+
+        assert response.status == 201
+        assert payload["status"] == "running"
+        assert payload["probe_id"] == probe_id
+
+        with post_json(
+            f"{base}/v1/telemetry/cancel",
+            {
+                "probe_id": probe_id,
+            },
+        ) as response:
+            payload = json.load(
+                response
+            )
+
+        assert response.status == 200
+        assert payload["status"] == "cancelled"
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_telemetry_stop_returns_local_metrics(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    server, thread = run_test_server(
+        config
+    )
+
+    probe_id = (
+        "a53ff6e7-3972-4287-"
+        "86ab-72f438fe56bf"
+    )
+
+    try:
+        host, port = server.server_address
+        base = f"http://{host}:{port}"
+
+        with post_json(
+            f"{base}/v1/telemetry/start",
+            {
+                "probe_id": probe_id,
+            },
+        ):
+            pass
+
+        with post_json(
+            f"{base}/v1/telemetry/stop",
+            {
+                "probe_id": probe_id,
+            },
+        ) as response:
+            payload = json.load(
+                response
+            )
+
+        assert response.status == 200
+        assert payload["probe_id"] == probe_id
+
+        assert (
+            payload["telemetry_schema_version"]
+            == "0.1"
+        )
+
+        assert payload["sample_count"] >= 1
+
+        assert (
+            payload["peak_browser_rss_bytes"]
+            is not None
+        )
+
+        assert (
+            payload[
+                "min_system_memory_available_bytes"
+            ]
+            is not None
+        )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

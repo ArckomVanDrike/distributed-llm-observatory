@@ -11,9 +11,17 @@ from consumer_probe.due import (
     find_due_probe,
     find_next_probe,
 )
+from consumer_probe.local_telemetry import (
+    LocalTelemetryUnavailableError,
+)
 from consumer_probe.sampling import SamplingPolicy
 from consumer_probe.schemas import ConsumerPlatform
 from consumer_probe.storage.sqlite import ConsumerProbeSQLiteStore
+from consumer_probe.telemetry_registry import (
+    TelemetrySessionConflictError,
+    TelemetrySessionNotFoundError,
+    TelemetrySessionRegistry,
+)
 from observer.core.consumer_schedule import build_prompt_bank_schedule
 
 
@@ -182,7 +190,16 @@ def build_next_payload(
     }
 
 
-def make_handler(config: BridgeConfig):
+def make_handler(
+    config: BridgeConfig,
+    telemetry_registry: TelemetrySessionRegistry | None = None,
+):
+    registry = (
+        telemetry_registry
+        if telemetry_registry is not None
+        else TelemetrySessionRegistry()
+    )
+
     class BridgeHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
@@ -207,6 +224,174 @@ def make_handler(config: BridgeConfig):
                     "error": "not_found",
                 },
             )
+
+        def do_POST(self) -> None:
+            parsed = urlparse(self.path)
+
+            if parsed.path == "/v1/telemetry/start":
+                self._handle_telemetry_action(
+                    "start"
+                )
+                return
+
+            if parsed.path == "/v1/telemetry/stop":
+                self._handle_telemetry_action(
+                    "stop"
+                )
+                return
+
+            if parsed.path == "/v1/telemetry/cancel":
+                self._handle_telemetry_action(
+                    "cancel"
+                )
+                return
+
+            self._send_json(
+                404,
+                {
+                    "error": "not_found",
+                },
+            )
+
+        def _read_json_body(
+            self,
+        ) -> dict:
+            raw_length = self.headers.get(
+                "Content-Length"
+            )
+
+            if raw_length is None:
+                raise ValueError(
+                    "Content-Length is required."
+                )
+
+            try:
+                length = int(raw_length)
+            except ValueError as exc:
+                raise ValueError(
+                    "Invalid Content-Length."
+                ) from exc
+
+            if length <= 0:
+                raise ValueError(
+                    "Request body is required."
+                )
+
+            if length > 4096:
+                raise ValueError(
+                    "Request body is too large."
+                )
+
+            raw_body = self.rfile.read(
+                length
+            )
+
+            try:
+                payload = json.loads(
+                    raw_body.decode("utf-8")
+                )
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+            ) as exc:
+                raise ValueError(
+                    "Invalid JSON request body."
+                ) from exc
+
+            if not isinstance(
+                payload,
+                dict,
+            ):
+                raise ValueError(
+                    "JSON request body must be an object."
+                )
+
+            return payload
+
+        def _handle_telemetry_action(
+            self,
+            action: str,
+        ) -> None:
+            try:
+                payload = (
+                    self._read_json_body()
+                )
+
+                probe_id = payload.get(
+                    "probe_id"
+                )
+
+                if not isinstance(
+                    probe_id,
+                    str,
+                ):
+                    raise ValueError(
+                        "probe_id is required."
+                    )
+
+                if action == "start":
+                    response = registry.start(
+                        probe_id
+                    )
+                    status = 201
+
+                elif action == "stop":
+                    response = registry.stop(
+                        probe_id
+                    )
+                    status = 200
+
+                elif action == "cancel":
+                    response = registry.cancel(
+                        probe_id
+                    )
+                    status = 200
+
+                else:
+                    raise ValueError(
+                        "Unknown telemetry action."
+                    )
+
+                self._send_json(
+                    status,
+                    response,
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+
+            except TelemetrySessionConflictError as exc:
+                self._send_json(
+                    409,
+                    {
+                        "error": "session_conflict",
+                        "message": str(exc),
+                    },
+                )
+
+            except TelemetrySessionNotFoundError as exc:
+                self._send_json(
+                    404,
+                    {
+                        "error": "session_not_found",
+                        "message": str(exc),
+                    },
+                )
+
+            except LocalTelemetryUnavailableError as exc:
+                self._send_json(
+                    503,
+                    {
+                        "error": "telemetry_unavailable",
+                        "message": str(exc),
+                    },
+                )
 
         def _handle_next(
             self,
