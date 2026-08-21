@@ -1,5 +1,6 @@
 import json
 from datetime import date, datetime
+from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -125,10 +126,15 @@ def test_build_next_payload_rejects_naive_time(
 
 def run_test_server(
     config: BridgeConfig,
+    *,
+    collector_static_root: Path | None = None,
 ):
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0),
-        make_handler(config),
+        make_handler(
+            config,
+            collector_static_root=collector_static_root,
+        ),
     )
 
     thread = Thread(
@@ -201,6 +207,134 @@ def test_next_endpoint_returns_json_contract(
         assert payload["item"]["prompt_id"] == (
             "mathematics-001"
         )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_root_serves_local_collector(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    collector_root = tmp_path / "collector"
+    collector_root.mkdir()
+
+    (collector_root / "index.html").write_text(
+        "<!doctype html><title>DLLO Collector</title>",
+        encoding="utf-8",
+    )
+
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/",
+            timeout=2,
+        ) as response:
+            body = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert "DLLO Collector" in body
+        assert response.headers["Content-Type"].startswith(
+            "text/html"
+        )
+        assert response.headers["Cache-Control"] == "no-store"
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_collector_serves_static_asset(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    collector_root = tmp_path / "collector"
+    assets_root = collector_root / "assets"
+    assets_root.mkdir(parents=True)
+
+    (assets_root / "app.js").write_text(
+        "console.log('DLLO Collector');",
+        encoding="utf-8",
+    )
+
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/assets/app.js",
+            timeout=2,
+        ) as response:
+            body = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert "DLLO Collector" in body
+        assert response.headers["Content-Type"].startswith(
+            "text/javascript"
+        )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_collector_rejects_path_traversal(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    collector_root = tmp_path / "collector"
+    assets_root = collector_root / "assets"
+    assets_root.mkdir(parents=True)
+
+    secret_path = tmp_path / "secret.txt"
+    secret_path.write_text(
+        "must-not-be-served",
+        encoding="utf-8",
+    )
+
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        connection = HTTPConnection(
+            host,
+            port,
+            timeout=2,
+        )
+
+        connection.request(
+            "GET",
+            "/assets/../secret.txt",
+        )
+
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+
+        assert response.status == 404
+        assert "must-not-be-served" not in body
+
+        connection.close()
 
     finally:
         server.shutdown()

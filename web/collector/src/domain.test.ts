@@ -10,7 +10,6 @@ import type {
 } from './domain'
 
 const probe: CollectorProbe = {
-  assignmentId: 'test-reasoning-001',
   platform: 'chatgpt',
   pageHostname: 'chatgpt.com',
   benchmarkVersion: '0.1',

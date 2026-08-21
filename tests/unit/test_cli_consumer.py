@@ -851,6 +851,28 @@ def test_parser_exposes_consumer_bridge():
     assert args.port == 8765
 
 
+def test_parser_accepts_collector_static_root(
+    tmp_path: Path,
+):
+    parser = build_parser()
+
+    collector_root = tmp_path / "collector-dist"
+
+    args = parser.parse_args(
+        [
+            "consumer-bridge",
+            "--platform",
+            "chatgpt",
+            "--observer-id",
+            "observer-test",
+            "--collector-static-root",
+            str(collector_root),
+        ]
+    )
+
+    assert args.collector_static_root == collector_root
+
+
 def test_consumer_bridge_invokes_server(
     tmp_path: Path,
     monkeypatch,
@@ -862,10 +884,14 @@ def test_consumer_bridge_invokes_server(
         *,
         host,
         port,
+        collector_static_root=None,
     ):
         captured["config"] = config
         captured["host"] = host
         captured["port"] = port
+        captured["collector_static_root"] = (
+            collector_static_root
+        )
 
     monkeypatch.setattr(
         "observer.cli.serve",
@@ -899,6 +925,8 @@ def test_consumer_bridge_invokes_server(
             "127.0.0.1",
             "--port",
             "9876",
+            "--collector-static-root",
+            str(tmp_path / "collector-dist"),
         ]
     )
 
@@ -921,6 +949,9 @@ def test_consumer_bridge_invokes_server(
 
     assert captured["host"] == "127.0.0.1"
     assert captured["port"] == 9876
+    assert captured["collector_static_root"] == (
+        tmp_path / "collector-dist"
+    )
 
 
 def test_consumer_summary_separates_collector_versions(

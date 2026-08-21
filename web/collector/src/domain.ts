@@ -1,5 +1,4 @@
 export type CollectorProbe = {
-  assignmentId: string
   platform: 'chatgpt' | 'claude' | 'gemini'
   pageHostname: string
   benchmarkVersion: string

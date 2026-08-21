@@ -480,6 +480,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bridge TCP port",
     )
 
+    bridge_parser.add_argument(
+        "--collector-static-root",
+        type=Path,
+        default=None,
+        help=(
+            "Optional local Collector build directory "
+            "to serve from the bridge"
+        ),
+    )
+
     return parser
 
 
@@ -1473,6 +1483,9 @@ def consumer_bridge(
             bridge_config,
             host=args.host,
             port=args.port,
+            collector_static_root=(
+                args.collector_static_root
+            ),
         )
 
         return 0

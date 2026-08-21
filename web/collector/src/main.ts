@@ -1,6 +1,10 @@
 import './style.css'
 
 import {
+  fetchBridgeAssignment,
+} from './bridge'
+
+import {
   buildCompletedRecord,
   elapsedMs,
 } from './domain'
@@ -18,23 +22,12 @@ type CollectorState =
   | 'first-output-marked'
   | 'completed'
 
-const demoProbe: CollectorProbe = {
-  assignmentId: 'demo-reasoning-001',
-  platform: 'chatgpt',
-  pageHostname: 'chatgpt.com',
-  benchmarkVersion: '0.1',
-  promptId: 'reasoning-001',
-  promptText:
-    'A farmer has 17 sheep. All but 9 run away. How many sheep remain?',
-  scheduledAtUtc: '2026-08-21T12:00:00Z',
-  measurementMode: 'consumer-ui-manual-v0.1',
-  responseCaptureEnabled: false,
-}
-
 let state: CollectorState = 'idle'
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
 let completedRecord: CompletedObservationRecord | null = null
+let bridgeMessage =
+  'Check the local DLLO Bridge for a scheduled probe.'
 
 function getAppRoot(): HTMLDivElement {
   const element =
@@ -148,12 +141,11 @@ function renderCurrentProbe(): string {
 
       <div class="empty-state">
         <p>
-          When a scheduled observation is available, its benchmark,
-          prompt, platform, and timing window will appear here.
+          ${bridgeMessage}
         </p>
 
         <button type="button" id="check-probe">
-          Load demo probe
+          Check scheduled probe
         </button>
       </div>
     `
@@ -412,12 +404,56 @@ function downloadCompletedRecord(): void {
 function bindEvents(): void {
   document
     .querySelector<HTMLButtonElement>('#check-probe')
-    ?.addEventListener('click', () => {
-      currentProbe = demoProbe
-      observationSession = null
-      completedRecord = null
-      state = 'ready'
+    ?.addEventListener('click', async () => {
+      bridgeMessage =
+        'Checking the local DLLO Bridge...'
       render()
+
+      try {
+        const assignment =
+          await fetchBridgeAssignment(
+            (input) => fetch(input),
+          )
+
+        observationSession = null
+        completedRecord = null
+
+        if (assignment === null) {
+          currentProbe = null
+          state = 'idle'
+          bridgeMessage =
+            'No scheduled probe is currently available.'
+          render()
+          return
+        }
+
+        if (assignment.status === 'upcoming') {
+          currentProbe = null
+          state = 'idle'
+          bridgeMessage =
+            'The next scheduled probe is upcoming and is not actionable yet.'
+          render()
+          return
+        }
+
+        currentProbe = assignment.probe
+        state = 'ready'
+        bridgeMessage =
+          'Scheduled probe loaded from the local DLLO Bridge.'
+        render()
+      } catch (error) {
+        currentProbe = null
+        observationSession = null
+        completedRecord = null
+        state = 'idle'
+
+        bridgeMessage =
+          error instanceof Error
+            ? error.message
+            : 'Unable to reach the local DLLO Bridge.'
+
+        render()
+      }
     })
 
   document
