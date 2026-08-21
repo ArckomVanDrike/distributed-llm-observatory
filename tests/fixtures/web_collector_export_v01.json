@@ -1,0 +1,34 @@
+{
+  "export_schema_version": "0.1",
+  "exported_at_utc": "2026-08-21T12:10:00Z",
+  "sample_count": 1,
+  "records": [
+    {
+      "schema_version": "0.1",
+      "probe_id": "29831d68-414c-4386-b429-20d9886dce9a",
+      "prompt_id": "reasoning-001",
+      "benchmark_version": "0.1",
+      "scheduled_at_utc": "2026-08-21T12:00:00Z",
+      "schedule_offset_ms": 60000,
+      "platform": "chatgpt",
+      "page_hostname": "chatgpt.com",
+      "started_at_ms": 1000000,
+      "started_at_utc": "2026-08-21T12:01:00Z",
+      "first_output_at_ms": 1004000,
+      "first_output_at_utc": "2026-08-21T12:01:04Z",
+      "completed_at_ms": 1009000,
+      "completed_at_utc": "2026-08-21T12:01:09Z",
+      "time_to_first_output_ms": 4000,
+      "first_output_measurement_mode": "human-observed-click-v0.1",
+      "total_latency_ms": 9000,
+      "generation_failed": false,
+      "interrupted": false,
+      "retry_observed": false,
+      "response_capture_enabled": false,
+      "response_text": null,
+      "measurement_mode": "consumer-ui-manual-v0.1",
+      "local_telemetry": null,
+      "local_telemetry_error": null
+    }
+  ]
+}
