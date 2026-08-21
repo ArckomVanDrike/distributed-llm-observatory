@@ -5,6 +5,12 @@ import {
 } from './bridge'
 
 import {
+  clearObservationHistory,
+  loadObservationHistory,
+  saveObservationHistory,
+} from './history-storage'
+
+import {
   appendObservationRecord,
   buildCompletedRecord,
   buildConsumerProbeExport,
@@ -31,7 +37,7 @@ let state: CollectorState = 'idle'
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
 let observationHistory: ObservationHistory =
-  createObservationHistory()
+  loadObservationHistory(window.localStorage)
 let observationOutcomes: ObservationOutcomes = {
   generationFailed: false,
   interrupted: false,
@@ -213,9 +219,37 @@ function renderCurrentProbe(): string {
           ${bridgeMessage}
         </p>
 
+        <p>
+          Session records:
+          <strong>${observationHistory.records.length}</strong>
+        </p>
+
         <button type="button" id="check-probe">
           Check scheduled probe
         </button>
+
+        ${
+          observationHistory.records.length > 0
+            ? `
+              <button
+                type="button"
+                id="download-record"
+                class="secondary-button"
+              >
+                Download session JSON
+                (${observationHistory.records.length} records)
+              </button>
+
+              <button
+                type="button"
+                id="reset-session-history"
+                class="secondary-button"
+              >
+                Reset local session
+              </button>
+            `
+            : ''
+        }
       </div>
     `
   }
@@ -281,6 +315,14 @@ function renderCurrentProbe(): string {
         class="secondary-button"
       >
         Clear completed probe
+      </button>
+
+      <button
+        type="button"
+        id="reset-session-history"
+        class="secondary-button"
+      >
+        Reset local session
       </button>
     `
   })()
@@ -603,6 +645,26 @@ function bindEvents(): void {
     })
 
   document
+    .querySelector<HTMLButtonElement>('#reset-session-history')
+    ?.addEventListener('click', () => {
+      const confirmed = window.confirm(
+        'Delete all locally persisted DLLO session records?',
+      )
+
+      if (!confirmed) {
+        return
+      }
+
+      clearObservationHistory(window.localStorage)
+      observationHistory = createObservationHistory()
+      currentProbe = null
+      observationSession = null
+      completedRecord = null
+      state = 'idle'
+      render()
+    })
+
+  document
     .querySelector<HTMLButtonElement>('#copy-prompt')
     ?.addEventListener('click', async () => {
       if (currentProbe === null) {
@@ -679,6 +741,11 @@ function bindEvents(): void {
       observationHistory = appendObservationRecord(
         observationHistory,
         completedRecord,
+      )
+
+      saveObservationHistory(
+        window.localStorage,
+        observationHistory,
       )
 
       state = 'completed'
