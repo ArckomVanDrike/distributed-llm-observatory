@@ -5,13 +5,17 @@ import {
 } from './bridge'
 
 import {
+  appendObservationRecord,
   buildCompletedRecord,
+  buildConsumerProbeExport,
+  createObservationHistory,
   elapsedMs,
 } from './domain'
 import type {
   CollectorProbe,
   CompletedObservationRecord,
   ConsumerProbeExport,
+  ObservationHistory,
   ObservationOutcomes,
   ObservationSession,
 } from './domain'
@@ -26,6 +30,8 @@ type CollectorState =
 let state: CollectorState = 'idle'
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
+let observationHistory: ObservationHistory =
+  createObservationHistory()
 let observationOutcomes: ObservationOutcomes = {
   generationFailed: false,
   interrupted: false,
@@ -88,6 +94,11 @@ function renderObservationStatus(): string {
       <div>
         <dt>Record</dt>
         <dd>${recordStatus}</dd>
+      </div>
+
+      <div>
+        <dt>Session records</dt>
+        <dd>${observationHistory.records.length}</dd>
       </div>
 
       <div>
@@ -260,7 +271,8 @@ function renderCurrentProbe(): string {
 
     return `
       <button type="button" id="download-record">
-        Download local JSON
+        Download session JSON
+        (${observationHistory.records.length} records)
       </button>
 
       <button
@@ -431,16 +443,15 @@ function render(): void {
 }
 
 function downloadCompletedRecord(): void {
-  if (completedRecord === null) {
+  if (observationHistory.records.length === 0) {
     return
   }
 
-  const exportPayload: ConsumerProbeExport = {
-    export_schema_version: '0.1',
-    exported_at_utc: new Date().toISOString(),
-    sample_count: 1,
-    records: [completedRecord],
-  }
+  const exportPayload: ConsumerProbeExport =
+    buildConsumerProbeExport(
+      observationHistory,
+      new Date().toISOString(),
+    )
 
   const blob = new Blob(
     [
@@ -460,7 +471,7 @@ function downloadCompletedRecord(): void {
   const link = document.createElement('a')
   link.href = url
   link.download =
-    `dllo-consumer-probe-${completedRecord.probe_id}.json`
+    `dllo-consumer-probes-session-${exportPayload.sample_count}.json`
 
   document.body.appendChild(link)
   link.click()
@@ -663,6 +674,11 @@ function bindEvents(): void {
         currentProbe,
         observationSession,
         observationOutcomes,
+      )
+
+      observationHistory = appendObservationRecord(
+        observationHistory,
+        completedRecord,
       )
 
       state = 'completed'

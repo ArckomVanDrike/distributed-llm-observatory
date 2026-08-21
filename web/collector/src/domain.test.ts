@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  appendObservationRecord,
   buildCompletedRecord,
+  buildConsumerProbeExport,
+  createObservationHistory,
   elapsedMs,
 } from './domain'
 import type {
@@ -327,5 +330,134 @@ describe('buildCompletedRecord outcome annotations', () => {
     expect(record.generation_failed).toBe(false)
     expect(record.interrupted).toBe(false)
     expect(record.retry_observed).toBe(true)
+  })
+})
+
+
+describe('ObservationHistory', () => {
+  it('appends completed records without mutating prior history', () => {
+    const firstSession: ObservationSession = {
+      observationId:
+        '1d118124-225b-4d9e-a68c-8d022fb0de37',
+      startedAtUtc: '2026-08-21T12:01:00.000Z',
+      firstOutputAtUtc:
+        '2026-08-21T12:01:04.000Z',
+      completedAtUtc:
+        '2026-08-21T12:01:09.000Z',
+      firstOutputMeasurementMode:
+        'human-observed-click-v0.1',
+      responseCaptureEnabled: false,
+    }
+
+    const secondSession: ObservationSession = {
+      ...firstSession,
+      observationId:
+        '59a20c62-a941-42b4-bf6a-891697380871',
+      startedAtUtc: '2026-08-21T16:01:00.000Z',
+      firstOutputAtUtc:
+        '2026-08-21T16:01:05.000Z',
+      completedAtUtc:
+        '2026-08-21T16:01:10.000Z',
+    }
+
+    const firstRecord = buildCompletedRecord(
+      probe,
+      firstSession,
+    )
+
+    const secondRecord = buildCompletedRecord(
+      {
+        ...probe,
+        scheduledAtUtc:
+          '2026-08-21T16:00:00.000Z',
+      },
+      secondSession,
+    )
+
+    const empty = createObservationHistory()
+
+    const one = appendObservationRecord(
+      empty,
+      firstRecord,
+    )
+
+    const two = appendObservationRecord(
+      one,
+      secondRecord,
+    )
+
+    expect(empty.records).toEqual([])
+    expect(one.records).toEqual([firstRecord])
+    expect(two.records).toEqual([
+      firstRecord,
+      secondRecord,
+    ])
+  })
+})
+
+
+describe('buildConsumerProbeExport', () => {
+  it('exports the complete observation history', () => {
+    const firstSession: ObservationSession = {
+      observationId:
+        'c54c19cb-a1a1-42d6-a66e-fcad110ad85b',
+      startedAtUtc: '2026-08-21T12:01:00.000Z',
+      firstOutputAtUtc: null,
+      completedAtUtc:
+        '2026-08-21T12:01:05.000Z',
+      firstOutputMeasurementMode: null,
+      responseCaptureEnabled: false,
+    }
+
+    const secondSession: ObservationSession = {
+      ...firstSession,
+      observationId:
+        '32ad1252-3931-444a-b846-d60c3591a924',
+      startedAtUtc: '2026-08-21T16:01:00.000Z',
+      completedAtUtc:
+        '2026-08-21T16:01:06.000Z',
+    }
+
+    const firstRecord = buildCompletedRecord(
+      probe,
+      firstSession,
+    )
+
+    const secondRecord = buildCompletedRecord(
+      {
+        ...probe,
+        scheduledAtUtc:
+          '2026-08-21T16:00:00.000Z',
+      },
+      secondSession,
+    )
+
+    let history = createObservationHistory()
+
+    history = appendObservationRecord(
+      history,
+      firstRecord,
+    )
+
+    history = appendObservationRecord(
+      history,
+      secondRecord,
+    )
+
+    const exportPayload = buildConsumerProbeExport(
+      history,
+      '2026-08-21T17:00:00.000Z',
+    )
+
+    expect(exportPayload).toEqual({
+      export_schema_version: '0.1',
+      exported_at_utc:
+        '2026-08-21T17:00:00.000Z',
+      sample_count: 2,
+      records: [
+        firstRecord,
+        secondRecord,
+      ],
+    })
   })
 })

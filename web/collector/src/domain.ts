@@ -57,6 +57,40 @@ export type ConsumerProbeExport = {
   records: CompletedObservationRecord[]
 }
 
+export type ObservationHistory = {
+  records: CompletedObservationRecord[]
+}
+
+export function createObservationHistory(): ObservationHistory {
+  return {
+    records: [],
+  }
+}
+
+export function appendObservationRecord(
+  history: ObservationHistory,
+  record: CompletedObservationRecord,
+): ObservationHistory {
+  return {
+    records: [
+      ...history.records,
+      record,
+    ],
+  }
+}
+
+export function buildConsumerProbeExport(
+  history: ObservationHistory,
+  exportedAtUtc: string,
+): ConsumerProbeExport {
+  return {
+    export_schema_version: '0.1',
+    exported_at_utc: exportedAtUtc,
+    sample_count: history.records.length,
+    records: [...history.records],
+  }
+}
+
 export type ObservationOutcomes = {
   generationFailed: boolean
   interrupted: boolean

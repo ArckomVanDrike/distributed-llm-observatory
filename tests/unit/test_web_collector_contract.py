@@ -72,3 +72,61 @@ def test_web_collector_export_round_trips_into_consumer_store(
     )
     assert loaded[0].response_capture_enabled is False
     assert loaded[0].response_text is None
+
+MULTI_FIXTURE = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "web_collector_export_multi_v01.json"
+)
+
+
+def test_web_collector_multi_export_round_trips_into_consumer_store(
+    tmp_path: Path,
+):
+    export = load_export(MULTI_FIXTURE)
+
+    assert export.export_schema_version == "0.1"
+    assert export.sample_count == 2
+    assert len(export.records) == 2
+
+    assert export.records[0].first_output_measurement_mode == (
+        "human-observed-click-v0.1"
+    )
+    assert export.records[1].generation_failed is True
+    assert export.records[1].time_to_first_output_ms is None
+    assert export.records[1].first_output_measurement_mode is None
+
+    normalized = normalize_export(
+        export,
+        observer_id="observer-web-multi-contract-test",
+        region_code="CL-Los-Lagos",
+        observer_timezone="America/Santiago",
+    )
+
+    assert len(normalized) == 2
+
+    store = ConsumerProbeSQLiteStore(
+        tmp_path / "collector-multi-contract.db"
+    )
+
+    for record in normalized:
+        store.append(record)
+
+    loaded = store.load_all()
+
+    assert len(loaded) == 2
+
+    by_probe_id = {
+        str(record.probe_id): record
+        for record in loaded
+    }
+
+    failed = by_probe_id[
+        "172d47a0-41a5-4443-8534-01287f763015"
+    ]
+
+    assert failed.generation_failed is True
+    assert failed.time_to_first_output_ms is None
+    assert failed.first_output_measurement_mode is None
+    assert failed.response_capture_enabled is False
+    assert failed.response_text is None
