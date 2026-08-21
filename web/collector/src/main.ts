@@ -1,82 +1,22 @@
 import './style.css'
 
+import {
+  buildCompletedRecord,
+  elapsedMs,
+} from './domain'
+import type {
+  CollectorProbe,
+  CompletedObservationRecord,
+  ConsumerProbeExport,
+  ObservationSession,
+} from './domain'
+
 type CollectorState =
   | 'idle'
   | 'ready'
   | 'running'
   | 'first-output-marked'
   | 'completed'
-
-type CollectorProbe = {
-  assignmentId: string
-  platform: 'chatgpt' | 'claude' | 'gemini'
-  pageHostname: string
-  benchmarkVersion: string
-  promptId: string
-  promptText: string
-  scheduledAtUtc: string
-  measurementMode: 'consumer-ui-manual-v0.1'
-  responseCaptureEnabled: false
-}
-
-type ConsumerProbeExport = {
-  export_schema_version: '0.1'
-  exported_at_utc: string
-  sample_count: number
-  records: CompletedObservationRecord[]
-}
-
-type CompletedObservationRecord = {
-  schema_version: '0.1'
-  probe_id: string
-
-  prompt_id: string
-  benchmark_version: string
-
-  scheduled_at_utc: string
-  schedule_offset_ms: number
-
-  platform: CollectorProbe['platform']
-  page_hostname: string
-
-  started_at_ms: number
-  started_at_utc: string
-
-  first_output_at_ms: number | null
-  first_output_at_utc: string | null
-
-  completed_at_ms: number
-  completed_at_utc: string
-
-  time_to_first_output_ms: number | null
-  first_output_measurement_mode:
-    | 'human-observed-click-v0.1'
-    | null
-  total_latency_ms: number
-
-  generation_failed: false
-  interrupted: false
-  retry_observed: false
-
-  response_capture_enabled: false
-  response_text: null
-
-  measurement_mode: 'consumer-ui-manual-v0.1'
-
-  local_telemetry: null
-  local_telemetry_error: null
-}
-
-type ObservationSession = {
-  observationId: string
-  startedAtUtc: string
-  firstOutputAtUtc: string | null
-  completedAtUtc: string | null
-  firstOutputMeasurementMode:
-    | 'human-observed-click-v0.1'
-    | null
-  responseCaptureEnabled: false
-}
 
 const demoProbe: CollectorProbe = {
   assignmentId: 'demo-reasoning-001',
@@ -108,92 +48,6 @@ function getAppRoot(): HTMLDivElement {
 }
 
 const app = getAppRoot()
-
-function elapsedMs(
-  startUtc: string,
-  endUtc: string | null,
-): number | null {
-  if (endUtc === null) {
-    return null
-  }
-
-  return (
-    new Date(endUtc).getTime()
-    - new Date(startUtc).getTime()
-  )
-}
-
-function buildCompletedRecord(
-  probe: CollectorProbe,
-  session: ObservationSession,
-): CompletedObservationRecord {
-  if (session.completedAtUtc === null) {
-    throw new Error(
-      'Cannot build a completed record before completion.',
-    )
-  }
-
-  const startedAtMs =
-    new Date(session.startedAtUtc).getTime()
-
-  const completedAtMs =
-    new Date(session.completedAtUtc).getTime()
-
-  const firstOutputAtMs =
-    session.firstOutputAtUtc === null
-      ? null
-      : new Date(session.firstOutputAtUtc).getTime()
-
-  const scheduledAtMs =
-    new Date(probe.scheduledAtUtc).getTime()
-
-  return {
-    schema_version: '0.1',
-    probe_id: session.observationId,
-
-    prompt_id: probe.promptId,
-    benchmark_version: probe.benchmarkVersion,
-
-    scheduled_at_utc: probe.scheduledAtUtc,
-    schedule_offset_ms:
-      startedAtMs - scheduledAtMs,
-
-    platform: probe.platform,
-    page_hostname: probe.pageHostname,
-
-    started_at_ms: startedAtMs,
-    started_at_utc: session.startedAtUtc,
-
-    first_output_at_ms: firstOutputAtMs,
-    first_output_at_utc: session.firstOutputAtUtc,
-
-    completed_at_ms: completedAtMs,
-    completed_at_utc: session.completedAtUtc,
-
-    time_to_first_output_ms:
-      firstOutputAtMs === null
-        ? null
-        : firstOutputAtMs - startedAtMs,
-
-    first_output_measurement_mode:
-      session.firstOutputMeasurementMode,
-
-    total_latency_ms:
-      completedAtMs - startedAtMs,
-
-    generation_failed: false,
-    interrupted: false,
-    retry_observed: false,
-
-    response_capture_enabled: false,
-    response_text: null,
-
-    measurement_mode: probe.measurementMode,
-
-    local_telemetry: null,
-    local_telemetry_error: null,
-  }
-}
 
 function renderObservationStatus(): string {
   if (observationSession === null) {
