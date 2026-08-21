@@ -37,9 +37,9 @@ export type CompletedObservationRecord = {
     | null
   total_latency_ms: number
 
-  generation_failed: false
-  interrupted: false
-  retry_observed: false
+  generation_failed: boolean
+  interrupted: boolean
+  retry_observed: boolean
 
   response_capture_enabled: false
   response_text: null
@@ -55,6 +55,18 @@ export type ConsumerProbeExport = {
   exported_at_utc: string
   sample_count: number
   records: CompletedObservationRecord[]
+}
+
+export type ObservationOutcomes = {
+  generationFailed: boolean
+  interrupted: boolean
+  retryObserved: boolean
+}
+
+const DEFAULT_OBSERVATION_OUTCOMES: ObservationOutcomes = {
+  generationFailed: false,
+  interrupted: false,
+  retryObserved: false,
 }
 
 export type ObservationSession = {
@@ -85,6 +97,8 @@ export function elapsedMs(
 export function buildCompletedRecord(
   probe: CollectorProbe,
   session: ObservationSession,
+  outcomes: ObservationOutcomes =
+    DEFAULT_OBSERVATION_OUTCOMES,
 ): CompletedObservationRecord {
   if (session.completedAtUtc === null) {
     throw new Error(
@@ -200,9 +214,12 @@ export function buildCompletedRecord(
     total_latency_ms:
       completedAtMs - startedAtMs,
 
-    generation_failed: false,
-    interrupted: false,
-    retry_observed: false,
+    generation_failed:
+      outcomes.generationFailed,
+    interrupted:
+      outcomes.interrupted,
+    retry_observed:
+      outcomes.retryObserved,
 
     response_capture_enabled: false,
     response_text: null,

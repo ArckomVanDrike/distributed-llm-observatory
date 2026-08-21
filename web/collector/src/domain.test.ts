@@ -298,3 +298,34 @@ describe('buildCompletedRecord schedule timestamp validation', () => {
     )
   })
 })
+
+describe('buildCompletedRecord outcome annotations', () => {
+  it('propagates manually observed outcomes', () => {
+    const session: ObservationSession = {
+      observationId:
+        '3f680670-a51f-41dd-9e85-65d987602337',
+      startedAtUtc: '2026-08-21T12:01:00.000Z',
+      firstOutputAtUtc:
+        '2026-08-21T12:01:04.000Z',
+      completedAtUtc:
+        '2026-08-21T12:01:09.000Z',
+      firstOutputMeasurementMode:
+        'human-observed-click-v0.1',
+      responseCaptureEnabled: false,
+    }
+
+    const record = buildCompletedRecord(
+      probe,
+      session,
+      {
+        generationFailed: false,
+        interrupted: false,
+        retryObserved: true,
+      },
+    )
+
+    expect(record.generation_failed).toBe(false)
+    expect(record.interrupted).toBe(false)
+    expect(record.retry_observed).toBe(true)
+  })
+})

@@ -12,6 +12,7 @@ import type {
   CollectorProbe,
   CompletedObservationRecord,
   ConsumerProbeExport,
+  ObservationOutcomes,
   ObservationSession,
 } from './domain'
 
@@ -25,6 +26,11 @@ type CollectorState =
 let state: CollectorState = 'idle'
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
+let observationOutcomes: ObservationOutcomes = {
+  generationFailed: false,
+  interrupted: false,
+  retryObserved: false,
+}
 let completedRecord: CompletedObservationRecord | null = null
 let bridgeMessage =
   'Check the local DLLO Bridge for a scheduled probe.'
@@ -127,6 +133,58 @@ function renderObservationStatus(): string {
   `
 }
 
+function renderOutcomeControls(): string {
+  if (
+    state !== 'running'
+    && state !== 'first-output-marked'
+  ) {
+    return ''
+  }
+
+  return `
+    <fieldset class="outcome-controls">
+      <legend>Human-observed outcomes</legend>
+
+      <label>
+        <input
+          type="checkbox"
+          id="outcome-generation-failed"
+          ${observationOutcomes.generationFailed
+            ? 'checked'
+            : ''}
+        />
+        Generation failed
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          id="outcome-interrupted"
+          ${observationOutcomes.interrupted
+            ? 'checked'
+            : ''}
+        />
+        Interrupted
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          id="outcome-retry-observed"
+          ${observationOutcomes.retryObserved
+            ? 'checked'
+            : ''}
+        />
+        Retry observed
+      </label>
+
+      <p>
+        Manual observation only. No response content is inspected.
+      </p>
+    </fieldset>
+  `
+}
+
 function renderCurrentProbe(): string {
   if (state === 'idle' || currentProbe === null) {
     return `
@@ -180,6 +238,14 @@ function renderCurrentProbe(): string {
 
         <button type="button" id="mark-first-output">
           Mark First Output (Human)
+        </button>
+
+        <button
+          type="button"
+          id="complete-observation"
+          class="secondary-button"
+        >
+          Complete without First Output
         </button>
       `
     }
@@ -243,6 +309,8 @@ function renderCurrentProbe(): string {
       <p class="section-label">Prompt</p>
       <p class="prompt-text">${currentProbe.promptText}</p>
     </div>
+
+    ${renderOutcomeControls()}
 
     <div class="probe-actions">
       ${controls}
@@ -457,6 +525,57 @@ function bindEvents(): void {
     })
 
   document
+    .querySelector<HTMLInputElement>(
+      '#outcome-generation-failed',
+    )
+    ?.addEventListener('change', (event) => {
+      const input = event.currentTarget
+
+      if (!(input instanceof HTMLInputElement)) {
+        return
+      }
+
+      observationOutcomes = {
+        ...observationOutcomes,
+        generationFailed: input.checked,
+      }
+    })
+
+  document
+    .querySelector<HTMLInputElement>(
+      '#outcome-interrupted',
+    )
+    ?.addEventListener('change', (event) => {
+      const input = event.currentTarget
+
+      if (!(input instanceof HTMLInputElement)) {
+        return
+      }
+
+      observationOutcomes = {
+        ...observationOutcomes,
+        interrupted: input.checked,
+      }
+    })
+
+  document
+    .querySelector<HTMLInputElement>(
+      '#outcome-retry-observed',
+    )
+    ?.addEventListener('change', (event) => {
+      const input = event.currentTarget
+
+      if (!(input instanceof HTMLInputElement)) {
+        return
+      }
+
+      observationOutcomes = {
+        ...observationOutcomes,
+        retryObserved: input.checked,
+      }
+    })
+
+  document
     .querySelector<HTMLButtonElement>('#download-record')
     ?.addEventListener('click', () => {
       downloadCompletedRecord()
@@ -487,6 +606,12 @@ function bindEvents(): void {
   document
     .querySelector<HTMLButtonElement>('#start-observation')
     ?.addEventListener('click', () => {
+      observationOutcomes = {
+        generationFailed: false,
+        interrupted: false,
+        retryObserved: false,
+      }
+
       observationSession = {
         observationId: crypto.randomUUID(),
         startedAtUtc: new Date().toISOString(),
@@ -537,6 +662,7 @@ function bindEvents(): void {
       completedRecord = buildCompletedRecord(
         currentProbe,
         observationSession,
+        observationOutcomes,
       )
 
       state = 'completed'
