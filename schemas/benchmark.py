@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+)
 
 from schemas.target import TargetCapability
 
@@ -51,3 +55,50 @@ class BenchmarkPrompt(BaseModel):
     )
 
     enabled: bool = True
+
+
+class BenchmarkTask(BaseModel):
+    schema_version: str = "0.1"
+
+    task_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    benchmark_version: str = Field(min_length=1)
+
+    family: BenchmarkFamily
+    category: BenchmarkCategory
+    difficulty: BenchmarkDifficulty
+
+    task: str = Field(min_length=1)
+
+    required_capabilities: set[TargetCapability] = Field(
+        default_factory=lambda: {
+            TargetCapability.TEXT,
+        },
+        min_length=1,
+    )
+
+    success_criteria: list[str] = Field(
+        min_length=1,
+    )
+
+    fixture_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_task_family(
+        self,
+    ) -> BenchmarkTask:
+        if self.family is BenchmarkFamily.FOUNDATION_MODEL:
+            raise ValueError(
+                "BenchmarkTask cannot use the "
+                "foundation_model family."
+            )
+
+        return self
