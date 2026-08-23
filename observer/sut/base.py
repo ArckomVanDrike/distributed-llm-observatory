@@ -24,6 +24,13 @@ class SUTRequest:
 
 
 @dataclass(frozen=True)
+class SUTCriterionEvidence:
+    criterion_id: str
+    passed: bool
+    evidence: str | None = None
+
+
+@dataclass(frozen=True)
 class SUTExecutionResult:
     context: SUTExecutionContext
 
@@ -37,6 +44,8 @@ class SUTExecutionResult:
     retry_count: int = 0
     human_intervention_count: int = 0
     error_type: str | None = None
+
+    criterion_evidence: tuple[SUTCriterionEvidence, ...] = ()
 
     metrics: dict[str, Any] = field(
         default_factory=dict,

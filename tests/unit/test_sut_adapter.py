@@ -139,3 +139,36 @@ def test_sut_runner_rejects_mismatched_target():
                 task="Fix the failing test.",
             ),
         )
+
+
+def test_sut_result_can_carry_structured_criterion_evidence():
+    from observer.sut.base import SUTCriterionEvidence
+
+    now = datetime.now(timezone.utc)
+
+    context = SUTExecutionContext(
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+        benchmark_version="0.1",
+        task_id="agent-coding-001",
+        target_id="mock-agent",
+    )
+
+    result = SUTExecutionResult(
+        context=context,
+        started_at_utc=now,
+        finished_at_utc=now,
+        latency_ms=0.0,
+        task_completed=True,
+        criterion_evidence=(
+            SUTCriterionEvidence(
+                criterion_id="tests-pass",
+                passed=True,
+                evidence="pytest: 42 passed",
+            ),
+        ),
+    )
+
+    assert result.criterion_evidence[0].criterion_id == "tests-pass"
+    assert result.criterion_evidence[0].passed is True
+    assert result.metrics == {}

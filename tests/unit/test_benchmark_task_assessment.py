@@ -18,6 +18,7 @@ from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
     BenchmarkFamily,
+    BenchmarkSuccessCriterion,
     BenchmarkTask,
 )
 from schemas.evaluation import (
@@ -71,7 +72,7 @@ class FailingCriterionEvaluator(TaskEvaluator):
             method=TaskEvaluationMethod.DETERMINISTIC,
             criteria=[
                 TaskCriterionEvaluation(
-                    criterion=benchmark.success_criteria[0],
+                    criterion=benchmark.success_criteria[0].description,
                     passed=False,
                     evidence="Expected verification did not pass.",
                 ),
@@ -94,7 +95,10 @@ def build_task() -> BenchmarkTask:
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="tests-pass",
+                description="All tests pass.",
+            ),
         ],
     )
 

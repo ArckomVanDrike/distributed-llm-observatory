@@ -10,6 +10,7 @@ from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
     BenchmarkFamily,
+    BenchmarkSuccessCriterion,
     BenchmarkTask,
 )
 from schemas.evaluation import (
@@ -31,7 +32,7 @@ class MockRegistryEvaluator(TaskEvaluator):
             method=TaskEvaluationMethod.DETERMINISTIC,
             criteria=[
                 TaskCriterionEvaluation(
-                    criterion=criterion,
+                    criterion=criterion.description,
                     passed=True,
                 )
                 for criterion in benchmark.success_criteria
@@ -56,7 +57,10 @@ def build_task(
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="tests-pass",
+                description="All tests pass.",
+            ),
         ],
     )
 

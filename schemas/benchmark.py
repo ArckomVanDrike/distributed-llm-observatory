@@ -57,6 +57,14 @@ class BenchmarkPrompt(BaseModel):
     enabled: bool = True
 
 
+class BenchmarkSuccessCriterion(BaseModel):
+    criterion_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    description: str = Field(min_length=1)
+
+
 class BenchmarkTask(BaseModel):
     schema_version: str = "0.1"
 
@@ -84,7 +92,7 @@ class BenchmarkTask(BaseModel):
         min_length=1,
     )
 
-    success_criteria: list[str] = Field(
+    success_criteria: list[BenchmarkSuccessCriterion] = Field(
         min_length=1,
     )
 

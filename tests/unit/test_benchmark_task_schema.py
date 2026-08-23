@@ -6,6 +6,7 @@ from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
     BenchmarkFamily,
+    BenchmarkSuccessCriterion,
     BenchmarkTask,
 )
 from schemas.target import (
@@ -30,8 +31,14 @@ def test_agent_benchmark_task():
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All existing tests pass.",
-            "No unrelated files are modified.",
+            BenchmarkSuccessCriterion(
+                criterion_id="all-existing-tests-pass",
+                description="All existing tests pass.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="no-unrelated-files-are-modified",
+                description="No unrelated files are modified.",
+            ),
         ],
         fixture_id="repo-python-bug-001",
     )
@@ -56,7 +63,10 @@ def test_ai_system_benchmark_task():
             TargetCapability.MEMORY,
         },
         success_criteria=[
-            "The stored fact is recalled correctly.",
+            BenchmarkSuccessCriterion(
+                criterion_id="the-stored-fact-is-recalled-correctly",
+                description="The stored fact is recalled correctly.",
+            ),
         ],
     )
 
@@ -78,7 +88,10 @@ def test_benchmark_task_rejects_foundation_model_family():
             difficulty=BenchmarkDifficulty.MEDIUM,
             task="Solve the reasoning problem.",
             success_criteria=[
-                "Correct answer.",
+                BenchmarkSuccessCriterion(
+                    criterion_id="correct-answer",
+                    description="Correct answer.",
+                ),
             ],
         )
 
@@ -108,7 +121,10 @@ def test_benchmark_task_id_uses_stable_slug_format():
             difficulty=BenchmarkDifficulty.MEDIUM,
             task="Perform the task.",
             success_criteria=[
-                "Task succeeds.",
+                BenchmarkSuccessCriterion(
+                    criterion_id="task-succeeds",
+                    description="Task succeeds.",
+                ),
             ],
         )
 
@@ -140,7 +156,10 @@ def test_agent_target_supports_compatible_task():
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="all-tests-pass",
+                description="All tests pass.",
+            ),
         ],
     )
 
@@ -170,7 +189,10 @@ def test_agent_target_rejects_task_with_missing_capability():
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="all-tests-pass",
+                description="All tests pass.",
+            ),
         ],
     )
 
@@ -201,7 +223,10 @@ def test_ai_system_rejects_agent_task_by_family():
             TargetCapability.TOOLS,
         },
         success_criteria=[
-            "Task completes successfully.",
+            BenchmarkSuccessCriterion(
+                criterion_id="task-completes-successfully",
+                description="Task completes successfully.",
+            ),
         ],
     )
 
@@ -222,8 +247,40 @@ def test_benchmark_task_declares_explicit_evaluator():
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="all-tests-pass",
+                description="All tests pass.",
+            ),
         ],
     )
 
     assert task.evaluator_id == "pytest-verifier-v0-1"
+
+
+def test_benchmark_task_uses_stable_success_criterion_ids():
+    task = BenchmarkTask(
+        task_id="agent-criteria-001",
+        benchmark_version="0.1",
+        evaluator_id="deterministic-evaluator-v0-1",
+        family=BenchmarkFamily.AGENT,
+        category=BenchmarkCategory.CODING,
+        difficulty=BenchmarkDifficulty.MEDIUM,
+        task="Run the repository tests.",
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.CODE_EXECUTION,
+        },
+        success_criteria=[
+            BenchmarkSuccessCriterion(
+                criterion_id="tests-pass",
+                description="All tests pass.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="no-unrelated-changes",
+                description="No unrelated files are modified.",
+            ),
+        ],
+    )
+
+    assert task.success_criteria[0].criterion_id == "tests-pass"
+    assert task.success_criteria[0].description == "All tests pass."

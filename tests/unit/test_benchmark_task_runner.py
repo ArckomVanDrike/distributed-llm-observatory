@@ -13,6 +13,7 @@ from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
     BenchmarkFamily,
+    BenchmarkSuccessCriterion,
     BenchmarkTask,
 )
 from schemas.target import (
@@ -66,7 +67,10 @@ def build_task() -> BenchmarkTask:
             TargetCapability.CODE_EXECUTION,
         },
         success_criteria=[
-            "All tests pass.",
+            BenchmarkSuccessCriterion(
+                criterion_id="tests-pass",
+                description="All tests pass.",
+            ),
         ],
         fixture_id="repo-python-bug-001",
     )
