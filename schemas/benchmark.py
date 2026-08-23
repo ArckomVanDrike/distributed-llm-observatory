@@ -66,6 +66,11 @@ class BenchmarkTask(BaseModel):
     )
     benchmark_version: str = Field(min_length=1)
 
+    evaluator_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+
     family: BenchmarkFamily
     category: BenchmarkCategory
     difficulty: BenchmarkDifficulty

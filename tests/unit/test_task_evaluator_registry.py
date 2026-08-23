@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+
+import pytest
 
 from observer.core.task_evaluator import TaskEvaluator
+from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
 from observer.sut.base import (
-    SUTExecutionContext,
     SUTExecutionResult,
 )
 from schemas.benchmark import (
@@ -19,7 +20,7 @@ from schemas.evaluation import (
 from schemas.target import TargetCapability
 
 
-class MockTaskEvaluator(TaskEvaluator):
+class MockRegistryEvaluator(TaskEvaluator):
     def evaluate(
         self,
         benchmark: BenchmarkTask,
@@ -31,20 +32,21 @@ class MockTaskEvaluator(TaskEvaluator):
             criteria=[
                 TaskCriterionEvaluation(
                     criterion=criterion,
-                    passed=result.task_completed,
-                    evidence="mock evaluator",
+                    passed=True,
                 )
                 for criterion in benchmark.success_criteria
             ],
-            passed=result.task_completed,
+            passed=True,
         )
 
 
-def build_task() -> BenchmarkTask:
+def build_task(
+    evaluator_id: str = "mock-evaluator-v0-1",
+) -> BenchmarkTask:
     return BenchmarkTask(
         task_id="agent-coding-001",
         benchmark_version="0.1",
-        evaluator_id="test-evaluator-v0-1",
+        evaluator_id=evaluator_id,
         family=BenchmarkFamily.AGENT,
         category=BenchmarkCategory.CODING,
         difficulty=BenchmarkDifficulty.MEDIUM,
@@ -59,41 +61,45 @@ def build_task() -> BenchmarkTask:
     )
 
 
-def build_result() -> SUTExecutionResult:
-    now = datetime.now(timezone.utc)
+def test_registry_resolves_evaluator_declared_by_benchmark():
+    evaluator = MockRegistryEvaluator()
+    registry = TaskEvaluatorRegistry()
 
-    context = SUTExecutionContext(
-        observer_id="observer-test",
-        region_code="CL-Los-Lagos",
-        benchmark_version="0.1",
-        task_id="agent-coding-001",
-        target_id="mock-agent",
+    registry.register(
+        "mock-evaluator-v0-1",
+        evaluator,
     )
 
-    return SUTExecutionResult(
-        context=context,
-        started_at_utc=now,
-        finished_at_utc=now,
-        latency_ms=0.0,
-        task_completed=True,
-        output_text="done",
+    assert registry.resolve(build_task()) is evaluator
+
+
+def test_registry_rejects_unknown_evaluator():
+    registry = TaskEvaluatorRegistry()
+
+    with pytest.raises(
+        KeyError,
+        match="missing-evaluator-v0-1",
+    ):
+        registry.resolve(
+            build_task(
+                evaluator_id="missing-evaluator-v0-1",
+            )
+        )
+
+
+def test_registry_rejects_duplicate_registration():
+    registry = TaskEvaluatorRegistry()
+
+    registry.register(
+        "mock-evaluator-v0-1",
+        MockRegistryEvaluator(),
     )
 
-
-def test_task_evaluator_produces_normalized_assessment():
-    evaluator = MockTaskEvaluator()
-
-    evaluation = evaluator.evaluate(
-        build_task(),
-        build_result(),
-    )
-
-    assert evaluation.task_id == "agent-coding-001"
-    assert evaluation.passed is True
-    assert evaluation.criteria[0].passed is True
-
-
-def test_task_evaluator_is_abstract_contract():
-    assert TaskEvaluator.__abstractmethods__ == {
-        "evaluate",
-    }
+    with pytest.raises(
+        ValueError,
+        match="already registered",
+    ):
+        registry.register(
+            "mock-evaluator-v0-1",
+            MockRegistryEvaluator(),
+        )

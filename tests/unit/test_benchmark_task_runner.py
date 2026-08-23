@@ -55,6 +55,7 @@ def build_task() -> BenchmarkTask:
     return BenchmarkTask(
         task_id="agent-coding-001",
         benchmark_version="0.1",
+        evaluator_id="test-evaluator-v0-1",
         family=BenchmarkFamily.AGENT,
         category=BenchmarkCategory.CODING,
         difficulty=BenchmarkDifficulty.MEDIUM,
