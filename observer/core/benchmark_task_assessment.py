@@ -7,7 +7,7 @@ from observer.core.benchmark_task_runner import (
     BenchmarkTaskRun,
     BenchmarkTaskRunner,
 )
-from observer.core.task_evaluator import TaskEvaluator
+from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
 from schemas.benchmark import BenchmarkTask
 from schemas.evaluation import TaskEvaluation
 
@@ -27,10 +27,10 @@ class BenchmarkTaskAssessmentRunner:
         self,
         *,
         task_runner: BenchmarkTaskRunner,
-        evaluator: TaskEvaluator,
+        registry: TaskEvaluatorRegistry,
     ) -> None:
         self.task_runner = task_runner
-        self.evaluator = evaluator
+        self.registry = registry
 
     def run(
         self,
@@ -43,7 +43,9 @@ class BenchmarkTaskAssessmentRunner:
             metadata=metadata,
         )
 
-        evaluation = self.evaluator.evaluate(
+        evaluator = self.registry.resolve(benchmark)
+
+        evaluation = evaluator.evaluate(
             benchmark,
             run.observation.result,
         )

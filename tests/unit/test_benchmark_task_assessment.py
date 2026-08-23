@@ -7,6 +7,7 @@ from observer.core.benchmark_task_assessment import (
 )
 from observer.core.benchmark_task_runner import BenchmarkTaskRunner
 from observer.core.task_evaluator import TaskEvaluator
+from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
 from observer.sut.base import (
     SUTAdapter,
     SUTExecutionContext,
@@ -107,9 +108,15 @@ def build_runner(
         region_code="CL-Los-Lagos",
     )
 
+    registry = TaskEvaluatorRegistry()
+    registry.register(
+        "test-evaluator-v0-1",
+        evaluator,
+    )
+
     return BenchmarkTaskAssessmentRunner(
         task_runner=task_runner,
-        evaluator=evaluator,
+        registry=registry,
     )
 
 
