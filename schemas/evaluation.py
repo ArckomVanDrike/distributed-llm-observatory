@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from enum import Enum
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class QualityEvaluation(BaseModel):
@@ -43,6 +45,55 @@ class QualityEvaluation(BaseModel):
         if all(score >= 4 for score in dimensions) and self.overall < 4:
             raise ValueError(
                 "Overall must be >= 4 when all quality dimensions are >= 4."
+            )
+
+        return self
+
+
+
+class TaskEvaluationMethod(str, Enum):
+    DETERMINISTIC = "deterministic"
+    HUMAN = "human"
+
+
+class TaskCriterionEvaluation(BaseModel):
+    criterion: str = Field(min_length=1)
+    passed: bool
+    evidence: str | None = None
+
+    @field_validator("criterion")
+    @classmethod
+    def validate_criterion(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("criterion cannot be empty.")
+
+        return value
+
+
+class TaskEvaluation(BaseModel):
+    schema_version: str = "0.1"
+
+    task_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    method: TaskEvaluationMethod
+    criteria: list[TaskCriterionEvaluation] = Field(
+        min_length=1,
+    )
+    passed: bool
+
+    @model_validator(mode="after")
+    def validate_overall_result(self) -> TaskEvaluation:
+        criteria_passed = all(
+            criterion.passed
+            for criterion in self.criteria
+        )
+
+        if self.passed != criteria_passed:
+            raise ValueError(
+                "Task evaluation overall result must match "
+                "the criterion results."
             )
 
         return self
