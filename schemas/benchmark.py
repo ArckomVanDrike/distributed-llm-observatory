@@ -4,6 +4,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from schemas.target import TargetCapability
+
 
 class BenchmarkCategory(str, Enum):
     REASONING = "reasoning"
@@ -33,5 +35,12 @@ class BenchmarkPrompt(BaseModel):
     prompt: str = Field(min_length=1)
     expected_characteristics: list[str] = Field(default_factory=list)
     scoring_method: str = Field(default="observatory_rubric_v0.1", min_length=1)
+
+    required_capabilities: set[TargetCapability] = Field(
+        default_factory=lambda: {
+            TargetCapability.TEXT,
+        },
+        min_length=1,
+    )
 
     enabled: bool = True
