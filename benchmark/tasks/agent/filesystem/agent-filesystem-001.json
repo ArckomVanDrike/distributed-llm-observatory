@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-filesystem-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "In the provided isolated workspace, create a file named dllo-probe.txt containing exactly the text DLLO-AGENT-SMOKE-001 and no additional characters.",
+  "required_capabilities": [
+    "text",
+    "filesystem"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "file-created",
+      "description": "The file dllo-probe.txt exists in the isolated workspace."
+    },
+    {
+      "criterion_id": "file-contents-match",
+      "description": "The file contains exactly DLLO-AGENT-SMOKE-001 with no additional characters."
+    }
+  ],
+  "enabled": true
+}
