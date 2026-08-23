@@ -461,3 +461,31 @@ describe('buildConsumerProbeExport', () => {
     })
   })
 })
+
+describe('buildCompletedRecord unscheduled provenance', () => {
+  it('preserves null schedule provenance for public probes', () => {
+    const unscheduledProbe = {
+      ...probe,
+      scheduledAtUtc: null,
+    } as unknown as CollectorProbe
+
+    const session: ObservationSession = {
+      observationId:
+        '6d0327ce-8962-43e9-b8fd-182ddde78c97',
+      startedAtUtc: '2026-08-21T12:01:00.000Z',
+      firstOutputAtUtc: null,
+      completedAtUtc:
+        '2026-08-21T12:01:09.000Z',
+      firstOutputMeasurementMode: null,
+      responseCaptureEnabled: false,
+    }
+
+    const record = buildCompletedRecord(
+      unscheduledProbe,
+      session,
+    )
+
+    expect(record.scheduled_at_utc).toBeNull()
+    expect(record.schedule_offset_ms).toBeNull()
+  })
+})

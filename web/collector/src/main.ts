@@ -5,6 +5,18 @@ import {
 } from './bridge'
 
 import {
+  parseCollectorMode,
+} from './config'
+
+import {
+  PUBLIC_PROMPT_BANK,
+} from './generated/public-prompt-bank'
+
+import {
+  buildPublicAssignment,
+} from './public-assignment'
+
+import {
   clearObservationHistory,
   loadObservationHistory,
   saveObservationHistory,
@@ -26,6 +38,10 @@ import type {
   ObservationSession,
 } from './domain'
 
+const collectorMode = parseCollectorMode(
+  import.meta.env.VITE_COLLECTOR_MODE,
+)
+
 type CollectorState =
   | 'idle'
   | 'ready'
@@ -45,7 +61,12 @@ let observationOutcomes: ObservationOutcomes = {
 }
 let completedRecord: CompletedObservationRecord | null = null
 let bridgeMessage =
-  'Check the local DLLO Bridge for a scheduled probe.'
+  collectorMode === 'bridge'
+    ? 'Check the local DLLO Bridge for a scheduled probe.'
+    : (
+        'Public mode: the local scheduler bridge is not '
+        + 'available in this deployment.'
+      )
 
 function getAppRoot(): HTMLDivElement {
   const element =
@@ -224,9 +245,46 @@ function renderCurrentProbe(): string {
           <strong>${observationHistory.records.length}</strong>
         </p>
 
-        <button type="button" id="check-probe">
-          Check scheduled probe
-        </button>
+        ${
+          collectorMode === 'bridge'
+            ? `
+              <button type="button" id="check-probe">
+                Check scheduled probe
+              </button>
+            `
+            : `
+              <label>
+                Platform
+                <select id="public-platform">
+                  <option value="chatgpt">ChatGPT</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </label>
+
+              <label>
+                Prompt
+                <select id="public-prompt">
+                  ${PUBLIC_PROMPT_BANK.map(
+                    (prompt) => `
+                      <option value="${prompt.promptId}">
+                        ${prompt.promptId} — ${prompt.category}
+                      </option>
+                    `,
+                  ).join('')}
+                </select>
+              </label>
+
+              <button type="button" id="load-public-probe">
+                Load public probe
+              </button>
+
+              <p>
+                Manual selection only. No provider request is sent
+                by the Collector.
+              </p>
+            `
+        }
 
         ${
           observationHistory.records.length > 0
@@ -575,6 +633,60 @@ function bindEvents(): void {
 
         render()
       }
+    })
+
+  document
+    .querySelector<HTMLButtonElement>('#load-public-probe')
+    ?.addEventListener('click', () => {
+      const platformElement =
+        document.querySelector<HTMLSelectElement>(
+          '#public-platform',
+        )
+
+      const promptElement =
+        document.querySelector<HTMLSelectElement>(
+          '#public-prompt',
+        )
+
+      if (
+        platformElement === null
+        || promptElement === null
+      ) {
+        return
+      }
+
+      const platform = platformElement.value
+
+      if (
+        platform !== 'chatgpt'
+        && platform !== 'claude'
+        && platform !== 'gemini'
+      ) {
+        bridgeMessage =
+          'Unsupported public Collector platform.'
+        render()
+        return
+      }
+
+      const assignment = buildPublicAssignment(
+        promptElement.value,
+        platform,
+      )
+
+      if (assignment === null) {
+        bridgeMessage =
+          'Selected public prompt is not available.'
+        render()
+        return
+      }
+
+      currentProbe = assignment
+      observationSession = null
+      completedRecord = null
+      state = 'ready'
+      bridgeMessage =
+        'Public probe loaded locally. Send the prompt manually.'
+      render()
     })
 
   document

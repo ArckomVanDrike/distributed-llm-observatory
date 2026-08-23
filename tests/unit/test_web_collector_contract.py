@@ -130,3 +130,25 @@ def test_web_collector_multi_export_round_trips_into_consumer_store(
     assert failed.first_output_measurement_mode is None
     assert failed.response_capture_enabled is False
     assert failed.response_text is None
+
+PUBLIC_FIXTURE = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "web_collector_export_public_v01.json"
+)
+
+
+def test_public_web_collector_preserves_unscheduled_provenance():
+    export = load_export(PUBLIC_FIXTURE)
+
+    assert export.sample_count == 1
+
+    record = export.records[0]
+
+    assert record.prompt_id == "coding-001"
+    assert record.scheduled_at_utc is None
+    assert record.schedule_offset_ms is None
+    assert record.time_to_first_output_ms is None
+    assert record.first_output_measurement_mode is None
+    assert record.response_capture_enabled is False
+    assert record.response_text is None

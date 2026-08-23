@@ -4,7 +4,7 @@ export type CollectorProbe = {
   benchmarkVersion: string
   promptId: string
   promptText: string
-  scheduledAtUtc: string
+  scheduledAtUtc: string | null
   measurementMode: 'consumer-ui-manual-v0.1'
   responseCaptureEnabled: false
 }
@@ -16,8 +16,8 @@ export type CompletedObservationRecord = {
   prompt_id: string
   benchmark_version: string
 
-  scheduled_at_utc: string
-  schedule_offset_ms: number
+  scheduled_at_utc: string | null
+  schedule_offset_ms: number | null
 
   platform: CollectorProbe['platform']
   page_hostname: string
@@ -206,9 +206,14 @@ export function buildCompletedRecord(
   }
 
   const scheduledAtMs =
-    new Date(probe.scheduledAtUtc).getTime()
+    probe.scheduledAtUtc === null
+      ? null
+      : new Date(probe.scheduledAtUtc).getTime()
 
-  if (Number.isNaN(scheduledAtMs)) {
+  if (
+    scheduledAtMs !== null
+    && Number.isNaN(scheduledAtMs)
+  ) {
     throw new Error(
       'Invalid scheduled timestamp.',
     )
@@ -223,7 +228,9 @@ export function buildCompletedRecord(
 
     scheduled_at_utc: probe.scheduledAtUtc,
     schedule_offset_ms:
-      startedAtMs - scheduledAtMs,
+      scheduledAtMs === null
+        ? null
+        : startedAtMs - scheduledAtMs,
 
     platform: probe.platform,
     page_hostname: probe.pageHostname,
