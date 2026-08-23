@@ -23,6 +23,12 @@ class BenchmarkDifficulty(str, Enum):
     HARD = "hard"
 
 
+class BenchmarkFamily(str, Enum):
+    FOUNDATION_MODEL = "foundation_model"
+    AGENT = "agent"
+    AI_SYSTEM = "ai_system"
+
+
 class BenchmarkPrompt(BaseModel):
     prompt_id: str = Field(
         min_length=1,
@@ -31,6 +37,7 @@ class BenchmarkPrompt(BaseModel):
     benchmark_version: str = Field(min_length=1)
     category: BenchmarkCategory
     difficulty: BenchmarkDifficulty
+    family: BenchmarkFamily = BenchmarkFamily.FOUNDATION_MODEL
 
     prompt: str = Field(min_length=1)
     expected_characteristics: list[str] = Field(default_factory=list)

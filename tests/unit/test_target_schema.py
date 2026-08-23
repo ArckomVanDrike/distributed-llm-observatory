@@ -2,7 +2,10 @@ import pytest
 from pydantic import ValidationError
 
 from observer.core.benchmark_compatibility import target_supports_benchmark
-from schemas.benchmark import BenchmarkPrompt
+from schemas.benchmark import (
+    BenchmarkFamily,
+    BenchmarkPrompt,
+)
 from schemas.target import (
     TargetCapability,
     TargetManifest,
@@ -138,6 +141,7 @@ def test_target_supports_compatible_benchmark():
         category="reasoning",
         difficulty="medium",
         prompt="Inspect the image.",
+        family=BenchmarkFamily.AI_SYSTEM,
         required_capabilities={
             TargetCapability.TEXT,
             TargetCapability.VISION,
@@ -170,6 +174,138 @@ def test_target_rejects_benchmark_with_missing_capability():
             TargetCapability.TEXT,
             TargetCapability.MEMORY,
         },
+    )
+
+    assert target_supports_benchmark(
+        target,
+        benchmark,
+    ) is False
+
+
+def test_existing_benchmark_defaults_to_foundation_model_family():
+    benchmark = BenchmarkPrompt(
+        prompt_id="reasoning-001",
+        benchmark_version="0.1",
+        category="reasoning",
+        difficulty="medium",
+        prompt="Test prompt.",
+    )
+
+    assert benchmark.family is BenchmarkFamily.FOUNDATION_MODEL
+
+
+def test_agent_benchmark_declares_agent_family():
+    benchmark = BenchmarkPrompt(
+        prompt_id="agent-coding-001",
+        benchmark_version="0.1",
+        category="coding",
+        difficulty="medium",
+        prompt="Fix the failing tests.",
+        family=BenchmarkFamily.AGENT,
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+            TargetCapability.CODE_EXECUTION,
+        },
+    )
+
+    assert benchmark.family is BenchmarkFamily.AGENT
+
+
+def test_ai_system_benchmark_declares_system_family():
+    benchmark = BenchmarkPrompt(
+        prompt_id="memory-001",
+        benchmark_version="0.1",
+        category="reasoning",
+        difficulty="medium",
+        prompt="Recall the stored fact.",
+        family=BenchmarkFamily.AI_SYSTEM,
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.MEMORY,
+        },
+    )
+
+    assert benchmark.family is BenchmarkFamily.AI_SYSTEM
+
+def test_foundation_model_rejects_agent_benchmark_even_with_capabilities():
+    target = TargetManifest(
+        target_id="tool-capable-model",
+        display_name="Tool Capable Model",
+        target_type=TargetType.FOUNDATION_MODEL,
+        capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+        },
+    )
+
+    benchmark = BenchmarkPrompt(
+        prompt_id="agent-tool-001",
+        benchmark_version="0.1",
+        category="reasoning",
+        difficulty="medium",
+        prompt="Use a tool to complete the task.",
+        family=BenchmarkFamily.AGENT,
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+        },
+    )
+
+    assert target_supports_benchmark(
+        target,
+        benchmark,
+    ) is False
+
+
+def test_agent_supports_agent_benchmark_when_capabilities_match():
+    target = TargetManifest(
+        target_id="coding-agent",
+        display_name="Coding Agent",
+        target_type=TargetType.AGENT,
+        capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+            TargetCapability.CODE_EXECUTION,
+        },
+    )
+
+    benchmark = BenchmarkPrompt(
+        prompt_id="agent-coding-001",
+        benchmark_version="0.1",
+        category="coding",
+        difficulty="medium",
+        prompt="Fix the failing tests.",
+        family=BenchmarkFamily.AGENT,
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+            TargetCapability.CODE_EXECUTION,
+        },
+    )
+
+    assert target_supports_benchmark(
+        target,
+        benchmark,
+    ) is True
+
+
+def test_ai_system_rejects_foundation_model_benchmark_by_family():
+    target = TargetManifest(
+        target_id="custom-jarvis",
+        display_name="Custom Jarvis",
+        target_type=TargetType.AI_SYSTEM,
+        capabilities={
+            TargetCapability.TEXT,
+        },
+    )
+
+    benchmark = BenchmarkPrompt(
+        prompt_id="reasoning-001",
+        benchmark_version="0.1",
+        category="reasoning",
+        difficulty="medium",
+        prompt="Solve the reasoning task.",
     )
 
     assert target_supports_benchmark(
