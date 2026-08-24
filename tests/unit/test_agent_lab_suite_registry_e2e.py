@@ -32,6 +32,7 @@ from schemas.agent_lab import AgentTestSessionStatus
 from schemas.benchmark import BenchmarkHarnessProfile
 
 EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
+INSTRUCTION_EXPECTED_OUTPUT = "alpha,bravo,charlie,delta"
 
 
 @pytest.mark.parametrize(
@@ -125,7 +126,18 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
                     # DLLO must evaluate observed output
                     # independently of SUT self-reporting.
                     "task_completed": sut_task_completed,
-                    "output_text": sut_output_text,
+                    "output_text": (
+                            {
+                                "agent-protocol-smoke-001": EXPECTED_OUTPUT,
+                                "agent-protocol-instruction-001": (
+                                    INSTRUCTION_EXPECTED_OUTPUT
+                                ),
+                            }[
+                                request_payload["context"]["task_id"]
+                            ]
+                            if expected_pass
+                            else sut_output_text
+                        ),
                     "retry_count": 0,
                     "human_intervention_count": 0,
                     "error_type": None,
@@ -187,7 +199,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         )
 
         assert resolved.suite.suite_id == "agent-protocol-core"
-        assert resolved.suite.suite_version == "0.1"
+        assert resolved.suite.suite_version == "0.2"
         assert (
             resolved.suite.harness_profile
             is BenchmarkHarnessProfile.SUT_PROTOCOL
@@ -198,6 +210,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             for task in resolved.tasks
         ] == [
             "agent-protocol-smoke-001",
+            "agent-protocol-instruction-001",
         ]
 
         task_runner = BenchmarkTaskRunner(
@@ -224,11 +237,13 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         assert session.status is AgentTestSessionStatus.COMPLETED
         assert session.target == adapter.manifest
 
-        assert len(execute_requests) == 1
-        assert (
-            execute_requests[0]["context"]["task_id"]
-            == "agent-protocol-smoke-001"
-        )
+        assert [
+            request["context"]["task_id"]
+            for request in execute_requests
+        ] == [
+            "agent-protocol-smoke-001",
+            "agent-protocol-instruction-001",
+        ]
 
         assert (
             execute_requests[0]["task"]
@@ -238,19 +253,18 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             )
         )
 
-        assert len(session.results) == 1
+        assert len(session.results) == 2
 
-        result = session.results[0]
+        for result in session.results:
+            assert result.task_completed is sut_task_completed
 
-        assert result.task_completed is sut_task_completed
-
-        # DLLO's verdict follows the independently observed output,
-        # not the SUT's task_completed self-report.
-        assert result.evaluation.passed is expected_pass
-        assert (
-            result.evaluation.criteria[0].passed
-            is expected_pass
-        )
+            # DLLO's verdict follows independently observed output,
+            # not the SUT's task_completed self-report.
+            assert result.evaluation.passed is expected_pass
+            assert (
+                result.evaluation.criteria[0].passed
+                is expected_pass
+            )
 
         report = build_agent_technical_report(
             session,
@@ -259,9 +273,9 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
 
         assert report.target_id == "auto-suite-agent"
         assert report.suite_id == "agent-protocol-core"
-        assert report.suite_version == "0.1"
-        assert report.total_tasks == 1
-        assert report.passed_tasks == int(expected_pass)
+        assert report.suite_version == "0.2"
+        assert report.total_tasks == 2
+        assert report.passed_tasks == 2 * int(expected_pass)
         assert report.pass_rate == float(expected_pass)
 
     finally:

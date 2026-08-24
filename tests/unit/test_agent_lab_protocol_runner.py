@@ -26,6 +26,7 @@ from schemas.target import (
 )
 
 EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
+INSTRUCTION_EXPECTED_OUTPUT = "alpha,bravo,charlie,delta"
 
 
 def test_protocol_runner_builds_session_and_report():
@@ -93,7 +94,12 @@ def test_protocol_runner_builds_session_and_report():
                     "finished_at_utc": now,
                     "latency_ms": 4.5,
                     "task_completed": False,
-                    "output_text": EXPECTED_OUTPUT,
+                    "output_text": {
+                            "agent-protocol-smoke-001": EXPECTED_OUTPUT,
+                            "agent-protocol-instruction-001": (
+                                INSTRUCTION_EXPECTED_OUTPUT
+                            ),
+                        }[request_payload["context"]["task_id"]],
                     "retry_count": 0,
                     "human_intervention_count": 0,
                     "error_type": None,
@@ -164,28 +170,34 @@ def test_protocol_runner_builds_session_and_report():
             == "protocol-runner-agent"
         )
         assert result.session.suite_id == "agent-protocol-core"
-        assert result.session.suite_version == "0.1"
+        assert result.session.suite_version == "0.2"
 
-        assert len(execute_requests) == 1
-        assert (
-            execute_requests[0]["context"]["task_id"]
-            == "agent-protocol-smoke-001"
+        assert [
+            request["context"]["task_id"]
+            for request in execute_requests
+        ] == [
+            "agent-protocol-smoke-001",
+            "agent-protocol-instruction-001",
+        ]
+
+        assert len(result.session.results) == 2
+
+        assert all(
+            task_result.task_completed is False
+            for task_result in result.session.results
         )
-
-        assert len(result.session.results) == 1
-
-        task_result = result.session.results[0]
-
-        assert task_result.task_completed is False
-        assert task_result.evaluation.passed is True
+        assert all(
+            task_result.evaluation.passed is True
+            for task_result in result.session.results
+        )
 
         assert result.report.session_id == result.session.session_id
         assert result.report.target_id == "protocol-runner-agent"
         assert result.report.suite_id == "agent-protocol-core"
-        assert result.report.suite_version == "0.1"
+        assert result.report.suite_version == "0.2"
         assert result.report.generated_at_utc == generated_at
-        assert result.report.total_tasks == 1
-        assert result.report.passed_tasks == 1
+        assert result.report.total_tasks == 2
+        assert result.report.passed_tasks == 2
         assert result.report.pass_rate == 1.0
 
     finally:

@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-instruction-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "exact-output-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Sort these four tokens in ascending ASCII order: delta, alpha, charlie, bravo. Return exactly one comma-separated line with no spaces and no additional characters.",
+  "required_capabilities": [
+    "text"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "output-exact-match",
+      "description": "The observed output contains exactly alpha,bravo,charlie,delta with no additional characters."
+    }
+  ],
+  "expected_output_text": "alpha,bravo,charlie,delta",
+  "enabled": true
+}
