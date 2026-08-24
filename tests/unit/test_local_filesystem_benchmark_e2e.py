@@ -16,7 +16,10 @@ from observer.core.fixture_materializer import (
 )
 from observer.core.task_bank import TaskBank
 from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
-from observer.sut.local_filesystem import LocalFilesystemSUTAdapter
+from observer.sut.local_filesystem import (
+    LocalFilesystemSUTAdapter,
+    LocalFilesystemWriteControl,
+)
 
 
 def test_canonical_filesystem_task_runs_end_to_end(
@@ -47,6 +50,10 @@ def test_canonical_filesystem_task_runs_end_to_end(
 
     adapter = LocalFilesystemSUTAdapter(
         tmp_path,
+        control=LocalFilesystemWriteControl(
+            path="dllo-probe.txt",
+            content="DLLO-AGENT-SMOKE-001",
+        ),
     )
 
     task_runner = BenchmarkTaskRunner(
@@ -68,11 +75,6 @@ def test_canonical_filesystem_task_runs_end_to_end(
 
     assessed = assessment_runner.run(
         task,
-        metadata={
-            "operation": "write_file",
-            "path": "dllo-probe.txt",
-            "content": "DLLO-AGENT-SMOKE-001",
-        },
         evidence_collector=FilesystemTaskEvidenceCollector(
             workspace=tmp_path,
             relative_path="dllo-probe.txt",

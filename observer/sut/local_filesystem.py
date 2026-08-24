@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,6 +15,12 @@ from schemas.target import (
     TargetManifest,
     TargetType,
 )
+
+
+@dataclass(frozen=True)
+class LocalFilesystemWriteControl:
+    path: str
+    content: str
 
 
 class LocalFilesystemSUTAdapter(SUTAdapter):
@@ -34,6 +41,8 @@ class LocalFilesystemSUTAdapter(SUTAdapter):
     def __init__(
         self,
         workspace: Path,
+        *,
+        control: LocalFilesystemWriteControl | None = None,
     ) -> None:
         if not workspace.exists():
             raise ValueError(
@@ -46,21 +55,21 @@ class LocalFilesystemSUTAdapter(SUTAdapter):
             )
 
         self.workspace = workspace.resolve()
+        self.control = control
 
     def execute(
         self,
         context: SUTExecutionContext,
         request: SUTRequest,
     ) -> SUTExecutionResult:
-        metadata = request.metadata or {}
-
-        if metadata.get("operation") != "write_file":
+        if self.control is None:
             raise ValueError(
-                "Unsupported local filesystem operation."
+                "Local filesystem reference SUT requires "
+                "explicit control."
             )
 
-        relative_path = metadata.get("path")
-        content = metadata.get("content")
+        relative_path = self.control.path
+        content = self.control.content
 
         if not isinstance(relative_path, str) or not relative_path:
             raise ValueError(

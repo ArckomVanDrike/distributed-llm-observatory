@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from observer.sut.local_filesystem import LocalFilesystemSUTAdapter
+from observer.sut.local_filesystem import (
+    LocalFilesystemSUTAdapter,
+    LocalFilesystemWriteControl,
+)
 
 
 def test_local_filesystem_sut_requires_existing_workspace(
@@ -50,7 +53,13 @@ def test_local_filesystem_sut_writes_file_inside_workspace(
         SUTRequest,
     )
 
-    adapter = LocalFilesystemSUTAdapter(tmp_path)
+    adapter = LocalFilesystemSUTAdapter(
+        tmp_path,
+        control=LocalFilesystemWriteControl(
+            path="dllo-probe.txt",
+            content="DLLO-AGENT-SMOKE-001",
+        ),
+    )
 
     context = SUTExecutionContext(
         observer_id="observer-test",
@@ -64,11 +73,6 @@ def test_local_filesystem_sut_writes_file_inside_workspace(
         context,
         SUTRequest(
             task="Create the requested probe file.",
-            metadata={
-                "operation": "write_file",
-                "path": "dllo-probe.txt",
-                "content": "DLLO-AGENT-SMOKE-001",
-            },
         ),
     )
 
@@ -88,7 +92,13 @@ def test_local_filesystem_sut_rejects_absolute_path(
         SUTRequest,
     )
 
-    adapter = LocalFilesystemSUTAdapter(tmp_path)
+    adapter = LocalFilesystemSUTAdapter(
+        tmp_path,
+        control=LocalFilesystemWriteControl(
+            path="/tmp/escape.txt",
+            content="x",
+        ),
+    )
 
     context = SUTExecutionContext(
         observer_id="observer-test",
@@ -106,11 +116,6 @@ def test_local_filesystem_sut_rejects_absolute_path(
             context,
             SUTRequest(
                 task="Write a file.",
-                metadata={
-                    "operation": "write_file",
-                    "path": "/tmp/escape.txt",
-                    "content": "x",
-                },
             ),
         )
 
@@ -123,7 +128,13 @@ def test_local_filesystem_sut_rejects_parent_escape(
         SUTRequest,
     )
 
-    adapter = LocalFilesystemSUTAdapter(tmp_path)
+    adapter = LocalFilesystemSUTAdapter(
+        tmp_path,
+        control=LocalFilesystemWriteControl(
+            path="../escape.txt",
+            content="x",
+        ),
+    )
 
     context = SUTExecutionContext(
         observer_id="observer-test",
@@ -141,10 +152,5 @@ def test_local_filesystem_sut_rejects_parent_escape(
             context,
             SUTRequest(
                 task="Write a file.",
-                metadata={
-                    "operation": "write_file",
-                    "path": "../escape.txt",
-                    "content": "x",
-                },
             ),
         )
