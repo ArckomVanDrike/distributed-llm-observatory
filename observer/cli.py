@@ -32,6 +32,10 @@ from consumer_probe.telemetry_analytics import (
     summarize_local_telemetry_by_collector,
     summarize_local_telemetry_records,
 )
+from observer.core.agent_lab_protocol_runner import (
+    AgentLabProtocolRunner,
+    AgentLabProtocolRunnerError,
+)
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
 from observer.core.consumer_schedule import (
@@ -489,6 +493,53 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional local Collector build directory "
             "to serve from the bridge"
         ),
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab protocol test
+    # -----------------------------------------------------
+
+    agent_test_parser = subparsers.add_parser(
+        "agent-test",
+        help="Test an agent through the Local SUT Protocol",
+    )
+
+    agent_test_parser.add_argument(
+        "base_url",
+        help=(
+            "Local SUT Protocol base URL, for example "
+            "http://127.0.0.1:8000"
+        ),
+    )
+
+    agent_test_parser.add_argument(
+        "--observer-id",
+        help=(
+            "Observer identifier. Defaults to "
+            "OBSERVATORY_ID when omitted."
+        ),
+    )
+
+    agent_test_parser.add_argument(
+        "--region-code",
+        help=(
+            "Observer region. Defaults to "
+            "OBSERVATORY_REGION when omitted."
+        ),
+    )
+
+    agent_test_parser.add_argument(
+        "--suite-bank",
+        type=Path,
+        default=Path("benchmark/suites"),
+        help="Benchmark suite bank directory",
+    )
+
+    agent_test_parser.add_argument(
+        "--task-bank",
+        type=Path,
+        default=Path("benchmark/tasks"),
+        help="Benchmark task bank directory",
     )
 
     # -----------------------------------------------------
@@ -1537,6 +1588,61 @@ def consumer_bridge(
 
 
 
+def agent_test(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        observer_id, region_code = (
+            resolve_observer_identity(args)
+        )
+
+        runner = AgentLabProtocolRunner(
+            observer_id=observer_id,
+            region_code=region_code,
+            suite_root=args.suite_bank,
+            task_root=args.task_bank,
+        )
+
+        result = runner.run(
+            base_url=args.base_url,
+            generated_at_utc=datetime.now(timezone.utc),
+        )
+
+        report = result.report
+
+        print("=== DLLO AGENT LAB ===")
+        print(
+            f"Target:            "
+            f"{result.session.target.target_id}"
+        )
+        print(
+            f"Suite:             "
+            f"{report.suite_id} v{report.suite_version}"
+        )
+        print(f"Tasks:             {report.total_tasks}")
+        print(f"Passed:            {report.passed_tasks}")
+        print(
+            f"Pass rate:         "
+            f"{format_rate(report.pass_rate)}"
+        )
+        print(
+            f"Median latency:    "
+            f"{format_ms(report.median_latency_ms)}"
+        )
+
+        return 0
+
+    except (
+        AgentLabProtocolRunnerError,
+        ObserverConfigError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def task_list(
     args: argparse.Namespace,
 ) -> int:
@@ -1673,6 +1779,9 @@ def main() -> int:
 
     if args.command == "consumer-bridge":
         return consumer_bridge(args)
+
+    if args.command == "agent-test":
+        return agent_test(args)
 
     if args.command == "task-list":
         return task_list(args)
