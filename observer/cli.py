@@ -40,6 +40,7 @@ from observer.core.consumer_schedule import (
 )
 from observer.core.prompt_bank import PromptBank, PromptBankError
 from observer.core.recording import build_observation_record
+from observer.core.task_bank import TaskBank, TaskBankError
 from observer.providers.mock import MockProvider
 from observer.storage.sqlite import SQLiteObservationStore
 
@@ -488,6 +489,39 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional local Collector build directory "
             "to serve from the bridge"
         ),
+    )
+
+    # -----------------------------------------------------
+    # Benchmark task discovery
+    # -----------------------------------------------------
+
+    task_list_parser = subparsers.add_parser(
+        "task-list",
+        help="List enabled benchmark tasks",
+    )
+
+    task_list_parser.add_argument(
+        "--task-bank",
+        type=Path,
+        default=Path("benchmark/tasks"),
+        help="Benchmark task bank directory",
+    )
+
+    task_show_parser = subparsers.add_parser(
+        "task-show",
+        help="Show one benchmark task",
+    )
+
+    task_show_parser.add_argument(
+        "task_id",
+        help="Benchmark task ID",
+    )
+
+    task_show_parser.add_argument(
+        "--task-bank",
+        type=Path,
+        default=Path("benchmark/tasks"),
+        help="Benchmark task bank directory",
     )
 
     return parser
@@ -1502,6 +1536,119 @@ def consumer_bridge(
         return 2
 
 
+
+def task_list(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        tasks = TaskBank(
+            args.task_bank
+        ).load_enabled()
+
+        print("=== DLLO BENCHMARK TASKS ===")
+        print(f"Tasks:             {len(tasks)}")
+
+        for task in tasks:
+            capabilities = ", ".join(
+                sorted(
+                    capability.value
+                    for capability
+                    in task.required_capabilities
+                )
+            )
+
+            print(
+                f"{task.task_id} "
+                f"[{task.family.value}/"
+                f"{task.category.value}/"
+                f"{task.difficulty.value}] "
+                f"capabilities={capabilities}"
+            )
+
+        return 0
+
+    except TaskBankError as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
+def task_show(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        tasks = TaskBank(
+            args.task_bank
+        ).load_all()
+
+        task = next(
+            (
+                candidate
+                for candidate in tasks
+                if candidate.task_id == args.task_id
+            ),
+            None,
+        )
+
+        if task is None:
+            print(
+                f"Task not found: {args.task_id}",
+                file=sys.stderr,
+            )
+            return 2
+
+        capabilities = ", ".join(
+            sorted(
+                capability.value
+                for capability
+                in task.required_capabilities
+            )
+        )
+
+        print("=== DLLO BENCHMARK TASK ===")
+        print(f"Task ID:           {task.task_id}")
+        print(
+            f"Benchmark version: {task.benchmark_version}"
+        )
+        print(f"Family:            {task.family.value}")
+        print(f"Category:          {task.category.value}")
+        print(
+            f"Difficulty:        {task.difficulty.value}"
+        )
+        print(f"Evaluator:         {task.evaluator_id}")
+        print(f"Capabilities:      {capabilities}")
+        print(
+            f"Fixture:           "
+            f"{task.fixture_id or 'none'}"
+        )
+        print(
+            f"Enabled:           "
+            f"{str(task.enabled).lower()}"
+        )
+        print()
+        print("Task:")
+        print(task.task)
+        print()
+        print("Success criteria:")
+
+        for criterion in task.success_criteria:
+            print(
+                f"- {criterion.criterion_id}: "
+                f"{criterion.description}"
+            )
+
+        return 0
+
+    except TaskBankError as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1526,6 +1673,12 @@ def main() -> int:
 
     if args.command == "consumer-bridge":
         return consumer_bridge(args)
+
+    if args.command == "task-list":
+        return task_list(args)
+
+    if args.command == "task-show":
+        return task_show(args)
 
     parser.print_help()
     return 1
