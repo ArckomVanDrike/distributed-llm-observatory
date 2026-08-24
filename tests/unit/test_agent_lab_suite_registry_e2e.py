@@ -7,6 +7,8 @@ from http.server import (
 )
 from pathlib import Path
 
+import pytest
+
 from observer.core.agent_technical_report import (
     build_agent_technical_report,
 )
@@ -19,105 +21,43 @@ from observer.core.benchmark_task_assessment import (
 from observer.core.benchmark_task_runner import (
     BenchmarkTaskRunner,
 )
+from observer.core.default_task_evaluator_registry import (
+    build_default_task_evaluator_registry,
+)
 from observer.core.suite_bank import SuiteBank
 from observer.core.suite_registry import SuiteRegistry
 from observer.core.task_bank import TaskBank
-from observer.core.task_evaluator import TaskEvaluator
-from observer.core.task_evaluator_registry import (
-    TaskEvaluatorRegistry,
-)
-from observer.sut.base import SUTExecutionResult
 from observer.sut.local_http import LocalHTTPSUTAdapter
 from schemas.agent_lab import AgentTestSessionStatus
-from schemas.benchmark import (
-    BenchmarkHarnessProfile,
-    BenchmarkTask,
+from schemas.benchmark import BenchmarkHarnessProfile
+
+EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
+
+
+@pytest.mark.parametrize(
+    (
+        "sut_task_completed",
+        "sut_output_text",
+        "expected_pass",
+    ),
+    [
+        (
+            False,
+            EXPECTED_OUTPUT,
+            True,
+        ),
+        (
+            True,
+            "WRONG-OUTPUT",
+            False,
+        ),
+    ],
 )
-from schemas.evaluation import (
-    TaskCriterionEvaluation,
-    TaskEvaluation,
-    TaskEvaluationMethod,
-)
-
-
-class CompletionEvaluator(TaskEvaluator):
-    def evaluate(
-        self,
-        benchmark: BenchmarkTask,
-        result: SUTExecutionResult,
-        *,
-        evidence=None,
-    ) -> TaskEvaluation:
-        passed = result.task_completed
-
-        return TaskEvaluation(
-            task_id=benchmark.task_id,
-            method=TaskEvaluationMethod.DETERMINISTIC,
-            criteria=[
-                TaskCriterionEvaluation(
-                    criterion=(
-                        benchmark.success_criteria[0].description
-                    ),
-                    passed=passed,
-                    evidence="Observed normalized SUT result.",
-                ),
-            ],
-            passed=passed,
-        )
-
-
-def test_agent_lab_resolves_suite_and_runs_http_session(
-    tmp_path: Path,
+def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
+    sut_task_completed: bool,
+    sut_output_text: str,
+    expected_pass: bool,
 ):
-    suite_root = tmp_path / "suites"
-    task_root = tmp_path / "tasks"
-
-    suite_root.mkdir()
-    task_root.mkdir()
-
-    (suite_root / "agent-core.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "0.1",
-                "suite_id": "agent-core",
-                "suite_version": "0.1",
-                "family": "agent",
-                "harness_profile": "sut_protocol",
-                "task_ids": [
-                    "agent-http-auto-001",
-                ],
-                "enabled": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    (task_root / "agent-http-auto-001.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "0.1",
-                "task_id": "agent-http-auto-001",
-                "benchmark_version": "0.1",
-                "evaluator_id": "completion-evaluator-v0-1",
-                "family": "agent",
-                "category": "technical",
-                "difficulty": "easy",
-                "task": "Complete the automatically selected task.",
-                "required_capabilities": [
-                    "text"
-                ],
-                "success_criteria": [
-                    {
-                        "criterion_id": "completed",
-                        "description": "The task is completed."
-                    }
-                ],
-                "enabled": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-
     execute_requests = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -181,8 +121,11 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
                     "started_at_utc": now,
                     "finished_at_utc": now,
                     "latency_ms": 8.5,
-                    "task_completed": True,
-                    "output_text": "automatic suite task completed",
+
+                    # DLLO must evaluate observed output
+                    # independently of SUT self-reporting.
+                    "task_completed": sut_task_completed,
+                    "output_text": sut_output_text,
                     "retry_count": 0,
                     "human_intervention_count": 0,
                     "error_type": None,
@@ -230,8 +173,12 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
         )
 
         suite_registry = SuiteRegistry(
-            suite_bank=SuiteBank(suite_root),
-            task_bank=TaskBank(task_root),
+            suite_bank=SuiteBank(
+                Path("benchmark/suites"),
+            ),
+            task_bank=TaskBank(
+                Path("benchmark/tasks"),
+            ),
         )
 
         resolved = suite_registry.resolve_unique_for_target(
@@ -239,13 +186,18 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
             harness_profile=BenchmarkHarnessProfile.SUT_PROTOCOL,
         )
 
-        assert resolved.suite.suite_id == "agent-core"
+        assert resolved.suite.suite_id == "agent-protocol-core"
         assert resolved.suite.suite_version == "0.1"
+        assert (
+            resolved.suite.harness_profile
+            is BenchmarkHarnessProfile.SUT_PROTOCOL
+        )
+
         assert [
             task.task_id
             for task in resolved.tasks
         ] == [
-            "agent-http-auto-001",
+            "agent-protocol-smoke-001",
         ]
 
         task_runner = BenchmarkTaskRunner(
@@ -254,15 +206,9 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
             region_code="CL-Los-Lagos",
         )
 
-        evaluator_registry = TaskEvaluatorRegistry()
-        evaluator_registry.register(
-            "completion-evaluator-v0-1",
-            CompletionEvaluator(),
-        )
-
         assessment_runner = BenchmarkTaskAssessmentRunner(
             task_runner=task_runner,
-            registry=evaluator_registry,
+            registry=build_default_task_evaluator_registry(),
         )
 
         session_runner = AgentTestSessionRunner(
@@ -281,11 +227,30 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
         assert len(execute_requests) == 1
         assert (
             execute_requests[0]["context"]["task_id"]
-            == "agent-http-auto-001"
+            == "agent-protocol-smoke-001"
+        )
+
+        assert (
+            execute_requests[0]["task"]
+            == (
+                "Return exactly DLLO-AGENT-SMOKE-001 "
+                "and no additional characters."
+            )
         )
 
         assert len(session.results) == 1
-        assert session.results[0].evaluation.passed is True
+
+        result = session.results[0]
+
+        assert result.task_completed is sut_task_completed
+
+        # DLLO's verdict follows the independently observed output,
+        # not the SUT's task_completed self-report.
+        assert result.evaluation.passed is expected_pass
+        assert (
+            result.evaluation.criteria[0].passed
+            is expected_pass
+        )
 
         report = build_agent_technical_report(
             session,
@@ -293,11 +258,11 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
         )
 
         assert report.target_id == "auto-suite-agent"
-        assert report.suite_id == "agent-core"
+        assert report.suite_id == "agent-protocol-core"
         assert report.suite_version == "0.1"
         assert report.total_tasks == 1
-        assert report.passed_tasks == 1
-        assert report.pass_rate == 1.0
+        assert report.passed_tasks == int(expected_pass)
+        assert report.pass_rate == float(expected_pass)
 
     finally:
         server.shutdown()

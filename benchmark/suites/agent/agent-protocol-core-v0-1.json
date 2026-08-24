@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1",
+  "suite_id": "agent-protocol-core",
+  "suite_version": "0.1",
+  "family": "agent",
+  "harness_profile": "sut_protocol",
+  "task_ids": [
+    "agent-protocol-smoke-001"
+  ],
+  "enabled": true
+}

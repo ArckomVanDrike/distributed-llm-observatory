@@ -107,6 +107,11 @@ class BenchmarkTask(BaseModel):
         pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
     )
 
+    expected_output_text: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
     enabled: bool = True
 
     @model_validator(mode="after")

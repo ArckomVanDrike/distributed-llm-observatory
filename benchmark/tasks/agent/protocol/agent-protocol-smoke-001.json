@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-smoke-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "exact-output-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Return exactly DLLO-AGENT-SMOKE-001 and no additional characters.",
+  "required_capabilities": [
+    "text"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "output-exact-match",
+      "description": "The observed output contains exactly DLLO-AGENT-SMOKE-001 with no additional characters."
+    }
+  ],
+  "expected_output_text": "DLLO-AGENT-SMOKE-001",
+  "enabled": true
+}

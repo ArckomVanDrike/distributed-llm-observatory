@@ -41,7 +41,9 @@ def test_task_list_reports_enabled_repository_tasks(
 
     assert result == 0
     assert "=== DLLO BENCHMARK TASKS ===" in output
-    assert "Tasks:             1" in output
+    assert "Tasks:             2" in output
+    assert "agent-filesystem-001" in output
+    assert "agent-protocol-smoke-001" in output
     assert "agent-filesystem-001" in output
     assert "agent" in output
     assert "technical" in output
