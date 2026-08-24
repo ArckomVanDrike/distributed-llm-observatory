@@ -8,13 +8,66 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, model_validator
 
 from schemas.evaluation import TaskEvaluation
-from schemas.target import TargetManifest
+from schemas.target import TargetCapability, TargetManifest
 
 
 class AgentTestSessionStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class AgentTestTaskSelectionStatus(str, Enum):
+    SELECTED = "selected"
+    INCOMPATIBLE = "incompatible"
+    DISABLED = "disabled"
+
+
+class AgentTestTaskSelection(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    task_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    benchmark_version: str = Field(min_length=1)
+
+    status: AgentTestTaskSelectionStatus
+
+    missing_capabilities: set[TargetCapability] = Field(
+        default_factory=set,
+    )
+    family_mismatch: bool = False
+
+    @model_validator(mode="after")
+    def validate_selection(
+        self,
+    ) -> AgentTestTaskSelection:
+        if self.status is AgentTestTaskSelectionStatus.INCOMPATIBLE:
+            if (
+                not self.missing_capabilities
+                and not self.family_mismatch
+            ):
+                raise ValueError(
+                    "An incompatible task selection must record "
+                    "missing capabilities or a family mismatch."
+                )
+
+            return self
+
+        if self.missing_capabilities:
+            raise ValueError(
+                "Only incompatible task selections may record "
+                "missing capabilities."
+            )
+
+        if self.family_mismatch:
+            raise ValueError(
+                "Only incompatible task selections may record "
+                "a family mismatch."
+            )
+
+        return self
 
 
 class AgentTestTaskResult(BaseModel):
@@ -84,6 +137,10 @@ class AgentTestSession(BaseModel):
 
     started_at_utc: datetime
     completed_at_utc: datetime | None = None
+
+    selections: list[AgentTestTaskSelection] = Field(
+        default_factory=list,
+    )
 
     results: list[AgentTestTaskResult] = Field(
         default_factory=list,

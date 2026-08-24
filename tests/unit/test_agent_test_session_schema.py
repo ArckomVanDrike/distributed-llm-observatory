@@ -213,3 +213,65 @@ def test_session_records_test_suite_provenance():
 
     assert session.suite_id == "agent-core"
     assert session.suite_version == "0.1"
+
+
+def test_incompatible_selection_requires_reason():
+    from pydantic import ValidationError
+
+    from schemas.agent_lab import (
+        AgentTestTaskSelection,
+        AgentTestTaskSelectionStatus,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="missing capabilities or a family mismatch",
+    ):
+        AgentTestTaskSelection(
+            task_id="agent-task-001",
+            benchmark_version="0.1",
+            status=AgentTestTaskSelectionStatus.INCOMPATIBLE,
+        )
+
+
+def test_selected_selection_rejects_missing_capabilities():
+    from pydantic import ValidationError
+
+    from schemas.agent_lab import (
+        AgentTestTaskSelection,
+        AgentTestTaskSelectionStatus,
+    )
+    from schemas.target import TargetCapability
+
+    with pytest.raises(
+        ValidationError,
+        match="Only incompatible task selections",
+    ):
+        AgentTestTaskSelection(
+            task_id="agent-task-001",
+            benchmark_version="0.1",
+            status=AgentTestTaskSelectionStatus.SELECTED,
+            missing_capabilities={
+                TargetCapability.FILESYSTEM,
+            },
+        )
+
+
+def test_disabled_selection_rejects_family_mismatch():
+    from pydantic import ValidationError
+
+    from schemas.agent_lab import (
+        AgentTestTaskSelection,
+        AgentTestTaskSelectionStatus,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Only incompatible task selections",
+    ):
+        AgentTestTaskSelection(
+            task_id="agent-task-001",
+            benchmark_version="0.1",
+            status=AgentTestTaskSelectionStatus.DISABLED,
+            family_mismatch=True,
+        )
