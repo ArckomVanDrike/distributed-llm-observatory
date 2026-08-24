@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "suite_id": "agent-core",
+  "suite_version": "0.1",
+  "family": "agent",
+  "task_ids": [
+    "agent-filesystem-001"
+  ],
+  "enabled": true
+}

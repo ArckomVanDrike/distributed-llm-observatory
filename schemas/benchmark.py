@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import (
     BaseModel,
     Field,
+    field_validator,
     model_validator,
 )
 
@@ -45,7 +47,10 @@ class BenchmarkPrompt(BaseModel):
 
     prompt: str = Field(min_length=1)
     expected_characteristics: list[str] = Field(default_factory=list)
-    scoring_method: str = Field(default="observatory_rubric_v0.1", min_length=1)
+    scoring_method: str = Field(
+        default="observatory_rubric_v0.1",
+        min_length=1,
+    )
 
     required_capabilities: set[TargetCapability] = Field(
         default_factory=lambda: {
@@ -111,6 +116,62 @@ class BenchmarkTask(BaseModel):
         if self.family is BenchmarkFamily.FOUNDATION_MODEL:
             raise ValueError(
                 "BenchmarkTask cannot use the "
+                "foundation_model family."
+            )
+
+        return self
+
+
+class BenchmarkSuite(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    suite_id: str = Field(
+        min_length=1,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    suite_version: str = Field(min_length=1)
+
+    family: BenchmarkFamily
+
+    task_ids: list[str] = Field(
+        min_length=1,
+    )
+
+    enabled: bool = True
+
+    @field_validator("task_ids")
+    @classmethod
+    def validate_task_ids(
+        cls,
+        task_ids: list[str],
+    ) -> list[str]:
+        import re
+
+        pattern = re.compile(
+            r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        )
+
+        for task_id in task_ids:
+            if not pattern.fullmatch(task_id):
+                raise ValueError(
+                    "BenchmarkSuite task_ids must use "
+                    "stable slug format."
+                )
+
+        if len(task_ids) != len(set(task_ids)):
+            raise ValueError(
+                "BenchmarkSuite task_ids must be unique."
+            )
+
+        return task_ids
+
+    @model_validator(mode="after")
+    def validate_suite_family(
+        self,
+    ) -> BenchmarkSuite:
+        if self.family is BenchmarkFamily.FOUNDATION_MODEL:
+            raise ValueError(
+                "BenchmarkSuite cannot use the "
                 "foundation_model family."
             )
 
