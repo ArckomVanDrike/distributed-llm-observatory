@@ -21,5 +21,6 @@
       "description": "The file contains exactly DLLO-AGENT-SMOKE-001 with no additional characters."
     }
   ],
-  "enabled": true
+  "enabled": true,
+  "fixture_id": "filesystem-empty-v0-1"
 }

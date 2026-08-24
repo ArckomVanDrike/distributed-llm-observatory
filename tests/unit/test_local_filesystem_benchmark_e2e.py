@@ -7,6 +7,10 @@ from observer.core.benchmark_task_runner import BenchmarkTaskRunner
 from observer.core.deterministic_task_evaluator import (
     DeterministicTaskEvaluator,
 )
+from observer.core.fixture_bank import FixtureBank
+from observer.core.fixture_materializer import (
+    materialize_filesystem_fixture,
+)
 from observer.core.task_bank import TaskBank
 from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
 from observer.sut.local_filesystem import LocalFilesystemSUTAdapter
@@ -15,9 +19,28 @@ from observer.sut.local_filesystem import LocalFilesystemSUTAdapter
 def test_canonical_filesystem_task_runs_end_to_end(
     tmp_path: Path,
 ):
-    task = TaskBank(
-        Path("benchmark/tasks"),
-    ).load_enabled()[0]
+    task = next(
+        task
+        for task in TaskBank(
+            Path("benchmark/tasks"),
+        ).load_enabled()
+        if task.task_id == "agent-filesystem-001"
+    )
+
+    assert task.fixture_id is not None
+
+    fixture = next(
+        fixture
+        for fixture in FixtureBank(
+            Path("benchmark/fixtures"),
+        ).load_all()
+        if fixture.fixture_id == task.fixture_id
+    )
+
+    materialize_filesystem_fixture(
+        fixture,
+        tmp_path,
+    )
 
     adapter = LocalFilesystemSUTAdapter(
         tmp_path,
