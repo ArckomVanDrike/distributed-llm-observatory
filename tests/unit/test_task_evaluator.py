@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from observer.core.task_evaluator import TaskEvaluator
+from observer.core.task_evidence import TaskCriterionEvidence
 from observer.sut.base import (
     SUTExecutionContext,
     SUTExecutionResult,
@@ -25,6 +26,8 @@ class MockTaskEvaluator(TaskEvaluator):
         self,
         benchmark: BenchmarkTask,
         result: SUTExecutionResult,
+        *,
+        evidence: tuple[TaskCriterionEvidence, ...] | None = None,
     ) -> TaskEvaluation:
         return TaskEvaluation(
             task_id=benchmark.task_id,

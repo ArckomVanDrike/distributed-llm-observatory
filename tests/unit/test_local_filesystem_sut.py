@@ -77,13 +77,7 @@ def test_local_filesystem_sut_writes_file_inside_workspace(
     assert probe.read_text(encoding="utf-8") == "DLLO-AGENT-SMOKE-001"
     assert result.task_completed is True
 
-    evidence = {
-        item.criterion_id: item
-        for item in result.criterion_evidence
-    }
-
-    assert evidence["file-created"].passed is True
-    assert evidence["file-contents-match"].passed is True
+    assert not hasattr(result, "criterion_evidence")
 
 
 def test_local_filesystem_sut_rejects_absolute_path(

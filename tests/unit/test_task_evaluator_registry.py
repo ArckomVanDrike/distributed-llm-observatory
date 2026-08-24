@@ -3,6 +3,7 @@ import pytest
 
 from observer.core.task_evaluator import TaskEvaluator
 from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
+from observer.core.task_evidence import TaskCriterionEvidence
 from observer.sut.base import (
     SUTExecutionResult,
 )
@@ -26,6 +27,8 @@ class MockRegistryEvaluator(TaskEvaluator):
         self,
         benchmark: BenchmarkTask,
         result: SUTExecutionResult,
+        *,
+        evidence: tuple[TaskCriterionEvidence, ...] | None = None,
     ) -> TaskEvaluation:
         return TaskEvaluation(
             task_id=benchmark.task_id,

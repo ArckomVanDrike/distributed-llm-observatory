@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from observer.core.task_evaluator import TaskEvaluator
+from observer.core.task_evidence import TaskCriterionEvidence
 from observer.sut.base import SUTExecutionResult
 from schemas.benchmark import BenchmarkTask
 from schemas.evaluation import (
@@ -19,17 +20,25 @@ class DeterministicTaskEvaluator(TaskEvaluator):
         self,
         benchmark: BenchmarkTask,
         result: SUTExecutionResult,
+        *,
+        evidence: tuple[TaskCriterionEvidence, ...] | None = None,
     ) -> TaskEvaluation:
+        if evidence is None:
+            raise ValueError(
+                "Deterministic evaluation requires "
+                "external criterion evidence."
+            )
+
         evidence_by_id = {}
 
-        for evidence in result.criterion_evidence:
-            if evidence.criterion_id in evidence_by_id:
+        for evidence_item in evidence:
+            if evidence_item.criterion_id in evidence_by_id:
                 raise ValueError(
                     "Duplicate criterion evidence for "
-                    f"{evidence.criterion_id!r}."
+                    f"{evidence_item.criterion_id!r}."
                 )
 
-            evidence_by_id[evidence.criterion_id] = evidence
+            evidence_by_id[evidence_item.criterion_id] = evidence_item
 
         criteria = []
 

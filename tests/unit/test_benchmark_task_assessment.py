@@ -8,6 +8,7 @@ from observer.core.benchmark_task_assessment import (
 from observer.core.benchmark_task_runner import BenchmarkTaskRunner
 from observer.core.task_evaluator import TaskEvaluator
 from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
+from observer.core.task_evidence import TaskCriterionEvidence
 from observer.sut.base import (
     SUTAdapter,
     SUTExecutionContext,
@@ -66,6 +67,8 @@ class FailingCriterionEvaluator(TaskEvaluator):
         self,
         benchmark: BenchmarkTask,
         result: SUTExecutionResult,
+        *,
+        evidence: tuple[TaskCriterionEvidence, ...] | None = None,
     ) -> TaskEvaluation:
         return TaskEvaluation(
             task_id=benchmark.task_id,

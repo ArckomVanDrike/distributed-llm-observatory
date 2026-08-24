@@ -5,7 +5,6 @@ from pathlib import Path
 
 from observer.sut.base import (
     SUTAdapter,
-    SUTCriterionEvidence,
     SUTExecutionContext,
     SUTExecutionResult,
     SUTRequest,
@@ -122,21 +121,5 @@ class LocalFilesystemSUTAdapter(SUTAdapter):
             task_completed=(
                 file_exists
                 and contents_match
-            ),
-            criterion_evidence=(
-                SUTCriterionEvidence(
-                    criterion_id="file-created",
-                    passed=file_exists,
-                    evidence=str(target),
-                ),
-                SUTCriterionEvidence(
-                    criterion_id="file-contents-match",
-                    passed=contents_match,
-                    evidence=(
-                        "Written contents match requested content."
-                        if contents_match
-                        else "Written contents do not match."
-                    ),
-                ),
             ),
         )

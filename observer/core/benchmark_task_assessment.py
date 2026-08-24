@@ -8,6 +8,10 @@ from observer.core.benchmark_task_runner import (
     BenchmarkTaskRunner,
 )
 from observer.core.task_evaluator_registry import TaskEvaluatorRegistry
+from observer.core.task_evidence import (
+    TaskCriterionEvidence,
+    TaskEvidenceCollector,
+)
 from schemas.benchmark import BenchmarkTask
 from schemas.evaluation import TaskEvaluation
 
@@ -37,18 +41,35 @@ class BenchmarkTaskAssessmentRunner:
         benchmark: BenchmarkTask,
         *,
         metadata: dict[str, Any] | None = None,
+        evidence: tuple[TaskCriterionEvidence, ...] | None = None,
+        evidence_collector: TaskEvidenceCollector | None = None,
     ) -> AssessedBenchmarkTaskRun:
+        if evidence is not None and evidence_collector is not None:
+            raise ValueError(
+                "Provide either evidence or evidence_collector, not both."
+            )
+
         run = self.task_runner.run(
             benchmark,
             metadata=metadata,
         )
 
+        if evidence_collector is not None:
+            evidence = evidence_collector.collect()
+
         evaluator = self.registry.resolve(benchmark)
 
-        evaluation = evaluator.evaluate(
-            benchmark,
-            run.observation.result,
-        )
+        if evidence is None:
+            evaluation = evaluator.evaluate(
+                benchmark,
+                run.observation.result,
+            )
+        else:
+            evaluation = evaluator.evaluate(
+                benchmark,
+                run.observation.result,
+                evidence=evidence,
+            )
 
         if evaluation.task_id != benchmark.task_id:
             raise ValueError(

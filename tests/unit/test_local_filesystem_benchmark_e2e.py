@@ -7,6 +7,9 @@ from observer.core.benchmark_task_runner import BenchmarkTaskRunner
 from observer.core.deterministic_task_evaluator import (
     DeterministicTaskEvaluator,
 )
+from observer.core.filesystem_task_evidence import (
+    FilesystemTaskEvidenceCollector,
+)
 from observer.core.fixture_bank import FixtureBank
 from observer.core.fixture_materializer import (
     materialize_filesystem_fixture,
@@ -70,6 +73,11 @@ def test_canonical_filesystem_task_runs_end_to_end(
             "path": "dllo-probe.txt",
             "content": "DLLO-AGENT-SMOKE-001",
         },
+        evidence_collector=FilesystemTaskEvidenceCollector(
+            workspace=tmp_path,
+            relative_path="dllo-probe.txt",
+            expected_content="DLLO-AGENT-SMOKE-001",
+        ),
     )
 
     assert assessed.run.observation.result.task_completed is True

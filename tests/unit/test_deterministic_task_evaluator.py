@@ -5,8 +5,10 @@ import pytest
 from observer.core.deterministic_task_evaluator import (
     DeterministicTaskEvaluator,
 )
+from observer.core.task_evidence import (
+    TaskCriterionEvidence,
+)
 from observer.sut.base import (
-    SUTCriterionEvidence,
     SUTExecutionContext,
     SUTExecutionResult,
 )
@@ -47,9 +49,7 @@ def build_task() -> BenchmarkTask:
     )
 
 
-def build_result(
-    evidence: tuple[SUTCriterionEvidence, ...],
-) -> SUTExecutionResult:
+def build_result() -> SUTExecutionResult:
     now = datetime.now(timezone.utc)
 
     return SUTExecutionResult(
@@ -64,7 +64,6 @@ def build_result(
         finished_at_utc=now,
         latency_ms=0.0,
         task_completed=True,
-        criterion_evidence=evidence,
     )
 
 
@@ -73,19 +72,18 @@ def test_deterministic_evaluator_maps_structured_evidence():
 
     evaluation = evaluator.evaluate(
         build_task(),
-        build_result(
-            (
-                SUTCriterionEvidence(
-                    criterion_id="tests-pass",
-                    passed=True,
-                    evidence="pytest: 42 passed",
-                ),
-                SUTCriterionEvidence(
-                    criterion_id="no-unrelated-changes",
-                    passed=True,
-                    evidence="git diff clean outside expected files",
-                ),
-            )
+        build_result(),
+        evidence=(
+            TaskCriterionEvidence(
+                criterion_id="tests-pass",
+                passed=True,
+                evidence="pytest: 42 passed",
+            ),
+            TaskCriterionEvidence(
+                criterion_id="no-unrelated-changes",
+                passed=True,
+                evidence="git diff clean outside expected files",
+            ),
         ),
     )
 
@@ -100,18 +98,17 @@ def test_deterministic_evaluator_preserves_failed_criterion():
 
     evaluation = evaluator.evaluate(
         build_task(),
-        build_result(
-            (
-                SUTCriterionEvidence(
-                    criterion_id="tests-pass",
-                    passed=False,
-                    evidence="pytest: 1 failed",
-                ),
-                SUTCriterionEvidence(
-                    criterion_id="no-unrelated-changes",
-                    passed=True,
-                ),
-            )
+        build_result(),
+        evidence=(
+            TaskCriterionEvidence(
+                criterion_id="tests-pass",
+                passed=False,
+                evidence="pytest: 1 failed",
+            ),
+            TaskCriterionEvidence(
+                criterion_id="no-unrelated-changes",
+                passed=True,
+            ),
         ),
     )
 
@@ -128,13 +125,12 @@ def test_deterministic_evaluator_rejects_missing_evidence():
     ):
         evaluator.evaluate(
             build_task(),
-            build_result(
-                (
-                    SUTCriterionEvidence(
-                        criterion_id="tests-pass",
-                        passed=True,
-                    ),
-                )
+            build_result(),
+            evidence=(
+                TaskCriterionEvidence(
+                    criterion_id="tests-pass",
+                    passed=True,
+                ),
             ),
         )
 
@@ -148,20 +144,32 @@ def test_deterministic_evaluator_rejects_duplicate_evidence():
     ):
         evaluator.evaluate(
             build_task(),
-            build_result(
-                (
-                    SUTCriterionEvidence(
-                        criterion_id="tests-pass",
-                        passed=True,
-                    ),
-                    SUTCriterionEvidence(
-                        criterion_id="tests-pass",
-                        passed=True,
-                    ),
-                    SUTCriterionEvidence(
-                        criterion_id="no-unrelated-changes",
-                        passed=True,
-                    ),
-                )
+            build_result(),
+            evidence=(
+                TaskCriterionEvidence(
+                    criterion_id="tests-pass",
+                    passed=True,
+                ),
+                TaskCriterionEvidence(
+                    criterion_id="tests-pass",
+                    passed=True,
+                ),
+                TaskCriterionEvidence(
+                    criterion_id="no-unrelated-changes",
+                    passed=True,
+                ),
             ),
+        )
+
+
+def test_deterministic_evaluator_requires_external_evidence():
+    evaluator = DeterministicTaskEvaluator()
+
+    with pytest.raises(
+        ValueError,
+        match="external criterion evidence",
+    ):
+        evaluator.evaluate(
+            build_task(),
+            build_result(),
         )
