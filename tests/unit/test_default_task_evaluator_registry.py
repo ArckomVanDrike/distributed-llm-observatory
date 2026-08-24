@@ -7,6 +7,9 @@ from observer.core.deterministic_task_evaluator import (
 from observer.core.exact_output_task_evaluator import (
     ExactOutputTaskEvaluator,
 )
+from observer.core.json_structure_task_evaluator import (
+    JsonStructureTaskEvaluator,
+)
 from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
@@ -69,4 +72,20 @@ def test_default_registry_registers_exact_output_evaluator():
     assert isinstance(
         evaluator,
         ExactOutputTaskEvaluator,
+    )
+
+
+
+def test_default_registry_registers_json_structure_evaluator():
+    registry = build_default_task_evaluator_registry()
+
+    evaluator = registry.resolve(
+        build_task(
+            evaluator_id="json-structure-v0-1",
+        )
+    )
+
+    assert isinstance(
+        evaluator,
+        JsonStructureTaskEvaluator,
     )

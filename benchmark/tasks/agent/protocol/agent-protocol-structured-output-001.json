@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-structured-output-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "json-structure-v0-1",
+  "family": "agent",
+  "category": "instruction_following",
+  "difficulty": "easy",
+  "task": "Return only one JSON object with exactly these keys and values: name is delta, count is 4, and active is true. Do not include Markdown fences, commentary, or additional keys.",
+  "required_capabilities": [
+    "text"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "json-structure-match",
+      "description": "The observed output is exactly one JSON object with the expected keys and values."
+    }
+  ],
+  "expected_output_json_object": {
+    "name": "delta",
+    "count": 4,
+    "active": true
+  },
+  "enabled": true
+}

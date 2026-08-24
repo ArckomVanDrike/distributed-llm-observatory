@@ -112,6 +112,11 @@ class BenchmarkTask(BaseModel):
         min_length=1,
     )
 
+    expected_output_json_object: (
+        dict[str, str | int | float | bool | None]
+        | None
+    ) = None
+
     enabled: bool = True
 
     @model_validator(mode="after")

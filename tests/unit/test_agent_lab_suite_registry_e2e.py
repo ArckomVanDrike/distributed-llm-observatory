@@ -33,6 +33,7 @@ from schemas.benchmark import BenchmarkHarnessProfile
 
 EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
 INSTRUCTION_EXPECTED_OUTPUT = "alpha,bravo,charlie,delta"
+STRUCTURED_EXPECTED_OUTPUT = '{"name":"delta","count":4,"active":true}'
 
 
 @pytest.mark.parametrize(
@@ -132,6 +133,9 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
                                 "agent-protocol-instruction-001": (
                                     INSTRUCTION_EXPECTED_OUTPUT
                                 ),
+                                "agent-protocol-structured-output-001": (
+                                    STRUCTURED_EXPECTED_OUTPUT
+                                ),
                             }[
                                 request_payload["context"]["task_id"]
                             ]
@@ -199,7 +203,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         )
 
         assert resolved.suite.suite_id == "agent-protocol-core"
-        assert resolved.suite.suite_version == "0.2"
+        assert resolved.suite.suite_version == "0.3"
         assert (
             resolved.suite.harness_profile
             is BenchmarkHarnessProfile.SUT_PROTOCOL
@@ -211,6 +215,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         ] == [
             "agent-protocol-smoke-001",
             "agent-protocol-instruction-001",
+            "agent-protocol-structured-output-001",
         ]
 
         task_runner = BenchmarkTaskRunner(
@@ -243,6 +248,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         ] == [
             "agent-protocol-smoke-001",
             "agent-protocol-instruction-001",
+            "agent-protocol-structured-output-001",
         ]
 
         assert (
@@ -253,7 +259,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             )
         )
 
-        assert len(session.results) == 2
+        assert len(session.results) == 3
 
         for result in session.results:
             assert result.task_completed is sut_task_completed
@@ -273,9 +279,9 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
 
         assert report.target_id == "auto-suite-agent"
         assert report.suite_id == "agent-protocol-core"
-        assert report.suite_version == "0.2"
-        assert report.total_tasks == 2
-        assert report.passed_tasks == 2 * int(expected_pass)
+        assert report.suite_version == "0.3"
+        assert report.total_tasks == 3
+        assert report.passed_tasks == 3 * int(expected_pass)
         assert report.pass_rate == float(expected_pass)
 
     finally:

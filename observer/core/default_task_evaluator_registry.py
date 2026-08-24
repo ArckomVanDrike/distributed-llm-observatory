@@ -6,6 +6,9 @@ from observer.core.deterministic_task_evaluator import (
 from observer.core.exact_output_task_evaluator import (
     ExactOutputTaskEvaluator,
 )
+from observer.core.json_structure_task_evaluator import (
+    JsonStructureTaskEvaluator,
+)
 from observer.core.task_evaluator_registry import (
     TaskEvaluatorRegistry,
 )
@@ -23,6 +26,11 @@ def build_default_task_evaluator_registry(
     registry.register(
         "exact-output-v0-1",
         ExactOutputTaskEvaluator(),
+    )
+
+    registry.register(
+        "json-structure-v0-1",
+        JsonStructureTaskEvaluator(),
     )
 
     return registry

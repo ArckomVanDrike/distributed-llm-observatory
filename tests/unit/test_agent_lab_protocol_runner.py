@@ -27,6 +27,7 @@ from schemas.target import (
 
 EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
 INSTRUCTION_EXPECTED_OUTPUT = "alpha,bravo,charlie,delta"
+STRUCTURED_EXPECTED_OUTPUT = '{"name":"delta","count":4,"active":true}'
 
 
 def test_protocol_runner_builds_session_and_report():
@@ -99,6 +100,9 @@ def test_protocol_runner_builds_session_and_report():
                             "agent-protocol-instruction-001": (
                                 INSTRUCTION_EXPECTED_OUTPUT
                             ),
+                            "agent-protocol-structured-output-001": (
+                                STRUCTURED_EXPECTED_OUTPUT
+                            ),
                         }[request_payload["context"]["task_id"]],
                     "retry_count": 0,
                     "human_intervention_count": 0,
@@ -170,7 +174,7 @@ def test_protocol_runner_builds_session_and_report():
             == "protocol-runner-agent"
         )
         assert result.session.suite_id == "agent-protocol-core"
-        assert result.session.suite_version == "0.2"
+        assert result.session.suite_version == "0.3"
 
         assert [
             request["context"]["task_id"]
@@ -178,9 +182,10 @@ def test_protocol_runner_builds_session_and_report():
         ] == [
             "agent-protocol-smoke-001",
             "agent-protocol-instruction-001",
+            "agent-protocol-structured-output-001",
         ]
 
-        assert len(result.session.results) == 2
+        assert len(result.session.results) == 3
 
         assert all(
             task_result.task_completed is False
@@ -194,10 +199,10 @@ def test_protocol_runner_builds_session_and_report():
         assert result.report.session_id == result.session.session_id
         assert result.report.target_id == "protocol-runner-agent"
         assert result.report.suite_id == "agent-protocol-core"
-        assert result.report.suite_version == "0.2"
+        assert result.report.suite_version == "0.3"
         assert result.report.generated_at_utc == generated_at
-        assert result.report.total_tasks == 2
-        assert result.report.passed_tasks == 2
+        assert result.report.total_tasks == 3
+        assert result.report.passed_tasks == 3
         assert result.report.pass_rate == 1.0
 
     finally:

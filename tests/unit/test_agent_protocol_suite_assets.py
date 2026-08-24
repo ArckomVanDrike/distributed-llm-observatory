@@ -136,7 +136,7 @@ def test_canonical_agent_protocol_suite_v0_2():
         "agent-protocol-smoke-001",
         "agent-protocol-instruction-001",
     ]
-    assert suite.enabled is True
+    assert suite.enabled is False
 
 
 
@@ -163,3 +163,82 @@ def test_protocol_suite_v0_1_remains_exactly_resolvable():
     ] == [
         "agent-protocol-smoke-001",
     ]
+
+
+
+def test_canonical_agent_protocol_structured_output_task():
+    tasks = TaskBank(
+        Path("benchmark/tasks")
+    ).load_all()
+
+    matches = [
+        task
+        for task in tasks
+        if (
+            task.task_id
+            == "agent-protocol-structured-output-001"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    task = matches[0]
+
+    assert task.benchmark_version == "0.1"
+    assert task.family.value == "agent"
+    assert (
+        task.category.value
+        == "instruction_following"
+    )
+    assert task.evaluator_id == "json-structure-v0-1"
+    assert task.fixture_id is None
+    assert task.expected_output_text is None
+    assert task.expected_output_json_object == {
+        "name": "delta",
+        "count": 4,
+        "active": True,
+    }
+    assert {
+        capability.value
+        for capability in task.required_capabilities
+    } == {
+        "text",
+    }
+
+    assert [
+        criterion.criterion_id
+        for criterion in task.success_criteria
+    ] == [
+        "json-structure-match",
+    ]
+
+
+def test_canonical_agent_protocol_suite_v0_3():
+    suites = SuiteBank(
+        Path("benchmark/suites")
+    ).load_all()
+
+    matches = [
+        suite
+        for suite in suites
+        if (
+            suite.suite_id == "agent-protocol-core"
+            and suite.suite_version == "0.3"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family.value == "agent"
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+    ]
+    assert suite.enabled is True
