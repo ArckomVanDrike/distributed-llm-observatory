@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from schemas.benchmark import (
     BenchmarkFamily,
+    BenchmarkHarnessProfile,
     BenchmarkSuite,
 )
 
@@ -12,6 +13,7 @@ def test_agent_benchmark_suite():
         suite_id="agent-core",
         suite_version="0.1",
         family=BenchmarkFamily.AGENT,
+        harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
         task_ids=[
             "agent-filesystem-001",
         ],
@@ -32,6 +34,7 @@ def test_ai_system_benchmark_suite():
         suite_id="ai-system-core",
         suite_version="0.1",
         family=BenchmarkFamily.AI_SYSTEM,
+        harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
         task_ids=[
             "memory-recall-001",
         ],
@@ -49,6 +52,7 @@ def test_benchmark_suite_rejects_foundation_model_family():
             suite_id="foundation-core",
             suite_version="0.1",
             family=BenchmarkFamily.FOUNDATION_MODEL,
+            harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
             task_ids=[
                 "reasoning-task-001",
             ],
@@ -61,6 +65,7 @@ def test_benchmark_suite_requires_task_ids():
             suite_id="agent-core",
             suite_version="0.1",
             family=BenchmarkFamily.AGENT,
+            harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
             task_ids=[],
         )
 
@@ -74,6 +79,7 @@ def test_benchmark_suite_rejects_duplicate_task_ids():
             suite_id="agent-core",
             suite_version="0.1",
             family=BenchmarkFamily.AGENT,
+            harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
             task_ids=[
                 "agent-filesystem-001",
                 "agent-filesystem-001",
@@ -87,6 +93,7 @@ def test_benchmark_suite_task_ids_use_stable_slug_format():
             suite_id="agent-core",
             suite_version="0.1",
             family=BenchmarkFamily.AGENT,
+            harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
             task_ids=[
                 "Bad Task ID",
             ],
@@ -99,6 +106,7 @@ def test_benchmark_suite_id_uses_stable_slug_format():
             suite_id="Bad Suite ID",
             suite_version="0.1",
             family=BenchmarkFamily.AGENT,
+            harness_profile=BenchmarkHarnessProfile.SHARED_WORKSPACE,
             task_ids=[
                 "agent-filesystem-001",
             ],

@@ -3,6 +3,7 @@
   "suite_id": "agent-core",
   "suite_version": "0.1",
   "family": "agent",
+  "harness_profile": "shared_workspace",
   "task_ids": [
     "agent-filesystem-001"
   ],

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from observer.core.suite_bank import SuiteBank
 from observer.core.task_bank import TaskBank
 from schemas.benchmark import (
+    BenchmarkHarnessProfile,
     BenchmarkSuite,
     BenchmarkTask,
 )
@@ -34,6 +35,8 @@ class SuiteRegistry:
     def candidates_for_target(
         self,
         target: TargetManifest,
+        *,
+        harness_profile: BenchmarkHarnessProfile | None = None,
     ) -> list[BenchmarkSuite]:
         return [
             suite
@@ -41,15 +44,23 @@ class SuiteRegistry:
             if (
                 suite.family.value
                 == target.target_type.value
+                and (
+                    harness_profile is None
+                    or suite.harness_profile
+                    == harness_profile
+                )
             )
         ]
 
     def resolve_unique_for_target(
         self,
         target: TargetManifest,
+        *,
+        harness_profile: BenchmarkHarnessProfile,
     ) -> ResolvedBenchmarkSuite:
         candidates = self.candidates_for_target(
             target,
+            harness_profile=harness_profile,
         )
 
         if not candidates:

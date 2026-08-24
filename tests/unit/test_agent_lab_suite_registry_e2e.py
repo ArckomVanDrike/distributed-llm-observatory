@@ -29,7 +29,10 @@ from observer.core.task_evaluator_registry import (
 from observer.sut.base import SUTExecutionResult
 from observer.sut.local_http import LocalHTTPSUTAdapter
 from schemas.agent_lab import AgentTestSessionStatus
-from schemas.benchmark import BenchmarkTask
+from schemas.benchmark import (
+    BenchmarkHarnessProfile,
+    BenchmarkTask,
+)
 from schemas.evaluation import (
     TaskCriterionEvaluation,
     TaskEvaluation,
@@ -79,6 +82,7 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
                 "suite_id": "agent-core",
                 "suite_version": "0.1",
                 "family": "agent",
+                "harness_profile": "sut_protocol",
                 "task_ids": [
                     "agent-http-auto-001",
                 ],
@@ -232,6 +236,7 @@ def test_agent_lab_resolves_suite_and_runs_http_session(
 
         resolved = suite_registry.resolve_unique_for_target(
             adapter.manifest,
+            harness_profile=BenchmarkHarnessProfile.SUT_PROTOCOL,
         )
 
         assert resolved.suite.suite_id == "agent-core"

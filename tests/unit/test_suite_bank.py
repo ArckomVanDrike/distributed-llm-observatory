@@ -40,6 +40,7 @@ def test_suite_bank_loads_valid_suite(tmp_path: Path):
                 "suite_id": "agent-test",
                 "suite_version": "0.1",
                 "family": "agent",
+                "harness_profile": "shared_workspace",
                 "task_ids": [
                     "agent-task-001",
                 ],
@@ -79,6 +80,7 @@ def test_suite_bank_rejects_invalid_suite(tmp_path: Path):
                 "suite_id": "agent-test",
                 "suite_version": "0.1",
                 "family": "agent",
+                "harness_profile": "shared_workspace",
                 "task_ids": [],
             }
         ),
@@ -110,6 +112,7 @@ def test_suite_bank_rejects_duplicate_suite_identity(
         "suite_id": "agent-test",
         "suite_version": "0.1",
         "family": "agent",
+        "harness_profile": "shared_workspace",
         "task_ids": [
             "agent-task-001",
         ],
@@ -139,6 +142,7 @@ def test_load_enabled_excludes_disabled_suites(
         "suite_id": "agent-enabled",
         "suite_version": "0.1",
         "family": "agent",
+        "harness_profile": "shared_workspace",
         "task_ids": [
             "agent-task-001",
         ],
@@ -150,6 +154,7 @@ def test_load_enabled_excludes_disabled_suites(
         "suite_id": "agent-disabled",
         "suite_version": "0.1",
         "family": "agent",
+        "harness_profile": "shared_workspace",
         "task_ids": [
             "agent-task-002",
         ],

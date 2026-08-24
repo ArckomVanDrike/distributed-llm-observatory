@@ -122,6 +122,11 @@ class BenchmarkTask(BaseModel):
         return self
 
 
+class BenchmarkHarnessProfile(str, Enum):
+    SHARED_WORKSPACE = "shared_workspace"
+    SUT_PROTOCOL = "sut_protocol"
+
+
 class BenchmarkSuite(BaseModel):
     schema_version: Literal["0.1"] = "0.1"
 
@@ -132,6 +137,7 @@ class BenchmarkSuite(BaseModel):
     suite_version: str = Field(min_length=1)
 
     family: BenchmarkFamily
+    harness_profile: BenchmarkHarnessProfile
 
     task_ids: list[str] = Field(
         min_length=1,
