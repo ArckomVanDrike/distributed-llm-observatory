@@ -279,3 +279,52 @@ class AgentTechnicalReport(BaseModel):
             )
 
         return self
+
+
+class AgentLabRunArtifact(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    session: AgentTestSession
+    technical_report: AgentTechnicalReport
+
+    @model_validator(mode="after")
+    def validate_artifact(
+        self,
+    ) -> AgentLabRunArtifact:
+        if (
+            self.technical_report.session_id
+            != self.session.session_id
+        ):
+            raise ValueError(
+                "technical_report session_id must match "
+                "session session_id."
+            )
+
+        if (
+            self.technical_report.target_id
+            != self.session.target.target_id
+        ):
+            raise ValueError(
+                "technical_report target_id must match "
+                "session target_id."
+            )
+
+        if (
+            self.technical_report.suite_id
+            != self.session.suite_id
+        ):
+            raise ValueError(
+                "technical_report suite_id must match "
+                "session suite_id."
+            )
+
+        if (
+            self.technical_report.suite_version
+            != self.session.suite_version
+        ):
+            raise ValueError(
+                "technical_report suite_version must match "
+                "session suite_version."
+            )
+
+        return self

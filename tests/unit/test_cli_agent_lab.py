@@ -23,6 +23,8 @@ def test_parser_exposes_agent_test_command():
             "custom/suites",
             "--task-bank",
             "custom/tasks",
+            "--output",
+            "reports/agent-run.json",
         ]
     )
 
@@ -32,6 +34,7 @@ def test_parser_exposes_agent_test_command():
     assert args.region_code == "CL-Los-Lagos"
     assert args.suite_bank == Path("custom/suites")
     assert args.task_bank == Path("custom/tasks")
+    assert args.output == Path("reports/agent-run.json")
 
 
 
@@ -293,3 +296,258 @@ def test_main_dispatches_agent_test(
         captured["base_url"]
         == "http://127.0.0.1:8000"
     )
+
+
+def test_agent_test_output_defaults_to_none():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-test",
+            "http://127.0.0.1:8000",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+        ]
+    )
+
+    assert args.output is None
+
+
+def test_agent_test_writes_artifact_when_output_is_requested(
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
+):
+    captured = {}
+    artifact = object()
+    output_path = tmp_path / "agent-run.json"
+
+    class FakeProtocolRunner:
+        def __init__(
+            self,
+            *,
+            observer_id,
+            region_code,
+            suite_root,
+            task_root,
+        ):
+            pass
+
+        def run(
+            self,
+            *,
+            base_url,
+            generated_at_utc,
+        ):
+            return SimpleNamespace(
+                session=SimpleNamespace(
+                    target=SimpleNamespace(
+                        target_id="export-agent",
+                    ),
+                ),
+                report=SimpleNamespace(
+                    suite_id="agent-protocol-core",
+                    suite_version="0.1",
+                    total_tasks=1,
+                    passed_tasks=1,
+                    pass_rate=1.0,
+                    median_latency_ms=5.0,
+                ),
+                to_artifact=lambda: artifact,
+            )
+
+    def fake_write_agent_lab_run_artifact(
+        received_artifact,
+        received_path,
+    ):
+        captured["artifact"] = received_artifact
+        captured["path"] = received_path
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabProtocolRunner",
+        FakeProtocolRunner,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "write_agent_lab_run_artifact",
+        fake_write_agent_lab_run_artifact,
+        raising=False,
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-test",
+            "http://127.0.0.1:8000",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    result = agent_test(args)
+    capsys.readouterr()
+
+    assert result == 0
+    assert captured["artifact"] is artifact
+    assert captured["path"] == output_path
+
+
+def test_agent_test_does_not_write_artifact_without_output(
+    monkeypatch,
+    capsys,
+):
+    class FakeProtocolRunner:
+        def __init__(
+            self,
+            *,
+            observer_id,
+            region_code,
+            suite_root,
+            task_root,
+        ):
+            pass
+
+        def run(
+            self,
+            *,
+            base_url,
+            generated_at_utc,
+        ):
+            return SimpleNamespace(
+                session=SimpleNamespace(
+                    target=SimpleNamespace(
+                        target_id="no-export-agent",
+                    ),
+                ),
+                report=SimpleNamespace(
+                    suite_id="agent-protocol-core",
+                    suite_version="0.1",
+                    total_tasks=1,
+                    passed_tasks=1,
+                    pass_rate=1.0,
+                    median_latency_ms=5.0,
+                ),
+            )
+
+    def fail_if_writer_is_called(*args, **kwargs):
+        raise AssertionError(
+            "Artifact writer must not be called "
+            "without --output."
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabProtocolRunner",
+        FakeProtocolRunner,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "write_agent_lab_run_artifact",
+        fail_if_writer_is_called,
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-test",
+            "http://127.0.0.1:8000",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+        ]
+    )
+
+    result = agent_test(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Target:            no-export-agent" in output
+
+
+def test_agent_test_returns_two_when_artifact_write_fails(
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
+):
+    class FakeProtocolRunner:
+        def __init__(
+            self,
+            *,
+            observer_id,
+            region_code,
+            suite_root,
+            task_root,
+        ):
+            pass
+
+        def run(
+            self,
+            *,
+            base_url,
+            generated_at_utc,
+        ):
+            return SimpleNamespace(
+                session=SimpleNamespace(
+                    target=SimpleNamespace(
+                        target_id="export-agent",
+                    ),
+                ),
+                report=SimpleNamespace(
+                    suite_id="agent-protocol-core",
+                    suite_version="0.1",
+                    total_tasks=1,
+                    passed_tasks=1,
+                    pass_rate=1.0,
+                    median_latency_ms=5.0,
+                ),
+                to_artifact=lambda: object(),
+            )
+
+    def failing_writer(
+        artifact,
+        path,
+    ):
+        raise OSError("Cannot write artifact.")
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabProtocolRunner",
+        FakeProtocolRunner,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "write_agent_lab_run_artifact",
+        failing_writer,
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-test",
+            "http://127.0.0.1:8000",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--output",
+            str(tmp_path / "agent-run.json"),
+        ]
+    )
+
+    result = agent_test(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert "Error: Cannot write artifact." in captured.err

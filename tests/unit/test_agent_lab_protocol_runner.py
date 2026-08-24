@@ -9,10 +9,21 @@ from http.server import (
 import pytest
 
 from observer.core.agent_lab_protocol_runner import (
+    AgentLabProtocolRun,
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
 )
-from schemas.agent_lab import AgentTestSessionStatus
+from schemas.agent_lab import (
+    AgentLabRunArtifact,
+    AgentTechnicalReport,
+    AgentTestSession,
+    AgentTestSessionStatus,
+)
+from schemas.target import (
+    TargetCapability,
+    TargetManifest,
+    TargetType,
+)
 
 EXPECTED_OUTPUT = "DLLO-AGENT-SMOKE-001"
 
@@ -197,3 +208,51 @@ def test_protocol_runner_normalizes_operational_errors():
             base_url="https://example.com",
             generated_at_utc=datetime.now(timezone.utc),
         )
+
+
+def test_protocol_run_builds_valid_artifact():
+    now = datetime.now(timezone.utc)
+
+    session = AgentTestSession(
+        target=TargetManifest(
+            target_id="artifact-agent",
+            display_name="Artifact Agent",
+            target_type=TargetType.AGENT,
+            capabilities={
+                TargetCapability.TEXT,
+            },
+        ),
+        suite_id="agent-protocol-core",
+        suite_version="0.1",
+        status=AgentTestSessionStatus.COMPLETED,
+        started_at_utc=now,
+        completed_at_utc=now,
+    )
+
+    report = AgentTechnicalReport(
+        session_id=session.session_id,
+        target_id=session.target.target_id,
+        suite_id=session.suite_id,
+        suite_version=session.suite_version,
+        generated_at_utc=now,
+        total_tasks=0,
+        passed_tasks=0,
+        failed_tasks=0,
+        task_completion_rate=0.0,
+        pass_rate=None,
+        median_latency_ms=None,
+    )
+
+    run = AgentLabProtocolRun(
+        session=session,
+        report=report,
+    )
+
+    artifact = run.to_artifact()
+
+    assert isinstance(
+        artifact,
+        AgentLabRunArtifact,
+    )
+    assert artifact.session == session
+    assert artifact.technical_report == report

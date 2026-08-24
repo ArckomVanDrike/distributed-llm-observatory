@@ -32,6 +32,9 @@ from consumer_probe.telemetry_analytics import (
     summarize_local_telemetry_by_collector,
     summarize_local_telemetry_records,
 )
+from observer.core.agent_lab_artifact_io import (
+    write_agent_lab_run_artifact,
+)
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
@@ -540,6 +543,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("benchmark/tasks"),
         help="Benchmark task bank directory",
+    )
+
+    agent_test_parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path for the Agent Lab run "
+            "artifact JSON"
+        ),
     )
 
     # -----------------------------------------------------
@@ -1608,6 +1621,12 @@ def agent_test(
             generated_at_utc=datetime.now(timezone.utc),
         )
 
+        if args.output is not None:
+            write_agent_lab_run_artifact(
+                result.to_artifact(),
+                args.output,
+            )
+
         report = result.report
 
         print("=== DLLO AGENT LAB ===")
@@ -1635,6 +1654,7 @@ def agent_test(
     except (
         AgentLabProtocolRunnerError,
         ObserverConfigError,
+        OSError,
     ) as exc:
         print(
             f"Error: {exc}",

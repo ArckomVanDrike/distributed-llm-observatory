@@ -33,6 +33,7 @@ from observer.core.task_bank import (
 )
 from observer.sut.local_http import LocalHTTPSUTAdapter
 from schemas.agent_lab import (
+    AgentLabRunArtifact,
     AgentTechnicalReport,
     AgentTestSession,
 )
@@ -50,6 +51,12 @@ class AgentLabProtocolRunnerError(Exception):
 class AgentLabProtocolRun:
     session: AgentTestSession
     report: AgentTechnicalReport
+
+    def to_artifact(self) -> AgentLabRunArtifact:
+        return AgentLabRunArtifact(
+            session=self.session,
+            technical_report=self.report,
+        )
 
 
 class AgentLabProtocolRunner:
