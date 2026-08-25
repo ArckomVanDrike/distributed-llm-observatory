@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1016,3 +1017,466 @@ def test_agent_history_returns_two_on_invalid_artifact(
         "Error: Invalid Agent Lab run artifact"
         in captured.err
     )
+
+
+def test_parser_exposes_agent_compare_temporal_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-compare-temporal",
+            "baseline.json",
+            "candidate.json",
+        ]
+    )
+
+    assert args.command == "agent-compare-temporal"
+    assert args.baseline == Path("baseline.json")
+    assert args.candidate == Path("candidate.json")
+
+
+def test_agent_compare_temporal_reports_observation_context(
+    monkeypatch,
+    capsys,
+):
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            target=SimpleNamespace(
+                target_id="temporal-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        )
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace()
+    )
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+        if path == Path("candidate.json"):
+            return candidate
+        raise AssertionError(f"Unexpected path: {path}")
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        return SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                24,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            run_comparison=SimpleNamespace(
+                baseline_session_id="baseline-session",
+                candidate_session_id="candidate-session",
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+                task_changes=(),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_temporal_agent_observations",
+        fake_compare,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+    )
+
+    result = cli_module.agent_compare_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "=== DLLO AGENT TEMPORAL COMPARISON ==="
+        in output
+    )
+    assert "Target:             temporal-agent" in output
+    assert (
+        "Suite:              "
+        "agent-protocol-core v1.0"
+        in output
+    )
+    assert "Observer:           observer-test" in output
+    assert "Observed from:      CL-Los-Lagos" in output
+    assert (
+        "Baseline observed:  "
+        "2026-08-24T20:00:00+00:00"
+        in output
+    )
+    assert (
+        "Candidate observed: "
+        "2026-08-25T20:00:00+00:00"
+        in output
+    )
+    assert "Tasks compared:     4" in output
+    assert "Improved:           1" in output
+    assert "Regressed:          1" in output
+    assert "Pass rate delta:    +25.0%" in output
+    assert "Median latency:     +150.0 ms" in output
+
+
+def test_agent_compare_temporal_returns_two_on_invalid_comparison(
+    monkeypatch,
+    capsys,
+):
+    baseline = SimpleNamespace()
+    candidate = SimpleNamespace()
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+        if path == Path("candidate.json"):
+            return candidate
+        raise AssertionError(f"Unexpected path: {path}")
+
+    def failing_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        raise ValueError(
+            "Temporal comparison requires the same region_code."
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_temporal_agent_observations",
+        failing_compare,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+    )
+
+    result = cli_module.agent_compare_temporal(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Temporal comparison requires "
+        "the same region_code."
+        in captured.err
+    )
+
+
+def test_main_dispatches_agent_compare_temporal(
+    monkeypatch,
+):
+    sentinel = object()
+
+    def fake_agent_compare_temporal(args):
+        assert args.command == "agent-compare-temporal"
+        assert args.baseline == Path("baseline.json")
+        assert args.candidate == Path("candidate.json")
+        return sentinel
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_compare_temporal",
+        fake_agent_compare_temporal,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-compare-temporal",
+            "baseline.json",
+            "candidate.json",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result is sentinel
+
+
+def test_parser_exposes_agent_compare_geographic_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-compare-geographic",
+            "baseline.json",
+            "candidate.json",
+            "--max-observation-skew-seconds",
+            "600",
+        ]
+    )
+
+    assert args.command == "agent-compare-geographic"
+    assert args.baseline == Path("baseline.json")
+    assert args.candidate == Path("candidate.json")
+    assert args.max_observation_skew_seconds == 600.0
+
+
+def test_agent_compare_geographic_reports_observation_context(
+    monkeypatch,
+    capsys,
+):
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            target=SimpleNamespace(
+                target_id="geographic-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        )
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace()
+    )
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+        if path == Path("candidate.json"):
+            return candidate
+        raise AssertionError(f"Unexpected path: {path}")
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+        *,
+        max_observation_skew,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return SimpleNamespace(
+            baseline_observer_id="observer-los-lagos",
+            candidate_observer_id="observer-aysen",
+            baseline_region_code="CL-Los-Lagos",
+            candidate_region_code="CL-Aysen",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                5,
+                tzinfo=timezone.utc,
+            ),
+            observation_skew=timedelta(
+                minutes=5,
+            ),
+            max_observation_skew=timedelta(
+                minutes=10,
+            ),
+            run_comparison=SimpleNamespace(
+                baseline_session_id="baseline-session",
+                candidate_session_id="candidate-session",
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+                task_changes=(),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_geographic_agent_observations",
+        fake_compare,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_compare_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "=== DLLO AGENT GEOGRAPHIC COMPARISON ==="
+        in output
+    )
+    assert "geographic-agent" in output
+    assert "agent-protocol-core v1.0" in output
+
+    assert "observer-los-lagos" in output
+    assert "observer-aysen" in output
+
+    assert "Observed from baseline:  CL-Los-Lagos" in output
+    assert "Observed from candidate: CL-Aysen" in output
+
+    assert "Observation skew:      300.00 s" in output
+    assert "Maximum allowed skew: 600.00 s" in output
+
+    assert "Tasks compared:        4" in output
+    assert "Improved:              1" in output
+    assert "Regressed:             1" in output
+    assert "Pass rate delta:       +25.0%" in output
+    assert "Median latency:        +150.0 ms" in output
+
+
+def test_agent_compare_geographic_returns_two_on_invalid_comparison(
+    monkeypatch,
+    capsys,
+):
+    baseline = SimpleNamespace()
+    candidate = SimpleNamespace()
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+        if path == Path("candidate.json"):
+            return candidate
+        raise AssertionError(f"Unexpected path: {path}")
+
+    def failing_compare(
+        received_candidate,
+        received_baseline,
+        *,
+        max_observation_skew,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        raise ValueError(
+            "Geographic comparison requires "
+            "different region_code values."
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_geographic_agent_observations",
+        failing_compare,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_compare_geographic(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Geographic comparison requires "
+        "different region_code values."
+        in captured.err
+    )
+
+
+def test_main_dispatches_agent_compare_geographic(
+    monkeypatch,
+):
+    sentinel = object()
+
+    def fake_agent_compare_geographic(args):
+        assert args.command == "agent-compare-geographic"
+        assert args.baseline == Path("baseline.json")
+        assert args.candidate == Path("candidate.json")
+        assert args.max_observation_skew_seconds == 600.0
+        return sentinel
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_compare_geographic",
+        fake_agent_compare_geographic,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-compare-geographic",
+            "baseline.json",
+            "candidate.json",
+            "--max-observation-skew-seconds",
+            "600",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result is sentinel

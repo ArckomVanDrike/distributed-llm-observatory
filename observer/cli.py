@@ -37,6 +37,9 @@ from observer.core.agent_lab_artifact_io import (
     load_agent_lab_run_artifact,
     write_agent_lab_run_artifact,
 )
+from observer.core.agent_lab_geographic_comparison import (
+    compare_geographic_agent_observations,
+)
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
@@ -46,6 +49,9 @@ from observer.core.agent_lab_run_comparison import (
 )
 from observer.core.agent_lab_run_history import (
     AgentLabRunHistory,
+)
+from observer.core.agent_lab_temporal_comparison import (
+    compare_temporal_agent_observations,
 )
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
@@ -582,6 +588,64 @@ def build_parser() -> argparse.ArgumentParser:
         "candidate",
         type=Path,
         help="Candidate Agent Lab run artifact JSON",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab temporal comparison
+    # -----------------------------------------------------
+
+    agent_compare_temporal_parser = subparsers.add_parser(
+        "agent-compare-temporal",
+        help=(
+            "Compare two Agent Lab observations "
+            "across time"
+        ),
+    )
+
+    agent_compare_temporal_parser.add_argument(
+        "baseline",
+        type=Path,
+        help="Baseline Agent Lab run artifact JSON",
+    )
+
+    agent_compare_temporal_parser.add_argument(
+        "candidate",
+        type=Path,
+        help="Candidate Agent Lab run artifact JSON",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab geographic comparison
+    # -----------------------------------------------------
+
+    agent_compare_geographic_parser = subparsers.add_parser(
+        "agent-compare-geographic",
+        help=(
+            "Compare two Agent Lab observations "
+            "across regions"
+        ),
+    )
+
+    agent_compare_geographic_parser.add_argument(
+        "baseline",
+        type=Path,
+        help="Baseline Agent Lab run artifact JSON",
+    )
+
+    agent_compare_geographic_parser.add_argument(
+        "candidate",
+        type=Path,
+        help="Candidate Agent Lab run artifact JSON",
+    )
+
+    agent_compare_geographic_parser.add_argument(
+        "--max-observation-skew-seconds",
+        type=float,
+        required=True,
+        help=(
+            "Maximum allowed observation time skew "
+            "in seconds"
+        ),
     )
 
     # -----------------------------------------------------
@@ -1836,6 +1900,235 @@ def agent_compare(
         return 2
 
 
+def agent_compare_temporal(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        baseline = load_agent_lab_run_artifact(
+            args.baseline,
+        )
+        candidate = load_agent_lab_run_artifact(
+            args.candidate,
+        )
+
+        temporal_comparison = (
+            compare_temporal_agent_observations(
+                candidate,
+                baseline,
+            )
+        )
+        comparison = temporal_comparison.run_comparison
+
+        pass_rate_delta = (
+            "n/a"
+            if comparison.pass_rate_delta is None
+            else f"{comparison.pass_rate_delta:+.1%}"
+        )
+        latency_delta = (
+            "n/a"
+            if comparison.median_latency_ms_delta is None
+            else (
+                f"{comparison.median_latency_ms_delta:+.1f} ms"
+            )
+        )
+
+        print("=== DLLO AGENT TEMPORAL COMPARISON ===")
+        print(
+            f"Target:             "
+            f"{baseline.session.target.target_id}"
+        )
+        print(
+            f"Suite:              "
+            f"{baseline.session.suite_id} "
+            f"v{baseline.session.suite_version}"
+        )
+        print(
+            f"Observer:           "
+            f"{temporal_comparison.observer_id}"
+        )
+        print(
+            f"Observed from:      "
+            f"{temporal_comparison.region_code}"
+        )
+        print(
+            f"Baseline observed:  "
+            f"{temporal_comparison.baseline_started_at_utc.isoformat()}"
+        )
+        print(
+            f"Candidate observed: "
+            f"{temporal_comparison.candidate_started_at_utc.isoformat()}"
+        )
+        print()
+        print(
+            f"Tasks compared:     "
+            f"{comparison.total_tasks}"
+        )
+        print(
+            f"Improved:           "
+            f"{comparison.improvements}"
+        )
+        print(
+            f"Regressed:          "
+            f"{comparison.regressions}"
+        )
+        print(
+            f"Unchanged:          "
+            f"{comparison.unchanged}"
+        )
+        print()
+        print(
+            f"Pass rate delta:    "
+            f"{pass_rate_delta}"
+        )
+        print(
+            f"Median latency:     "
+            f"{latency_delta}"
+        )
+        print(
+            f"Retries:            "
+            f"{comparison.retry_delta:+d}"
+        )
+        print(
+            f"Human interventions:"
+            f"{comparison.human_intervention_delta:+d}"
+        )
+
+        return 0
+
+    except (
+        AgentLabArtifactIOError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+def agent_compare_geographic(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        baseline = load_agent_lab_run_artifact(
+            args.baseline,
+        )
+        candidate = load_agent_lab_run_artifact(
+            args.candidate,
+        )
+
+        geographic_comparison = (
+            compare_geographic_agent_observations(
+                candidate,
+                baseline,
+                max_observation_skew=timedelta(
+                    seconds=args.max_observation_skew_seconds,
+                ),
+            )
+        )
+        comparison = geographic_comparison.run_comparison
+
+        pass_rate_delta = (
+            "n/a"
+            if comparison.pass_rate_delta is None
+            else f"{comparison.pass_rate_delta:+.1%}"
+        )
+        latency_delta = (
+            "n/a"
+            if comparison.median_latency_ms_delta is None
+            else (
+                f"{comparison.median_latency_ms_delta:+.1f} ms"
+            )
+        )
+
+        print("=== DLLO AGENT GEOGRAPHIC COMPARISON ===")
+        print(
+            f"Target:                "
+            f"{baseline.session.target.target_id}"
+        )
+        print(
+            f"Suite:                 "
+            f"{baseline.session.suite_id} "
+            f"v{baseline.session.suite_version}"
+        )
+        print(
+            f"Baseline observer:     "
+            f"{geographic_comparison.baseline_observer_id}"
+        )
+        print(
+            f"Candidate observer:    "
+            f"{geographic_comparison.candidate_observer_id}"
+        )
+        print(
+            f"Observed from baseline:  "
+            f"{geographic_comparison.baseline_region_code}"
+        )
+        print(
+            f"Observed from candidate: "
+            f"{geographic_comparison.candidate_region_code}"
+        )
+        print(
+            f"Baseline observed:     "
+            f"{geographic_comparison.baseline_started_at_utc.isoformat()}"
+        )
+        print(
+            f"Candidate observed:    "
+            f"{geographic_comparison.candidate_started_at_utc.isoformat()}"
+        )
+        print(
+            f"Observation skew:      "
+            f"{geographic_comparison.observation_skew.total_seconds():.2f} s"
+        )
+        print(
+            f"Maximum allowed skew: "
+            f"{geographic_comparison.max_observation_skew.total_seconds():.2f} s"
+        )
+        print()
+        print(
+            f"Tasks compared:        "
+            f"{comparison.total_tasks}"
+        )
+        print(
+            f"Improved:              "
+            f"{comparison.improvements}"
+        )
+        print(
+            f"Regressed:             "
+            f"{comparison.regressions}"
+        )
+        print(
+            f"Unchanged:             "
+            f"{comparison.unchanged}"
+        )
+        print()
+        print(
+            f"Pass rate delta:       "
+            f"{pass_rate_delta}"
+        )
+        print(
+            f"Median latency:        "
+            f"{latency_delta}"
+        )
+        print(
+            f"Retries:               "
+            f"{comparison.retry_delta:+d}"
+        )
+        print(
+            f"Human interventions:   "
+            f"{comparison.human_intervention_delta:+d}"
+        )
+
+        return 0
+
+    except (
+        AgentLabArtifactIOError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
 def agent_history(
     args: argparse.Namespace,
 ) -> int:
@@ -2050,6 +2343,12 @@ def main() -> int:
 
     if args.command == "agent-compare":
         return agent_compare(args)
+
+    if args.command == "agent-compare-temporal":
+        return agent_compare_temporal(args)
+
+    if args.command == "agent-compare-geographic":
+        return agent_compare_geographic(args)
 
     if args.command == "agent-history":
         return agent_history(args)
