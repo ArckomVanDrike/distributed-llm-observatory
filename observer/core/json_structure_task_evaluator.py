@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from observer.core.json_value_comparison import (
+    json_flat_object_equal,
+)
 from observer.core.task_evaluator import TaskEvaluator
 from observer.core.task_evidence import TaskCriterionEvidence
 from observer.sut.base import SUTExecutionResult
@@ -12,55 +15,6 @@ from schemas.evaluation import (
     TaskEvaluation,
     TaskEvaluationMethod,
 )
-
-
-def _json_scalar_equal(
-    observed: Any,
-    expected: Any,
-) -> bool:
-    if isinstance(observed, bool) or isinstance(expected, bool):
-        return (
-            isinstance(observed, bool)
-            and isinstance(expected, bool)
-            and observed == expected
-        )
-
-    observed_is_number = isinstance(
-        observed,
-        (int, float),
-    )
-    expected_is_number = isinstance(
-        expected,
-        (int, float),
-    )
-
-    if observed_is_number or expected_is_number:
-        return (
-            observed_is_number
-            and expected_is_number
-            and observed == expected
-        )
-
-    return (
-        type(observed) is type(expected)
-        and observed == expected
-    )
-
-
-def _json_object_matches(
-    observed: dict[str, Any],
-    expected: dict[str, Any],
-) -> bool:
-    if observed.keys() != expected.keys():
-        return False
-
-    return all(
-        _json_scalar_equal(
-            observed[key],
-            expected[key],
-        )
-        for key in expected
-    )
 
 
 class JsonStructureTaskEvaluator(TaskEvaluator):
@@ -99,7 +53,7 @@ class JsonStructureTaskEvaluator(TaskEvaluator):
 
         passed = (
             isinstance(observed, dict)
-            and _json_object_matches(
+            and json_flat_object_equal(
                 observed,
                 expected,
             )

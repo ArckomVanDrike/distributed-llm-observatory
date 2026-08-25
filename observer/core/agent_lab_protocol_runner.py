@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from observer.core.action_task_environment import (
+    ActionTaskEnvironment,
+)
 from observer.core.agent_technical_report import (
     build_agent_technical_report,
 )
@@ -117,11 +121,34 @@ class AgentLabProtocolRunner:
                 assessment_runner=assessment_runner,
             )
 
-            session = session_runner.run(
-                suite_id=resolved.suite.suite_id,
-                suite_version=resolved.suite.suite_version,
-                tasks=list(resolved.tasks),
-            )
+            with ExitStack() as stack:
+                task_metadata = {}
+                evidence_collectors = {}
+
+                for task in resolved.tasks:
+                    if task.expected_action is None:
+                        continue
+
+                    environment = stack.enter_context(
+                        ActionTaskEnvironment(task)
+                    )
+
+                    task_metadata[task.task_id] = (
+                        environment.metadata
+                    )
+                    evidence_collectors[task.task_id] = (
+                        environment.collector
+                    )
+
+                session = session_runner.run(
+                    suite_id=resolved.suite.suite_id,
+                    suite_version=resolved.suite.suite_version,
+                    tasks=list(resolved.tasks),
+                    task_metadata=task_metadata,
+                    evidence_collectors=(
+                        evidence_collectors
+                    ),
+                )
 
             report = build_agent_technical_report(
                 session,

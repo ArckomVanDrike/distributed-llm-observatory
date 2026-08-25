@@ -1,13 +1,14 @@
 {
   "schema_version": "0.1",
   "suite_id": "agent-protocol-core",
-  "suite_version": "0.3",
+  "suite_version": "0.4",
   "family": "agent",
   "harness_profile": "sut_protocol",
   "task_ids": [
     "agent-protocol-smoke-001",
     "agent-protocol-instruction-001",
-    "agent-protocol-structured-output-001"
+    "agent-protocol-structured-output-001",
+    "agent-protocol-action-001"
   ],
-  "enabled": false
+  "enabled": true
 }
