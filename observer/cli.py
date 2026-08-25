@@ -1738,9 +1738,14 @@ def agent_test(
             generated_at_utc=datetime.now(timezone.utc),
         )
 
+        artifact = result.to_artifact()
+        qualification = qualify_agent_observation(
+            artifact
+        )
+
         if args.output is not None:
             write_agent_lab_run_artifact(
-                result.to_artifact(),
+                artifact,
                 args.output,
             )
 
@@ -1754,6 +1759,21 @@ def agent_test(
         print(
             f"Suite:             "
             f"{report.suite_id} v{report.suite_version}"
+        )
+        print(
+            f"Observer:          "
+            f"{result.session.observer_id}"
+        )
+        print(
+            f"Observed from:     "
+            f"{result.session.region_code}"
+        )
+        print(
+            f"Observatory:       "
+            f"temporal="
+            f"{'yes' if qualification.temporal_eligible else 'no'} "
+            f"geographic="
+            f"{'yes' if qualification.geographic_eligible else 'no'}"
         )
         print(f"Tasks:             {report.total_tasks}")
         print(f"Passed:            {report.passed_tasks}")
