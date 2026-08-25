@@ -1,0 +1,106 @@
+{
+  "schema_version": "0.1",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Determine the current condition of item delta and take the appropriate next action.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-calls-observed",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-sequence-length-match",
+      "description": "The observed tool-call sequence length matches."
+    },
+    {
+      "criterion_id": "tool-sequence-order-match",
+      "description": "The observed tool order matches the runtime-selected sequence."
+    },
+    {
+      "criterion_id": "tool-sequence-arguments-match",
+      "description": "The observed tool arguments match the runtime-selected sequence."
+    },
+    {
+      "criterion_id": "branch-source-result-observed",
+      "description": "A configured runtime branch source value was observed."
+    },
+    {
+      "criterion_id": "branch-selected",
+      "description": "The action selected for the observed runtime value was correct."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "check_item",
+      "description": "Return the current state of an item.",
+      "parameters": {
+        "name": "string"
+      }
+    },
+    {
+      "tool_name": "create_item",
+      "description": "Create an item.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "description": "Inspect an existing item.",
+      "parameters": {
+        "name": "string"
+      }
+    }
+  ],
+  "expected_actions": [
+    {
+      "tool_name": "check_item",
+      "arguments": {
+        "name": "delta"
+      }
+    }
+  ],
+  "expected_branches": {
+    "source_action_index": 0,
+    "source_result_field": "state",
+    "options": [
+      {
+        "expected_value": "missing",
+        "action": {
+          "tool_name": "create_item",
+          "arguments": {
+            "name": "delta",
+            "count": 4
+          }
+        }
+      },
+      {
+        "expected_value": "present",
+        "action": {
+          "tool_name": "inspect_item",
+          "arguments": {
+            "name": "delta"
+          }
+        }
+      }
+    ]
+  },
+  "enabled": true,
+  "task_id": "agent-protocol-multi-branch-002",
+  "tool_results": [
+    {
+      "tool_name": "check_item",
+      "result": {
+        "state": "present"
+      }
+    }
+  ]
+}
