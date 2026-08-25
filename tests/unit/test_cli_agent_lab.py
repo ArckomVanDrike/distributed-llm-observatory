@@ -1700,3 +1700,437 @@ def test_agent_history_reports_observatory_qualification_reasons(
         "missing region_code"
         in output
     )
+
+
+def test_parser_exposes_agent_pairs_temporal_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-pairs-temporal",
+            "runs",
+            "--target",
+            "pair-agent",
+        ]
+    )
+
+    assert args.command == "agent-pairs-temporal"
+    assert args.history_root == Path("runs")
+    assert args.target == "pair-agent"
+
+
+def test_main_dispatches_agent_pairs_temporal(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_pairs_temporal(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["target"] = args.target
+        return 31
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_pairs_temporal",
+        fake_agent_pairs_temporal,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-pairs-temporal",
+            "runs",
+            "--target",
+            "pair-agent",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 31
+    assert captured["command"] == "agent-pairs-temporal"
+    assert captured["history_root"] == Path("runs")
+    assert captured["target"] == "pair-agent"
+
+
+def test_agent_pairs_temporal_reports_discovered_pairs(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-a",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-b",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-c",
+            ),
+        ),
+    ]
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def for_target(self, target_id):
+            captured["target"] = target_id
+            return artifacts
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-b",
+                comparable=True,
+                reasons=(),
+            ),
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-c",
+                comparable=False,
+                reasons=(
+                    "Temporal comparison requires "
+                    "the same region_code.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="pair-agent",
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["target"] == "pair-agent"
+
+    assert "=== DLLO AGENT TEMPORAL PAIRS ===" in output
+    assert "Runs:               3" in output
+    assert "Pairs:              2" in output
+    assert "Target filter:      pair-agent" in output
+
+    assert "Baseline session:   session-a" in output
+    assert "Candidate session:  session-b" in output
+    assert "Comparable:         yes" in output
+
+    assert "Candidate session:  session-c" in output
+    assert "Comparable:         no" in output
+    assert (
+        "Reason:             Temporal comparison requires "
+        "the same region_code."
+        in output
+    )
+
+
+def test_parser_exposes_agent_pairs_geographic_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-pairs-geographic",
+            "runs",
+            "--target",
+            "pair-agent",
+            "--max-observation-skew-seconds",
+            "600",
+        ]
+    )
+
+    assert args.command == "agent-pairs-geographic"
+    assert args.history_root == Path("runs")
+    assert args.target == "pair-agent"
+    assert args.max_observation_skew_seconds == 600.0
+
+
+def test_main_dispatches_agent_pairs_geographic(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_pairs_geographic(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["target"] = args.target
+        captured["max_skew"] = (
+            args.max_observation_skew_seconds
+        )
+        return 37
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_pairs_geographic",
+        fake_agent_pairs_geographic,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-pairs-geographic",
+            "runs",
+            "--target",
+            "pair-agent",
+            "--max-observation-skew-seconds",
+            "600",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 37
+    assert captured["command"] == "agent-pairs-geographic"
+    assert captured["history_root"] == Path("runs")
+    assert captured["target"] == "pair-agent"
+    assert captured["max_skew"] == 600.0
+
+
+def test_agent_pairs_geographic_reports_discovered_pairs(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-a",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-b",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-c",
+            ),
+        ),
+    ]
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def for_target(self, target_id):
+            captured["target"] = target_id
+            return artifacts
+
+    def fake_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-b",
+                comparable=True,
+                reasons=(),
+            ),
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-c",
+                comparable=False,
+                reasons=(
+                    "Geographic comparison observation skew "
+                    "exceeds max_observation_skew.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        fake_discover,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="pair-agent",
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["target"] == "pair-agent"
+
+    assert "=== DLLO AGENT GEOGRAPHIC PAIRS ===" in output
+    assert "Runs:               3" in output
+    assert "Pairs:              2" in output
+    assert "Target filter:      pair-agent" in output
+    assert "Maximum skew:       600.00 s" in output
+
+    assert "Baseline session:   session-a" in output
+    assert "Candidate session:  session-b" in output
+    assert "Comparable:         yes" in output
+
+    assert "Candidate session:  session-c" in output
+    assert "Comparable:         no" in output
+    assert (
+        "Reason:             Geographic comparison "
+        "observation skew exceeds max_observation_skew."
+        in output
+    )
+
+
+def test_agent_pairs_geographic_returns_two_on_invalid_skew(
+    monkeypatch,
+    capsys,
+):
+    artifacts = []
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def failing_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=-1.0,
+        )
+
+        raise ValueError(
+            "max_observation_skew cannot be negative."
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        failing_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        max_observation_skew_seconds=-1.0,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: max_observation_skew cannot be negative."
+        in captured.err
+    )
+
+
+def test_agent_pairs_temporal_uses_all_runs_without_target(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-a",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-b",
+            ),
+        ),
+    ]
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def load_all(self):
+            captured["load_all"] = True
+            return artifacts
+
+        def for_target(self, target_id):
+            raise AssertionError(
+                f"Unexpected target filter: {target_id}"
+            )
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+        return []
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["load_all"] is True
+
+    assert "Runs:               2" in output
+    assert "Pairs:              0" in output
+    assert "Target filter:" not in output

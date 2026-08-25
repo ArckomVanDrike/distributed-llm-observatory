@@ -40,6 +40,10 @@ from observer.core.agent_lab_artifact_io import (
 from observer.core.agent_lab_geographic_comparison import (
     compare_geographic_agent_observations,
 )
+from observer.core.agent_lab_observation_pairs import (
+    discover_geographic_agent_observation_pairs,
+    discover_temporal_agent_observation_pairs,
+)
 from observer.core.agent_lab_observation_qualification import (
     qualify_agent_observation,
 )
@@ -670,6 +674,64 @@ def build_parser() -> argparse.ArgumentParser:
         "--target",
         default=None,
         help="Optional target ID filter",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab temporal pair discovery
+    # -----------------------------------------------------
+
+    agent_pairs_temporal_parser = subparsers.add_parser(
+        "agent-pairs-temporal",
+        help=(
+            "Discover comparable Agent Lab observation "
+            "pairs across time"
+        ),
+    )
+
+    agent_pairs_temporal_parser.add_argument(
+        "history_root",
+        type=Path,
+        help="Directory containing Agent Lab run artifacts",
+    )
+
+    agent_pairs_temporal_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optional target ID filter",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab geographic pair discovery
+    # -----------------------------------------------------
+
+    agent_pairs_geographic_parser = subparsers.add_parser(
+        "agent-pairs-geographic",
+        help=(
+            "Discover comparable Agent Lab observation "
+            "pairs across regions"
+        ),
+    )
+
+    agent_pairs_geographic_parser.add_argument(
+        "history_root",
+        type=Path,
+        help="Directory containing Agent Lab run artifacts",
+    )
+
+    agent_pairs_geographic_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optional target ID filter",
+    )
+
+    agent_pairs_geographic_parser.add_argument(
+        "--max-observation-skew-seconds",
+        type=float,
+        required=True,
+        help=(
+            "Maximum allowed observation time skew "
+            "in seconds"
+        ),
     )
 
     # -----------------------------------------------------
@@ -2152,6 +2214,158 @@ def agent_compare_geographic(
         )
         return 2
 
+def agent_pairs_geographic(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        history = AgentLabRunHistory(
+            args.history_root
+        )
+
+        if args.target is None:
+            artifacts = history.load_all()
+        else:
+            artifacts = history.for_target(
+                args.target
+            )
+
+        max_observation_skew = timedelta(
+            seconds=args.max_observation_skew_seconds,
+        )
+
+        pairs = (
+            discover_geographic_agent_observation_pairs(
+                artifacts,
+                max_observation_skew=max_observation_skew,
+            )
+        )
+
+        print("=== DLLO AGENT GEOGRAPHIC PAIRS ===")
+        print(
+            f"Runs:               "
+            f"{len(artifacts)}"
+        )
+        print(
+            f"Pairs:              "
+            f"{len(pairs)}"
+        )
+
+        if args.target is not None:
+            print(
+                f"Target filter:      "
+                f"{args.target}"
+            )
+
+        print(
+            f"Maximum skew:       "
+            f"{max_observation_skew.total_seconds():.2f} s"
+        )
+
+        for pair in pairs:
+            print()
+            print(
+                f"Baseline session:   "
+                f"{pair.baseline_session_id}"
+            )
+            print(
+                f"Candidate session:  "
+                f"{pair.candidate_session_id}"
+            )
+            print(
+                f"Comparable:         "
+                f"{'yes' if pair.comparable else 'no'}"
+            )
+
+            for reason in pair.reasons:
+                print(
+                    f"Reason:             "
+                    f"{reason}"
+                )
+
+        return 0
+
+    except (
+        AgentLabArtifactIOError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
+def agent_pairs_temporal(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        history = AgentLabRunHistory(
+            args.history_root
+        )
+
+        if args.target is None:
+            artifacts = history.load_all()
+        else:
+            artifacts = history.for_target(
+                args.target
+            )
+
+        pairs = (
+            discover_temporal_agent_observation_pairs(
+                artifacts
+            )
+        )
+
+        print("=== DLLO AGENT TEMPORAL PAIRS ===")
+        print(
+            f"Runs:               "
+            f"{len(artifacts)}"
+        )
+        print(
+            f"Pairs:              "
+            f"{len(pairs)}"
+        )
+
+        if args.target is not None:
+            print(
+                f"Target filter:      "
+                f"{args.target}"
+            )
+
+        for pair in pairs:
+            print()
+            print(
+                f"Baseline session:   "
+                f"{pair.baseline_session_id}"
+            )
+            print(
+                f"Candidate session:  "
+                f"{pair.candidate_session_id}"
+            )
+            print(
+                f"Comparable:         "
+                f"{'yes' if pair.comparable else 'no'}"
+            )
+
+            for reason in pair.reasons:
+                print(
+                    f"Reason:             "
+                    f"{reason}"
+                )
+
+        return 0
+
+    except (
+        AgentLabArtifactIOError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
 def agent_history(
     args: argparse.Namespace,
 ) -> int:
@@ -2404,6 +2618,12 @@ def main() -> int:
 
     if args.command == "agent-history":
         return agent_history(args)
+
+    if args.command == "agent-pairs-temporal":
+        return agent_pairs_temporal(args)
+
+    if args.command == "agent-pairs-geographic":
+        return agent_pairs_geographic(args)
 
     if args.command == "task-list":
         return task_list(args)
