@@ -625,3 +625,109 @@ def test_action_task_environment_uses_branch_collector():
         assert "expected_branch" not in metadata_text
         assert "tool_results" not in metadata_text
         assert '"state": "missing"' not in metadata_text
+
+
+def test_action_task_environment_uses_multi_branch_collector():
+    from observer.core.observed_action_multi_branch_evidence import (
+        ObservedActionMultiBranchEvidenceCollector,
+    )
+
+    base_task = make_sequence_task()
+
+    task = BenchmarkTask.model_validate(
+        {
+            **base_task.model_dump(),
+            "available_tools": [
+                {
+                    "tool_name": "record_item",
+                    "description": (
+                        "Return the current item state."
+                    ),
+                    "parameters": {
+                        "name": "string",
+                        "count": "integer",
+                    },
+                },
+                {
+                    "tool_name": "inspect_item",
+                    "description": "Inspect an item.",
+                    "parameters": {
+                        "name": "string",
+                    },
+                },
+                {
+                    "tool_name": "fallback_item",
+                    "description": "Fallback item action.",
+                    "parameters": {
+                        "name": "string",
+                    },
+                },
+            ],
+            "tool_results": [
+                {
+                    "tool_name": "record_item",
+                    "result": {
+                        "state": "missing",
+                    },
+                },
+            ],
+            "expected_actions": [
+                {
+                    "tool_name": "record_item",
+                    "arguments": {
+                        "name": "delta",
+                        "count": 4,
+                    },
+                },
+            ],
+            "expected_branches": {
+                "source_action_index": 0,
+                "source_result_field": "state",
+                "options": [
+                    {
+                        "expected_value": "missing",
+                        "action": {
+                            "tool_name": "inspect_item",
+                            "arguments": {
+                                "name": "delta",
+                            },
+                        },
+                    },
+                    {
+                        "expected_value": "present",
+                        "action": {
+                            "tool_name": "fallback_item",
+                            "arguments": {
+                                "name": "delta",
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+    )
+
+    with ActionTaskEnvironment(task) as environment:
+        assert isinstance(
+            environment.collector,
+            ObservedActionMultiBranchEvidenceCollector,
+        )
+
+        assert (
+            environment.collector.expected_actions
+            == tuple(task.expected_actions)
+        )
+        assert (
+            environment.collector.expected_branches
+            == task.expected_branches
+        )
+
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "expected_branches" not in metadata_text
+        assert "tool_results" not in metadata_text
+        assert '"state": "missing"' not in metadata_text
+        assert '"state": "present"' not in metadata_text

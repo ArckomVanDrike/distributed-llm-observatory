@@ -203,7 +203,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         )
 
         assert resolved.suite.suite_id == "agent-protocol-core"
-        assert resolved.suite.suite_version == "0.9"
+        assert resolved.suite.suite_version == "0.10"
         assert (
             resolved.suite.harness_profile
             is BenchmarkHarnessProfile.SUT_PROTOCOL
@@ -222,6 +222,8 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             "agent-protocol-data-flow-001",
             "agent-protocol-recovery-001",
             "agent-protocol-branch-001",
+            "agent-protocol-multi-branch-001",
+            "agent-protocol-multi-branch-002",
         ]
 
         task_runner = BenchmarkTaskRunner(
@@ -393,6 +395,31 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             "tools",
         }
 
+
+        multi_branch_selections = [
+            selection
+            for selection in session.selections
+            if selection.task_id in {
+                "agent-protocol-multi-branch-001",
+                "agent-protocol-multi-branch-002",
+            }
+        ]
+
+        assert len(multi_branch_selections) == 2
+
+        for selection in multi_branch_selections:
+            assert (
+                selection.status.value
+                == "incompatible"
+            )
+            assert {
+                capability.value
+                for capability
+                in selection.missing_capabilities
+            } == {
+                "tools",
+            }
+
         for result in session.results:
             assert result.task_completed is sut_task_completed
 
@@ -411,7 +438,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
 
         assert report.target_id == "auto-suite-agent"
         assert report.suite_id == "agent-protocol-core"
-        assert report.suite_version == "0.9"
+        assert report.suite_version == "0.10"
         assert report.total_tasks == 3
         assert report.passed_tasks == 3 * int(expected_pass)
         assert report.pass_rate == float(expected_pass)

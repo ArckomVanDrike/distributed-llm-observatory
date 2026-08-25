@@ -13,6 +13,21 @@ from pydantic import (
 from schemas.target import TargetCapability
 
 
+def _json_scalar_equal(
+    left: str | int | float | bool | None,
+    right: str | int | float | bool | None,
+) -> bool:
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+
+    if isinstance(left, (int, float)) and isinstance(
+        right,
+        (int, float),
+    ):
+        return float(left) == float(right)
+
+    return left == right
+
 class BenchmarkCategory(str, Enum):
     REASONING = "reasoning"
     CODING = "coding"
@@ -136,6 +151,19 @@ class BenchmarkExpectedActionCall(BaseModel):
     ] = Field(default_factory=dict)
 
 
+class BenchmarkExpectedBranchOption(BaseModel):
+    expected_value: str | int | float | bool | None
+    action: BenchmarkExpectedActionCall
+
+
+class BenchmarkExpectedBranches(BaseModel):
+    source_action_index: int = Field(ge=0)
+    source_result_field: str = Field(min_length=1)
+    options: list[BenchmarkExpectedBranchOption] = Field(
+        min_length=1,
+    )
+
+
 class BenchmarkExpectedAction(
     BenchmarkExpectedActionCall
 ):
@@ -226,6 +254,10 @@ class BenchmarkTask(BaseModel):
 
     expected_branch: (
         BenchmarkExpectedBranch | None
+    ) = None
+
+    expected_branches: (
+        BenchmarkExpectedBranches | None
     ) = None
 
     enabled: bool = True
@@ -393,6 +425,112 @@ class BenchmarkTask(BaseModel):
             raise ValueError(
                 "BenchmarkTask tool_results tool names "
                 "must reference available_tools entries."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_expected_branches(
+        self,
+    ) -> BenchmarkTask:
+        if self.expected_branches is None:
+            return self
+
+        if self.expected_actions is None:
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "requires expected_actions."
+            )
+
+        if not self.tool_results:
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "requires tool_results."
+            )
+
+        branches = self.expected_branches
+        actions = self.expected_actions
+        source_index = branches.source_action_index
+
+        if source_index >= len(actions):
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "source_action_index must reference "
+                "an expected_actions entry."
+            )
+
+        source_action = actions[source_index]
+
+        results_by_tool = {
+            result.tool_name: result
+            for result in self.tool_results
+        }
+
+        source_result = results_by_tool.get(
+            source_action.tool_name
+        )
+
+        if (
+            source_result is None
+            or branches.source_result_field
+            not in source_result.result
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "source_result_field must exist in "
+                "the source tool result."
+            )
+
+        option_values = [
+            option.expected_value
+            for option in branches.options
+        ]
+
+        for index, value in enumerate(option_values):
+            if any(
+                _json_scalar_equal(
+                    value,
+                    other,
+                )
+                for other in option_values[index + 1 :]
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_branches "
+                    "option expected_value entries "
+                    "must be unique."
+                )
+
+        available_tool_names = {
+            tool.tool_name
+            for tool in self.available_tools
+        }
+
+        if any(
+            option.action.tool_name
+            not in available_tool_names
+            for option in branches.options
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "option actions must reference "
+                "available_tools entries."
+            )
+
+        runtime_value = source_result.result[
+            branches.source_result_field
+        ]
+
+        if not any(
+            _json_scalar_equal(
+                option.expected_value,
+                runtime_value,
+            )
+            for option in branches.options
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_branches "
+                "must contain an option matching "
+                "the configured source tool result."
             )
 
         return self

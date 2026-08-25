@@ -12,6 +12,9 @@ from observer.core.observed_action_data_flow_evidence import (
 from observer.core.observed_action_evidence import (
     ObservedActionEvidenceCollector,
 )
+from observer.core.observed_action_multi_branch_evidence import (
+    ObservedActionMultiBranchEvidenceCollector,
+)
 from observer.core.observed_action_recovery_evidence import (
     ObservedActionRecoveryEvidenceCollector,
 )
@@ -87,6 +90,25 @@ class ActionTaskEnvironment:
                     ),
                     expected_recovery=(
                         task.expected_recovery
+                    ),
+                    calls_provider=(
+                        lambda: self.gateway.calls
+                    ),
+                    outcomes_provider=(
+                        lambda: self.gateway.outcomes
+                    ),
+                )
+            )
+        elif task.expected_branches is not None:
+            assert task.expected_actions is not None
+
+            self.collector = (
+                ObservedActionMultiBranchEvidenceCollector(
+                    expected_actions=tuple(
+                        task.expected_actions
+                    ),
+                    expected_branches=(
+                        task.expected_branches
                     ),
                     calls_provider=(
                         lambda: self.gateway.calls

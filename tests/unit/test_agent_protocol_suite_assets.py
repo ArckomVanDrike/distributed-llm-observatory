@@ -5,6 +5,7 @@ from observer.core.suite_registry import SuiteRegistry
 from observer.core.task_bank import TaskBank
 from schemas.benchmark import (
     BenchmarkCategory,
+    BenchmarkDifficulty,
     BenchmarkFamily,
     BenchmarkHarnessProfile,
 )
@@ -1093,6 +1094,260 @@ def test_canonical_agent_protocol_suite_v0_9():
         "agent-protocol-data-flow-001",
         "agent-protocol-recovery-001",
         "agent-protocol-branch-001",
+    ]
+
+    assert suite.enabled is False
+
+
+
+def test_canonical_agent_protocol_multi_branch_tasks():
+    task_bank = TaskBank(
+        Path("benchmark/tasks"),
+    )
+
+    task_ids = {
+        "agent-protocol-multi-branch-001",
+        "agent-protocol-multi-branch-002",
+    }
+
+    matches = [
+        task
+        for task in task_bank.load_all()
+        if task.task_id in task_ids
+    ]
+
+    tasks = {
+        task.task_id: task
+        for task in matches
+    }
+
+    assert set(tasks) == task_ids
+
+    first = tasks[
+        "agent-protocol-multi-branch-001"
+    ]
+    second = tasks[
+        "agent-protocol-multi-branch-002"
+    ]
+
+    for task in (first, second):
+        assert task.benchmark_version == "0.1"
+        assert task.family is BenchmarkFamily.AGENT
+        assert (
+            task.category
+            is BenchmarkCategory.TECHNICAL
+        )
+        assert (
+            task.difficulty
+            is BenchmarkDifficulty.EASY
+        )
+
+        assert {
+            capability.value
+            for capability
+            in task.required_capabilities
+        } == {
+            "text",
+            "tools",
+        }
+
+        prompt = task.task.lower()
+
+        for hidden_value in (
+            "check_item",
+            "create_item",
+            "inspect_item",
+            "missing",
+            "present",
+        ):
+            assert hidden_value not in prompt
+
+        assert [
+            (
+                tool.tool_name,
+                tool.parameters,
+            )
+            for tool in task.available_tools
+        ] == [
+            (
+                "check_item",
+                {
+                    "name": "string",
+                },
+            ),
+            (
+                "create_item",
+                {
+                    "name": "string",
+                    "count": "integer",
+                },
+            ),
+            (
+                "inspect_item",
+                {
+                    "name": "string",
+                },
+            ),
+        ]
+
+        assert task.expected_actions is not None
+        assert [
+            (
+                action.tool_name,
+                action.arguments,
+            )
+            for action in task.expected_actions
+        ] == [
+            (
+                "check_item",
+                {
+                    "name": "delta",
+                },
+            ),
+        ]
+
+        assert task.expected_branches is not None
+        assert (
+            task.expected_branches.source_action_index
+            == 0
+        )
+        assert (
+            task.expected_branches.source_result_field
+            == "state"
+        )
+
+        assert [
+            (
+                option.expected_value,
+                option.action.tool_name,
+                option.action.arguments,
+            )
+            for option
+            in task.expected_branches.options
+        ] == [
+            (
+                "missing",
+                "create_item",
+                {
+                    "name": "delta",
+                    "count": 4,
+                },
+            ),
+            (
+                "present",
+                "inspect_item",
+                {
+                    "name": "delta",
+                },
+            ),
+        ]
+
+        assert task.expected_branch is None
+        assert task.expected_recovery is None
+        assert task.expected_propagations is None
+        assert task.tool_failures == []
+
+        assert [
+            criterion.criterion_id
+            for criterion in task.success_criteria
+        ] == [
+            "tool-calls-observed",
+            "tool-sequence-length-match",
+            "tool-sequence-order-match",
+            "tool-sequence-arguments-match",
+            "branch-source-result-observed",
+            "branch-selected",
+        ]
+
+        assert task.enabled is True
+
+    assert first.task == second.task
+
+    assert [
+        tool.model_dump()
+        for tool in first.available_tools
+    ] == [
+        tool.model_dump()
+        for tool in second.available_tools
+    ]
+
+    assert (
+        first.expected_actions
+        == second.expected_actions
+    )
+    assert (
+        first.expected_branches
+        == second.expected_branches
+    )
+
+    assert [
+        (
+            result.tool_name,
+            result.result,
+        )
+        for result in first.tool_results
+    ] == [
+        (
+            "check_item",
+            {
+                "state": "missing",
+            },
+        ),
+    ]
+
+    assert [
+        (
+            result.tool_name,
+            result.result,
+        )
+        for result in second.tool_results
+    ] == [
+        (
+            "check_item",
+            {
+                "state": "present",
+            },
+        ),
+    ]
+
+
+def test_canonical_agent_protocol_suite_v0_10():
+    suite_bank = SuiteBank(
+        Path("benchmark/suites"),
+    )
+
+    matches = [
+        suite
+        for suite in suite_bank.load_all()
+        if (
+            suite.suite_id
+            == "agent-protocol-core"
+            and suite.suite_version == "0.10"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family is BenchmarkFamily.AGENT
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
+        "agent-protocol-tool-selection-001",
+        "agent-protocol-action-sequence-001",
+        "agent-protocol-data-flow-001",
+        "agent-protocol-recovery-001",
+        "agent-protocol-branch-001",
+        "agent-protocol-multi-branch-001",
+        "agent-protocol-multi-branch-002",
     ]
 
     assert suite.enabled is True
