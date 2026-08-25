@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 import observer.cli as cli_module
 from observer.cli import (
     agent_compare,
+    agent_history,
     agent_test,
     build_parser,
 )
@@ -748,6 +750,264 @@ def test_agent_compare_returns_two_on_invalid_artifact(
     )
 
     result = agent_compare(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Invalid Agent Lab run artifact"
+        in captured.err
+    )
+
+
+def test_parser_exposes_agent_history_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-history",
+            "runs",
+            "--target",
+            "comparison-agent",
+        ]
+    )
+
+    assert args.command == "agent-history"
+    assert args.history_root == Path("runs")
+    assert args.target == "comparison-agent"
+
+
+def test_agent_history_target_defaults_to_none():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-history",
+            "runs",
+        ]
+    )
+
+    assert args.target is None
+
+
+def test_main_dispatches_agent_history(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_history(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["target"] = args.target
+        return 23
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_history",
+        fake_agent_history,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dllo",
+            "agent-history",
+            "runs",
+            "--target",
+            "comparison-agent",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 23
+    assert captured["command"] == "agent-history"
+    assert captured["history_root"] == Path("runs")
+    assert captured["target"] == "comparison-agent"
+
+
+
+def test_agent_history_prints_persisted_runs(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-001",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    12,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                target=SimpleNamespace(
+                    target_id="history-agent",
+                ),
+                suite_id="agent-protocol-core",
+                suite_version="1.0",
+            ),
+            technical_report=SimpleNamespace(
+                total_tasks=11,
+                pass_rate=0.5,
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="session-002",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    12,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                target=SimpleNamespace(
+                    target_id="history-agent",
+                ),
+                suite_id="agent-protocol-core",
+                suite_version="1.0",
+            ),
+            technical_report=SimpleNamespace(
+                total_tasks=11,
+                pass_rate=1.0,
+            ),
+        ),
+    ]
+
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def load_all(self):
+            captured["mode"] = "all"
+            return artifacts
+
+        def for_target(self, target_id):
+            raise AssertionError(
+                "Target filter must not be used."
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = agent_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["mode"] == "all"
+    assert "=== DLLO AGENT RUN HISTORY ===" in output
+    assert "Runs:               2" in output
+    assert "session-001" in output
+    assert "session-002" in output
+    assert "history-agent" in output
+    assert "agent-protocol-core v1.0" in output
+    assert "Pass rate:          50.00%" in output
+    assert "Pass rate:          100.00%" in output
+
+
+def test_agent_history_uses_explicit_target_filter(
+    monkeypatch,
+    capsys,
+):
+    captured = {}
+
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id="filtered-session",
+            started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                18,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            target=SimpleNamespace(
+                target_id="filtered-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+        technical_report=SimpleNamespace(
+            total_tasks=11,
+            pass_rate=0.75,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def load_all(self):
+            raise AssertionError(
+                "Unfiltered history must not be loaded."
+            )
+
+        def for_target(self, target_id):
+            captured["target"] = target_id
+            return [artifact]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="filtered-agent",
+    )
+
+    result = agent_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["target"] == "filtered-agent"
+    assert "Target filter:      filtered-agent" in output
+    assert "filtered-session" in output
+
+
+def test_agent_history_returns_two_on_invalid_artifact(
+    monkeypatch,
+    capsys,
+):
+    class FakeHistory:
+        def __init__(self, root):
+            pass
+
+        def load_all(self):
+            raise cli_module.AgentLabArtifactIOError(
+                "Invalid Agent Lab run artifact"
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = agent_history(args)
     captured = capsys.readouterr()
 
     assert result == 2

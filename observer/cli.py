@@ -44,6 +44,9 @@ from observer.core.agent_lab_protocol_runner import (
 from observer.core.agent_lab_run_comparison import (
     compare_agent_lab_runs,
 )
+from observer.core.agent_lab_run_history import (
+    AgentLabRunHistory,
+)
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
 from observer.core.consumer_schedule import (
@@ -579,6 +582,27 @@ def build_parser() -> argparse.ArgumentParser:
         "candidate",
         type=Path,
         help="Candidate Agent Lab run artifact JSON",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab run history
+    # -----------------------------------------------------
+
+    agent_history_parser = subparsers.add_parser(
+        "agent-history",
+        help="List persisted Agent Lab run artifacts",
+    )
+
+    agent_history_parser.add_argument(
+        "history_root",
+        type=Path,
+        help="Directory containing Agent Lab run artifacts",
+    )
+
+    agent_history_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optional target ID filter",
     )
 
     # -----------------------------------------------------
@@ -1811,6 +1835,79 @@ def agent_compare(
         )
         return 2
 
+
+def agent_history(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        history = AgentLabRunHistory(
+            args.history_root
+        )
+
+        if args.target is None:
+            artifacts = history.load_all()
+        else:
+            artifacts = history.for_target(
+                args.target
+            )
+
+        print("=== DLLO AGENT RUN HISTORY ===")
+        print(
+            f"Runs:               "
+            f"{len(artifacts)}"
+        )
+
+        if args.target is not None:
+            print(
+                f"Target filter:      "
+                f"{args.target}"
+            )
+
+        if not artifacts:
+            print()
+            print("No Agent Lab runs found.")
+            return 0
+
+        for artifact in artifacts:
+            session = artifact.session
+            report = artifact.technical_report
+
+            print()
+            print(
+                f"Started:            "
+                f"{session.started_at_utc.isoformat()}"
+            )
+            print(
+                f"Session:            "
+                f"{session.session_id}"
+            )
+            print(
+                f"Target:             "
+                f"{session.target.target_id}"
+            )
+            print(
+                f"Suite:              "
+                f"{session.suite_id} "
+                f"v{session.suite_version}"
+            )
+            print(
+                f"Tasks:              "
+                f"{report.total_tasks}"
+            )
+            print(
+                f"Pass rate:          "
+                f"{format_rate(report.pass_rate)}"
+            )
+
+        return 0
+
+    except AgentLabArtifactIOError as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
 def task_list(
     args: argparse.Namespace,
 ) -> int:
@@ -1953,6 +2050,9 @@ def main() -> int:
 
     if args.command == "agent-compare":
         return agent_compare(args)
+
+    if args.command == "agent-history":
+        return agent_history(args)
 
     if args.command == "task-list":
         return task_list(args)
