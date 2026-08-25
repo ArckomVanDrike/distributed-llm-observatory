@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from statistics import median
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -150,6 +151,19 @@ class AgentTestSession(BaseModel):
     def validate_session(
         self,
     ) -> AgentTestSession:
+        result_task_ids = [
+            result.task_id
+            for result in self.results
+        ]
+
+        if len(result_task_ids) != len(
+            set(result_task_ids)
+        ):
+            raise ValueError(
+                "Session results must contain unique "
+                "task_id values."
+            )
+
         if self.started_at_utc.tzinfo is None:
             raise ValueError(
                 "started_at_utc must be timezone-aware."
@@ -325,6 +339,90 @@ class AgentLabRunArtifact(BaseModel):
             raise ValueError(
                 "technical_report suite_version must match "
                 "session suite_version."
+            )
+
+        results = self.session.results
+        total_tasks = len(results)
+
+        passed_tasks = sum(
+            1
+            for result in results
+            if result.evaluation.passed
+        )
+        failed_tasks = total_tasks - passed_tasks
+
+        completed_tasks = sum(
+            1
+            for result in results
+            if result.task_completed
+        )
+
+        expected_summary = {
+            "total_tasks": total_tasks,
+            "passed_tasks": passed_tasks,
+            "failed_tasks": failed_tasks,
+            "task_completion_rate": (
+                completed_tasks / total_tasks
+                if total_tasks
+                else 0.0
+            ),
+            "pass_rate": (
+                passed_tasks / total_tasks
+                if total_tasks
+                else None
+            ),
+            "median_latency_ms": (
+                float(
+                    median(
+                        result.latency_ms
+                        for result in results
+                    )
+                )
+                if results
+                else None
+            ),
+            "total_retries": sum(
+                result.retry_count
+                for result in results
+            ),
+            "total_human_interventions": sum(
+                result.human_intervention_count
+                for result in results
+            ),
+        }
+
+        actual_summary = {
+            "total_tasks": (
+                self.technical_report.total_tasks
+            ),
+            "passed_tasks": (
+                self.technical_report.passed_tasks
+            ),
+            "failed_tasks": (
+                self.technical_report.failed_tasks
+            ),
+            "task_completion_rate": (
+                self.technical_report.task_completion_rate
+            ),
+            "pass_rate": (
+                self.technical_report.pass_rate
+            ),
+            "median_latency_ms": (
+                self.technical_report.median_latency_ms
+            ),
+            "total_retries": (
+                self.technical_report.total_retries
+            ),
+            "total_human_interventions": (
+                self.technical_report
+                .total_human_interventions
+            ),
+        }
+
+        if actual_summary != expected_summary:
+            raise ValueError(
+                "technical_report summary must match "
+                "session results."
             )
 
         return self

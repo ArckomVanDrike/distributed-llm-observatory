@@ -275,3 +275,22 @@ def test_disabled_selection_rejects_family_mismatch():
             status=AgentTestTaskSelectionStatus.DISABLED,
             family_mismatch=True,
         )
+
+
+def test_session_rejects_duplicate_result_task_ids():
+    with pytest.raises(
+        ValidationError,
+        match="unique task_id",
+    ):
+        AgentTestSession(
+            target=make_target(),
+            suite_id="agent-core",
+            suite_version="0.1",
+            status=AgentTestSessionStatus.COMPLETED,
+            started_at_utc=NOW,
+            completed_at_utc=NOW + timedelta(seconds=3),
+            results=[
+                make_result(),
+                make_result(),
+            ],
+        )

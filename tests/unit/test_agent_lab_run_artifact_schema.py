@@ -163,3 +163,35 @@ def test_agent_lab_run_artifact_rejects_mismatched_suite_version():
             session=artifact.session,
             technical_report=mismatched_report,
         )
+
+
+def test_agent_lab_run_artifact_rejects_report_summary_mismatch():
+    artifact = build_artifact()
+    report = artifact.technical_report
+
+    mismatched_report = AgentTechnicalReport(
+        session_id=report.session_id,
+        target_id=report.target_id,
+        suite_id=report.suite_id,
+        suite_version=report.suite_version,
+        generated_at_utc=report.generated_at_utc,
+        total_tasks=1,
+        passed_tasks=1,
+        failed_tasks=0,
+        task_completion_rate=1.0,
+        pass_rate=1.0,
+        median_latency_ms=10.0,
+        total_retries=0,
+        total_human_interventions=0,
+        findings=[],
+        recommendations=[],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="technical_report summary",
+    ):
+        AgentLabRunArtifact(
+            session=artifact.session,
+            technical_report=mismatched_report,
+        )

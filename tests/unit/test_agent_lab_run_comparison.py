@@ -7,9 +7,11 @@ from observer.core.agent_lab_run_comparison import (
     AgentTaskOutcomeTransition,
     compare_agent_lab_runs,
 )
+from observer.core.agent_technical_report import (
+    build_agent_technical_report,
+)
 from schemas.agent_lab import (
     AgentLabRunArtifact,
-    AgentTechnicalReport,
     AgentTestSession,
     AgentTestSessionStatus,
     AgentTestTaskResult,
@@ -118,40 +120,9 @@ def build_artifact(
         results=results,
     )
 
-    report = AgentTechnicalReport(
-        session_id=session.session_id,
-        target_id=target_id,
-        suite_id=suite_id,
-        suite_version=suite_version,
+    report = build_agent_technical_report(
+        session,
         generated_at_utc=NOW,
-        total_tasks=len(results),
-        passed_tasks=sum(
-            result.evaluation.passed
-            for result in results
-        ),
-        failed_tasks=sum(
-            not result.evaluation.passed
-            for result in results
-        ),
-        task_completion_rate=(
-            sum(
-                result.task_completed
-                for result in results
-            )
-            / len(results)
-            if results
-            else 0.0
-        ),
-        pass_rate=(
-            sum(
-                result.evaluation.passed
-                for result in results
-            )
-            / len(results)
-            if results
-            else None
-        ),
-        median_latency_ms=100.0 if results else None,
     )
 
     return AgentLabRunArtifact(
