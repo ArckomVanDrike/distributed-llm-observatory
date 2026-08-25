@@ -86,6 +86,22 @@ class BenchmarkToolContract(BaseModel):
     ] = Field(default_factory=dict)
 
 
+class BenchmarkToolResult(BaseModel):
+    tool_name: str = Field(min_length=1)
+
+    result: dict[
+        str,
+        str | int | float | bool | None,
+    ] = Field(default_factory=dict)
+
+
+class BenchmarkExpectedPropagation(BaseModel):
+    source_action_index: int = Field(ge=0)
+    source_result_field: str = Field(min_length=1)
+    target_action_index: int = Field(ge=0)
+    target_argument: str = Field(min_length=1)
+
+
 class BenchmarkExpectedActionCall(BaseModel):
     tool_name: str = Field(min_length=1)
 
@@ -155,10 +171,21 @@ class BenchmarkTask(BaseModel):
         default_factory=list,
     )
 
+    tool_results: list[BenchmarkToolResult] = Field(
+        default_factory=list,
+    )
+
     expected_action: BenchmarkExpectedAction | None = None
 
     expected_actions: (
         list[BenchmarkExpectedActionCall] | None
+    ) = Field(
+        default=None,
+        min_length=1,
+    )
+
+    expected_propagations: (
+        list[BenchmarkExpectedPropagation] | None
     ) = Field(
         default=None,
         min_length=1,
@@ -205,6 +232,155 @@ class BenchmarkTask(BaseModel):
                 "BenchmarkTask with expected action data "
                 "requires the tools capability."
             )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_tool_results_contract(
+        self,
+    ) -> BenchmarkTask:
+        if not self.tool_results:
+            return self
+
+        if (
+            TargetCapability.TOOLS
+            not in self.required_capabilities
+        ):
+            raise ValueError(
+                "BenchmarkTask with tool_results "
+                "requires the tools capability."
+            )
+
+        if not self.available_tools:
+            raise ValueError(
+                "BenchmarkTask tool_results "
+                "requires available_tools."
+            )
+
+        tool_names = {
+            tool.tool_name
+            for tool in self.available_tools
+        }
+
+        result_tool_names = [
+            tool_result.tool_name
+            for tool_result in self.tool_results
+        ]
+
+        if (
+            len(result_tool_names)
+            != len(set(result_tool_names))
+        ):
+            raise ValueError(
+                "BenchmarkTask tool_results "
+                "tool names must be unique."
+            )
+
+        unknown_tool_names = (
+            set(result_tool_names)
+            - tool_names
+        )
+
+        if unknown_tool_names:
+            raise ValueError(
+                "BenchmarkTask tool_results tool names "
+                "must reference available_tools entries."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_expected_propagations(
+        self,
+    ) -> BenchmarkTask:
+        if self.expected_propagations is None:
+            return self
+
+        if self.expected_actions is None:
+            raise ValueError(
+                "BenchmarkTask expected_propagations "
+                "requires expected_actions."
+            )
+
+        if not self.tool_results:
+            raise ValueError(
+                "BenchmarkTask expected_propagations "
+                "requires tool_results."
+            )
+
+        actions = self.expected_actions
+        tool_results = {
+            result.tool_name: result
+            for result in self.tool_results
+        }
+        tool_contracts = {
+            tool.tool_name: tool
+            for tool in self.available_tools
+        }
+
+        for propagation in self.expected_propagations:
+            source_index = propagation.source_action_index
+            target_index = propagation.target_action_index
+
+            if (
+                source_index >= len(actions)
+                or target_index >= len(actions)
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_propagations "
+                    "action indices must reference "
+                    "expected_actions entries."
+                )
+
+            if source_index >= target_index:
+                raise ValueError(
+                    "BenchmarkTask expected_propagations "
+                    "must flow from an earlier action "
+                    "to a later action."
+                )
+
+            source_action = actions[source_index]
+            target_action = actions[target_index]
+
+            source_result = tool_results.get(
+                source_action.tool_name
+            )
+
+            if (
+                source_result is None
+                or propagation.source_result_field
+                not in source_result.result
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_propagations "
+                    "source_result_field must exist in "
+                    "the source tool result."
+                )
+
+            target_contract = tool_contracts.get(
+                target_action.tool_name
+            )
+
+            if (
+                target_contract is None
+                or propagation.target_argument
+                not in target_contract.parameters
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_propagations "
+                    "target_argument must exist in "
+                    "the target tool parameters."
+                )
+
+            if (
+                propagation.target_argument
+                in target_action.arguments
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_propagations "
+                    "target_argument cannot also be a "
+                    "static expected action argument."
+                )
 
         return self
 

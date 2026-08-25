@@ -25,11 +25,22 @@ class ActionGateway:
     expectations and does not produce evaluation verdicts.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        tool_results: (
+            dict[str, dict[str, object]] | None
+        ) = None,
+    ) -> None:
         self.token = secrets.token_urlsafe(32)
 
         self._calls: list[ObservedActionCall] = []
         self._lock = threading.Lock()
+        self._tool_results = {
+            tool_name: dict(result)
+            for tool_name, result
+            in (tool_results or {}).items()
+        }
 
         gateway = self
 
@@ -123,11 +134,22 @@ class ActionGateway:
                 with gateway._lock:
                     gateway._calls.append(call)
 
+                response_payload: dict[str, object] = {
+                    "schema_version": "0.1",
+                    "accepted": True,
+                }
+
+                tool_result = gateway._tool_results.get(
+                    tool_name
+                )
+
+                if tool_result is not None:
+                    response_payload["result"] = dict(
+                        tool_result
+                    )
+
                 self._send_json(
-                    {
-                        "schema_version": "0.1",
-                        "accepted": True,
-                    },
+                    response_payload,
                     status=200,
                 )
 

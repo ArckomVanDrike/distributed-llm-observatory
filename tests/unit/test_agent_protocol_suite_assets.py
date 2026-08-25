@@ -635,4 +635,151 @@ def test_canonical_agent_protocol_suite_v0_6():
         "agent-protocol-action-sequence-001",
     ]
 
+    assert suite.enabled is False
+
+
+
+def test_canonical_agent_protocol_data_flow_task():
+    task_bank = TaskBank(
+        Path("benchmark/tasks"),
+    )
+
+    matches = [
+        task
+        for task in task_bank.load_all()
+        if (
+            task.task_id
+            == "agent-protocol-data-flow-001"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    task = matches[0]
+
+    assert task.benchmark_version == "0.1"
+    assert task.family is BenchmarkFamily.AGENT
+    assert (
+        task.category
+        is BenchmarkCategory.TECHNICAL
+    )
+    assert (
+        task.evaluator_id
+        == "deterministic-evidence-v0-1"
+    )
+
+    assert task.required_capabilities == {
+        TargetCapability.TEXT,
+        TargetCapability.TOOLS,
+    }
+
+    # The prompt describes the goal without
+    # revealing observer-side tool selection.
+    assert "create_item" not in task.task
+    assert "inspect_item" not in task.task
+    assert "item-742" not in task.task
+
+    assert [
+        tool.tool_name
+        for tool in task.available_tools
+    ] == [
+        "create_item",
+        "inspect_item",
+    ]
+
+    assert task.available_tools[0].parameters == {
+        "name": "string",
+        "count": "integer",
+    }
+    assert task.available_tools[1].parameters == {
+        "item_id": "string",
+    }
+
+    assert len(task.tool_results) == 1
+    assert (
+        task.tool_results[0].tool_name
+        == "create_item"
+    )
+    assert task.tool_results[0].result == {
+        "item_id": "item-742",
+    }
+
+    assert task.expected_action is None
+    assert task.expected_actions is not None
+
+    assert [
+        action.tool_name
+        for action in task.expected_actions
+    ] == [
+        "create_item",
+        "inspect_item",
+    ]
+
+    assert task.expected_actions[0].arguments == {
+        "name": "delta",
+        "count": 4,
+    }
+
+    # The propagated value must not be encoded
+    # as a static expected argument.
+    assert task.expected_actions[1].arguments == {}
+
+    assert task.expected_propagations is not None
+    assert len(task.expected_propagations) == 1
+
+    propagation = task.expected_propagations[0]
+
+    assert propagation.source_action_index == 0
+    assert propagation.source_result_field == "item_id"
+    assert propagation.target_action_index == 1
+    assert propagation.target_argument == "item_id"
+
+    assert [
+        criterion.criterion_id
+        for criterion in task.success_criteria
+    ] == [
+        "tool-calls-observed",
+        "tool-sequence-length-match",
+        "tool-sequence-order-match",
+        "tool-sequence-arguments-match",
+        "tool-result-propagated",
+    ]
+
+    assert task.enabled is True
+
+
+def test_canonical_agent_protocol_suite_v0_7():
+    suite_bank = SuiteBank(
+        Path("benchmark/suites"),
+    )
+
+    matches = [
+        suite
+        for suite in suite_bank.load_all()
+        if (
+            suite.suite_id == "agent-protocol-core"
+            and suite.suite_version == "0.7"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family is BenchmarkFamily.AGENT
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
+        "agent-protocol-tool-selection-001",
+        "agent-protocol-action-sequence-001",
+        "agent-protocol-data-flow-001",
+    ]
+
     assert suite.enabled is True

@@ -1,0 +1,83 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-data-flow-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Create an item named delta with count 4, then inspect the created item.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-calls-observed",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-sequence-length-match",
+      "description": "The observed tool-call sequence length matches."
+    },
+    {
+      "criterion_id": "tool-sequence-order-match",
+      "description": "The observed tool order matches the expected sequence."
+    },
+    {
+      "criterion_id": "tool-sequence-arguments-match",
+      "description": "The observed tool arguments match the effective expected sequence."
+    },
+    {
+      "criterion_id": "tool-result-propagated",
+      "description": "A result from an earlier tool call was propagated to a later tool argument."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "create_item",
+      "description": "Create an item and return its identifier.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "description": "Inspect an existing item by identifier.",
+      "parameters": {
+        "item_id": "string"
+      }
+    }
+  ],
+  "tool_results": [
+    {
+      "tool_name": "create_item",
+      "result": {
+        "item_id": "item-742"
+      }
+    }
+  ],
+  "expected_actions": [
+    {
+      "tool_name": "create_item",
+      "arguments": {
+        "name": "delta",
+        "count": 4
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "arguments": {}
+    }
+  ],
+  "expected_propagations": [
+    {
+      "source_action_index": 0,
+      "source_result_field": "item_id",
+      "target_action_index": 1,
+      "target_argument": "item_id"
+    }
+  ],
+  "enabled": true
+}
