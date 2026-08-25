@@ -5,6 +5,7 @@ from http.server import (
     BaseHTTPRequestHandler,
     ThreadingHTTPServer,
 )
+from pathlib import Path
 
 import pytest
 
@@ -174,7 +175,7 @@ def test_protocol_runner_builds_session_and_report():
             == "protocol-runner-agent"
         )
         assert result.session.suite_id == "agent-protocol-core"
-        assert result.session.suite_version == "0.4"
+        assert result.session.suite_version == "0.5"
 
         assert [
             request["context"]["task_id"]
@@ -208,6 +209,27 @@ def test_protocol_runner_builds_session_and_report():
             "tools",
         }
 
+        tool_selection = next(
+            selection
+            for selection in result.session.selections
+            if (
+                selection.task_id
+                == "agent-protocol-tool-selection-001"
+            )
+        )
+
+        assert (
+            tool_selection.status.value
+            == "incompatible"
+        )
+        assert {
+            capability.value
+            for capability
+            in tool_selection.missing_capabilities
+        } == {
+            "tools",
+        }
+
         assert all(
             task_result.task_completed is False
             for task_result in result.session.results
@@ -220,7 +242,7 @@ def test_protocol_runner_builds_session_and_report():
         assert result.report.session_id == result.session.session_id
         assert result.report.target_id == "protocol-runner-agent"
         assert result.report.suite_id == "agent-protocol-core"
-        assert result.report.suite_version == "0.4"
+        assert result.report.suite_version == "0.5"
         assert result.report.generated_at_utc == generated_at
         assert result.report.total_tasks == 3
         assert result.report.passed_tasks == 3
@@ -603,6 +625,363 @@ def test_protocol_runner_executes_observed_action_task(
         assert result.report.total_tasks == 1
         assert result.report.passed_tasks == 1
         assert result.report.pass_rate == 1.0
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+@pytest.mark.parametrize(
+    (
+        "selected_tool_name",
+        "selected_arguments",
+        "expected_pass",
+    ),
+    [
+        (
+            "record_item",
+            {
+                "name": "delta",
+                "count": 4,
+            },
+            True,
+        ),
+        (
+            "inspect_item",
+            {
+                "name": "delta",
+            },
+            False,
+        ),
+    ],
+)
+def test_protocol_runner_evaluates_tool_selection(
+    tmp_path,
+    selected_tool_name,
+    selected_arguments,
+    expected_pass,
+):
+    from urllib.request import Request, urlopen
+
+    suite_root = tmp_path / "suites"
+    task_root = tmp_path / "tasks"
+
+    suite_root.mkdir()
+    task_root.mkdir()
+
+    canonical_task = Path(
+        "benchmark/tasks/agent/protocol/"
+        "agent-protocol-tool-selection-001.json"
+    )
+
+    (
+        task_root
+        / "agent-protocol-tool-selection-001.json"
+    ).write_text(
+        canonical_task.read_text(
+            encoding="utf-8",
+        ),
+        encoding="utf-8",
+    )
+
+    suite_payload = {
+        "schema_version": "0.1",
+        "suite_id": "agent-protocol-core",
+        "suite_version": "0.5",
+        "family": "agent",
+        "harness_profile": "sut_protocol",
+        "task_ids": [
+            "agent-protocol-tool-selection-001",
+        ],
+        "enabled": True,
+    }
+
+    (
+        suite_root
+        / "agent-protocol-core-v0-5.json"
+    ).write_text(
+        json.dumps(suite_payload),
+        encoding="utf-8",
+    )
+
+    execute_requests = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path != "/v1/manifest":
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            payload = json.dumps(
+                {
+                    "schema_version": "0.1",
+                    "manifest": {
+                        "schema_version": "0.1",
+                        "target_id": "tool-selection-agent",
+                        "display_name": (
+                            "Tool Selection Agent"
+                        ),
+                        "target_type": "agent",
+                        "capabilities": [
+                            "text",
+                            "tools",
+                        ],
+                    },
+                }
+            ).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                "application/json",
+            )
+            self.send_header(
+                "Content-Length",
+                str(len(payload)),
+            )
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def do_POST(self):
+            if self.path != "/v1/execute":
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            length = int(
+                self.headers["Content-Length"]
+            )
+
+            request_payload = json.loads(
+                self.rfile.read(length).decode("utf-8")
+            )
+
+            execute_requests.append(request_payload)
+
+            assert (
+                request_payload["context"]["task_id"]
+                == "agent-protocol-tool-selection-001"
+            )
+
+            # The task specifies the goal but does not
+            # disclose the expected tool name.
+            assert (
+                "record_item"
+                not in request_payload["task"]
+            )
+
+            metadata = request_payload["metadata"]
+
+            assert set(metadata) == {
+                "dllo_action_gateway",
+            }
+
+            gateway_metadata = metadata[
+                "dllo_action_gateway"
+            ]
+
+            assert (
+                gateway_metadata["schema_version"]
+                == "0.1"
+            )
+
+            tools = gateway_metadata["tools"]
+
+            assert [
+                tool["tool_name"]
+                for tool in tools
+            ] == [
+                "record_item",
+                "inspect_item",
+            ]
+
+            assert tools[0]["description"] == (
+                "Persist an item with its count."
+            )
+            assert tools[0]["parameters"] == {
+                "name": "string",
+                "count": "integer",
+            }
+
+            assert tools[1]["description"] == (
+                "Inspect an existing item by name."
+            )
+            assert tools[1]["parameters"] == {
+                "name": "string",
+            }
+
+            # Runtime metadata contains only the public
+            # tool contract and invocation information.
+            for tool in tools:
+                assert set(tool) == {
+                    "tool_name",
+                    "description",
+                    "parameters",
+                    "endpoint",
+                    "authorization",
+                }
+
+            metadata_text = json.dumps(
+                metadata,
+                sort_keys=True,
+            )
+
+            assert "expected_action" not in metadata_text
+            assert "call_count" not in metadata_text
+
+            selected_tool = next(
+                tool
+                for tool in tools
+                if (
+                    tool["tool_name"]
+                    == selected_tool_name
+                )
+            )
+
+            action_request = Request(
+                selected_tool["endpoint"],
+                data=json.dumps(
+                    selected_arguments
+                ).encode("utf-8"),
+                headers={
+                    "Authorization": (
+                        "Bearer "
+                        + selected_tool[
+                            "authorization"
+                        ]["token"]
+                    ),
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+
+            with urlopen(
+                action_request,
+                timeout=2,
+            ) as action_response:
+                assert action_response.status == 200
+
+            now = datetime.now(
+                timezone.utc,
+            ).isoformat()
+
+            payload = json.dumps(
+                {
+                    "schema_version": "0.1",
+                    "context": request_payload["context"],
+                    "started_at_utc": now,
+                    "finished_at_utc": now,
+                    "latency_ms": 5.0,
+
+                    # Deliberately unrelated to the
+                    # Observatory-owned verdict.
+                    "task_completed": False,
+
+                    "output_text": None,
+                    "retry_count": 0,
+                    "human_intervention_count": 0,
+                    "error_type": None,
+                    "metrics": {
+                        "steps": 1,
+                    },
+                }
+            ).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                "application/json",
+            )
+            self.send_header(
+                "Content-Length",
+                str(len(payload)),
+            )
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(
+            self,
+            format,
+            *args,
+        ):
+            return
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        Handler,
+    )
+
+    thread = threading.Thread(
+        target=server.serve_forever,
+        daemon=True,
+    )
+    thread.start()
+
+    try:
+        host, port = server.server_address
+
+        runner = AgentLabProtocolRunner(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            suite_root=suite_root,
+            task_root=task_root,
+        )
+
+        result = runner.run(
+            base_url=f"http://{host}:{port}",
+            generated_at_utc=datetime.now(
+                timezone.utc,
+            ),
+        )
+
+        assert result.session.suite_version == "0.5"
+        assert len(execute_requests) == 1
+        assert len(result.session.results) == 1
+
+        task_result = result.session.results[0]
+
+        assert (
+            task_result.task_id
+            == "agent-protocol-tool-selection-001"
+        )
+
+        assert task_result.task_completed is False
+        assert (
+            task_result.evaluation.passed
+            is expected_pass
+        )
+
+        criterion_results = [
+            criterion.passed
+            for criterion
+            in task_result.evaluation.criteria
+        ]
+
+        if expected_pass:
+            assert criterion_results == [
+                True,
+                True,
+                True,
+                True,
+            ]
+        else:
+            assert criterion_results == [
+                True,
+                False,
+                False,
+                True,
+            ]
+
+        assert result.report.total_tasks == 1
+        assert result.report.passed_tasks == int(
+            expected_pass
+        )
+        assert (
+            result.report.pass_rate
+            == float(expected_pass)
+        )
 
     finally:
         server.shutdown()

@@ -345,7 +345,7 @@ def test_canonical_agent_protocol_suite_v0_4():
         "agent-protocol-action-001",
     ]
 
-    assert suite.enabled is True
+    assert suite.enabled is False
 
 
 def test_protocol_suite_v0_3_remains_exactly_resolvable():
@@ -372,4 +372,143 @@ def test_protocol_suite_v0_3_remains_exactly_resolvable():
         "agent-protocol-smoke-001",
         "agent-protocol-instruction-001",
         "agent-protocol-structured-output-001",
+    ]
+
+
+def test_canonical_agent_protocol_tool_selection_task():
+    task_bank = TaskBank(
+        Path("benchmark/tasks"),
+    )
+
+    matches = [
+        task
+        for task in task_bank.load_all()
+        if (
+            task.task_id
+            == "agent-protocol-tool-selection-001"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    task = matches[0]
+
+    assert task.benchmark_version == "0.1"
+    assert task.family is BenchmarkFamily.AGENT
+    assert (
+        task.category
+        is BenchmarkCategory.TECHNICAL
+    )
+    assert (
+        task.evaluator_id
+        == "deterministic-evidence-v0-1"
+    )
+
+    assert task.required_capabilities == {
+        TargetCapability.TEXT,
+        TargetCapability.TOOLS,
+    }
+
+    # The task describes the goal, but does not tell
+    # the SUT which tool the observer expects.
+    assert "record_item" not in task.task
+
+    assert [
+        tool.tool_name
+        for tool in task.available_tools
+    ] == [
+        "record_item",
+        "inspect_item",
+    ]
+
+    assert task.available_tools[0].parameters == {
+        "name": "string",
+        "count": "integer",
+    }
+    assert task.available_tools[1].parameters == {
+        "name": "string",
+    }
+
+    assert task.expected_action is not None
+    assert (
+        task.expected_action.tool_name
+        == "record_item"
+    )
+    assert task.expected_action.arguments == {
+        "name": "delta",
+        "count": 4,
+    }
+    assert task.expected_action.call_count == 1
+
+    assert [
+        criterion.criterion_id
+        for criterion in task.success_criteria
+    ] == [
+        "tool-called",
+        "tool-name-match",
+        "tool-arguments-match",
+        "tool-call-count-match",
+    ]
+
+
+def test_canonical_agent_protocol_suite_v0_5():
+    suite_bank = SuiteBank(
+        Path("benchmark/suites"),
+    )
+
+    matches = [
+        suite
+        for suite in suite_bank.load_all()
+        if (
+            suite.suite_id == "agent-protocol-core"
+            and suite.suite_version == "0.5"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family is BenchmarkFamily.AGENT
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
+        "agent-protocol-tool-selection-001",
+    ]
+
+    assert suite.enabled is True
+
+
+def test_protocol_suite_v0_4_remains_exactly_resolvable():
+    registry = SuiteRegistry(
+        suite_bank=SuiteBank(
+            Path("benchmark/suites"),
+        ),
+        task_bank=TaskBank(
+            Path("benchmark/tasks"),
+        ),
+    )
+
+    resolved = registry.resolve(
+        suite_id="agent-protocol-core",
+        suite_version="0.4",
+    )
+
+    assert resolved.suite.suite_version == "0.4"
+
+    assert [
+        task.task_id
+        for task in resolved.tasks
+    ] == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
     ]
