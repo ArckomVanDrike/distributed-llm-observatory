@@ -1,7 +1,11 @@
 import json
+from urllib.request import Request, urlopen
 
 from observer.core.action_task_environment import (
     ActionTaskEnvironment,
+)
+from observer.core.observed_action_data_flow_evidence import (
+    ObservedActionDataFlowEvidenceCollector,
 )
 from observer.core.observed_action_sequence_evidence import (
     ObservedActionSequenceEvidenceCollector,
@@ -221,3 +225,192 @@ def test_action_task_environment_supports_expected_action_sequence():
         assert "expected_action" not in metadata_text
         assert "expected_actions" not in metadata_text
         assert '"delta"' not in metadata_text
+
+
+def test_action_task_environment_wires_tool_results_to_gateway():
+    base_task = make_sequence_task()
+
+    task = BenchmarkTask.model_validate(
+        {
+            **base_task.model_dump(),
+            "tool_results": [
+                {
+                    "tool_name": "record_item",
+                    "result": {
+                        "item_id": "item-742",
+                    },
+                },
+            ],
+        }
+    )
+
+    with ActionTaskEnvironment(task) as environment:
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "tool_results" not in metadata_text
+        assert "item-742" not in metadata_text
+
+        request = Request(
+            environment.gateway.tool_url(
+                "record_item"
+            ),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    "Bearer "
+                    + environment.gateway.token
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload == {
+            "schema_version": "0.1",
+            "accepted": True,
+            "result": {
+                "item_id": "item-742",
+            },
+        }
+
+        assert len(environment.gateway.calls) == 1
+        assert (
+            environment.gateway.calls[0].tool_name
+            == "record_item"
+        )
+
+
+def make_data_flow_task() -> BenchmarkTask:
+    return BenchmarkTask(
+        task_id="agent-data-flow-environment-001",
+        benchmark_version="0.1",
+        evaluator_id="deterministic-evidence-v0-1",
+        family=BenchmarkFamily.AGENT,
+        category=BenchmarkCategory.TECHNICAL,
+        difficulty=BenchmarkDifficulty.EASY,
+        task="Create an item, then inspect the created item.",
+        required_capabilities={
+            TargetCapability.TEXT,
+            TargetCapability.TOOLS,
+        },
+        success_criteria=[
+            BenchmarkSuccessCriterion(
+                criterion_id="tool-calls-observed",
+                description="Tool calls were observed.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="tool-sequence-length-match",
+                description="Sequence length matches.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="tool-sequence-order-match",
+                description="Sequence order matches.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="tool-sequence-arguments-match",
+                description="Sequence arguments match.",
+            ),
+            BenchmarkSuccessCriterion(
+                criterion_id="tool-result-propagated",
+                description="Tool result was propagated.",
+            ),
+        ],
+        available_tools=[
+            {
+                "tool_name": "create_item",
+                "description": "Create an item.",
+                "parameters": {
+                    "name": "string",
+                    "count": "integer",
+                },
+            },
+            {
+                "tool_name": "inspect_item",
+                "description": "Inspect an item.",
+                "parameters": {
+                    "item_id": "string",
+                },
+            },
+        ],
+        tool_results=[
+            {
+                "tool_name": "create_item",
+                "result": {
+                    "item_id": "item-742",
+                },
+            },
+        ],
+        expected_actions=[
+            {
+                "tool_name": "create_item",
+                "arguments": {
+                    "name": "delta",
+                    "count": 4,
+                },
+            },
+            {
+                "tool_name": "inspect_item",
+                "arguments": {},
+            },
+        ],
+        expected_propagations=[
+            {
+                "source_action_index": 0,
+                "source_result_field": "item_id",
+                "target_action_index": 1,
+                "target_argument": "item_id",
+            },
+        ],
+    )
+
+
+def test_action_task_environment_uses_data_flow_collector():
+    task = make_data_flow_task()
+
+    with ActionTaskEnvironment(task) as environment:
+        assert isinstance(
+            environment.collector,
+            ObservedActionDataFlowEvidenceCollector,
+        )
+
+        assert task.expected_actions is not None
+        assert task.expected_propagations is not None
+
+        assert (
+            environment.collector.expected_actions
+            == tuple(task.expected_actions)
+        )
+        assert (
+            environment.collector.tool_results
+            == tuple(task.tool_results)
+        )
+        assert (
+            environment.collector.expected_propagations
+            == tuple(task.expected_propagations)
+        )
+
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "tool_results" not in metadata_text
+        assert "expected_propagations" not in metadata_text
+        assert "item-742" not in metadata_text

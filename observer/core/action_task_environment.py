@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from observer.core.action_gateway import ActionGateway
+from observer.core.observed_action_data_flow_evidence import (
+    ObservedActionDataFlowEvidenceCollector,
+)
 from observer.core.observed_action_evidence import (
     ObservedActionEvidenceCollector,
 )
@@ -40,12 +43,38 @@ class ActionTaskEnvironment:
             )
 
         self.task = task
-        self.gateway = ActionGateway()
+        self.gateway = ActionGateway(
+            tool_results={
+                tool_result.tool_name: dict(
+                    tool_result.result
+                )
+                for tool_result in task.tool_results
+            },
+        )
 
         if task.expected_action is not None:
             self.collector = ObservedActionEvidenceCollector(
                 expected_action=task.expected_action,
                 calls_provider=lambda: self.gateway.calls,
+            )
+        elif task.expected_propagations is not None:
+            assert task.expected_actions is not None
+
+            self.collector = (
+                ObservedActionDataFlowEvidenceCollector(
+                    expected_actions=tuple(
+                        task.expected_actions
+                    ),
+                    tool_results=tuple(
+                        task.tool_results
+                    ),
+                    expected_propagations=tuple(
+                        task.expected_propagations
+                    ),
+                    calls_provider=(
+                        lambda: self.gateway.calls
+                    ),
+                )
             )
         else:
             assert task.expected_actions is not None

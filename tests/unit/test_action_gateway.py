@@ -177,3 +177,55 @@ def test_action_gateway_records_multiple_calls_in_order():
                 "active": True,
             },
         ]
+
+
+def test_action_gateway_returns_configured_tool_result():
+    with ActionGateway(
+        tool_results={
+            "create_item": {
+                "item_id": "item-742",
+            },
+        },
+    ) as gateway:
+        request = Request(
+            gateway.tool_url("create_item"),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    f"Bearer {gateway.token}"
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload == {
+            "schema_version": "0.1",
+            "accepted": True,
+            "result": {
+                "item_id": "item-742",
+            },
+        }
+
+        assert gateway.calls == (
+            gateway.calls[0],
+        )
+        assert gateway.calls[0].tool_name == "create_item"
+        assert gateway.calls[0].arguments == {
+            "name": "delta",
+            "count": 4,
+        }
