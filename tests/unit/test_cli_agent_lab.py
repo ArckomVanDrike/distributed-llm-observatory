@@ -1795,12 +1795,52 @@ def test_agent_pairs_temporal_reports_discovered_pairs(
             SimpleNamespace(
                 baseline_session_id="session-a",
                 candidate_session_id="session-b",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-test",
+                candidate_observer_id="observer-test",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Los-Lagos",
                 comparable=True,
                 reasons=(),
             ),
             SimpleNamespace(
                 baseline_session_id="session-a",
                 candidate_session_id="session-c",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    26,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-test",
+                candidate_observer_id="observer-test",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
                 comparable=False,
                 reasons=(
                     "Temporal comparison requires "
@@ -1839,7 +1879,21 @@ def test_agent_pairs_temporal_reports_discovered_pairs(
     assert "Target filter:      pair-agent" in output
 
     assert "Baseline session:   session-a" in output
+    assert (
+        "Baseline observed:  2026-08-24T20:00:00+00:00"
+        in output
+    )
+    assert "Baseline observer:  observer-test" in output
+    assert "Observed from baseline:  CL-Los-Lagos" in output
+
     assert "Candidate session:  session-b" in output
+    assert (
+        "Candidate observed: 2026-08-25T20:00:00+00:00"
+        in output
+    )
+    assert "Candidate observer: observer-test" in output
+    assert "Observed from candidate: CL-Los-Lagos" in output
+
     assert "Comparable:         yes" in output
 
     assert "Candidate session:  session-c" in output
@@ -1960,12 +2014,52 @@ def test_agent_pairs_geographic_reports_discovered_pairs(
             SimpleNamespace(
                 baseline_session_id="session-a",
                 candidate_session_id="session-b",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    5,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-los-lagos",
+                candidate_observer_id="observer-aysen",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
                 comparable=True,
                 reasons=(),
             ),
             SimpleNamespace(
                 baseline_session_id="session-a",
                 candidate_session_id="session-c",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    30,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-los-lagos",
+                candidate_observer_id="observer-aysen-two",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
                 comparable=False,
                 reasons=(
                     "Geographic comparison observation skew "
@@ -2006,7 +2100,21 @@ def test_agent_pairs_geographic_reports_discovered_pairs(
     assert "Maximum skew:       600.00 s" in output
 
     assert "Baseline session:   session-a" in output
+    assert (
+        "Baseline observed:  2026-08-25T20:00:00+00:00"
+        in output
+    )
+    assert "Baseline observer:  observer-los-lagos" in output
+    assert "Observed from baseline:  CL-Los-Lagos" in output
+
     assert "Candidate session:  session-b" in output
+    assert (
+        "Candidate observed: 2026-08-25T20:05:00+00:00"
+        in output
+    )
+    assert "Candidate observer: observer-aysen" in output
+    assert "Observed from candidate: CL-Aysen" in output
+
     assert "Comparable:         yes" in output
 
     assert "Candidate session:  session-c" in output
@@ -2134,3 +2242,183 @@ def test_agent_pairs_temporal_uses_all_runs_without_target(
     assert "Runs:               2" in output
     assert "Pairs:              0" in output
     assert "Target filter:" not in output
+
+
+def test_agent_pairs_temporal_reports_missing_provenance_as_na(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="legacy-session",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="modern-session",
+            ),
+        ),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="legacy-session",
+                candidate_session_id="modern-session",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id=None,
+                candidate_observer_id="observer-test",
+                baseline_region_code=None,
+                candidate_region_code="CL-Los-Lagos",
+                comparable=False,
+                reasons=(
+                    "Baseline observation is not eligible "
+                    "for temporal comparison.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Baseline observer:  n/a" in output
+    assert "Observed from baseline:  n/a" in output
+    assert "Candidate observer: observer-test" in output
+    assert "Observed from candidate: CL-Los-Lagos" in output
+    assert "None" not in output
+
+
+def test_agent_pairs_geographic_reports_missing_provenance_as_na(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="legacy-session",
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="modern-session",
+            ),
+        ),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="legacy-session",
+                candidate_session_id="modern-session",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    5,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id=None,
+                candidate_observer_id="observer-test",
+                baseline_region_code=None,
+                candidate_region_code="CL-Aysen",
+                comparable=False,
+                reasons=(
+                    "Baseline observation is not eligible "
+                    "for geographic comparison.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "Baseline observer:  n/a" in output
+    assert "Observed from baseline:  n/a" in output
+    assert "Candidate observer: observer-test" in output
+    assert "Observed from candidate: CL-Aysen" in output
+    assert "None" not in output

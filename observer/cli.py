@@ -2268,8 +2268,32 @@ def agent_pairs_geographic(
                 f"{pair.baseline_session_id}"
             )
             print(
+                f"Baseline observed:  "
+                f"{pair.baseline_started_at_utc.isoformat()}"
+            )
+            print(
+                f"Baseline observer:  "
+                f"{pair.baseline_observer_id or 'n/a'}"
+            )
+            print(
+                f"Observed from baseline:  "
+                f"{pair.baseline_region_code or 'n/a'}"
+            )
+            print(
                 f"Candidate session:  "
                 f"{pair.candidate_session_id}"
+            )
+            print(
+                f"Candidate observed: "
+                f"{pair.candidate_started_at_utc.isoformat()}"
+            )
+            print(
+                f"Candidate observer: "
+                f"{pair.candidate_observer_id or 'n/a'}"
+            )
+            print(
+                f"Observed from candidate: "
+                f"{pair.candidate_region_code or 'n/a'}"
             )
             print(
                 f"Comparable:         "
@@ -2339,8 +2363,32 @@ def agent_pairs_temporal(
                 f"{pair.baseline_session_id}"
             )
             print(
+                f"Baseline observed:  "
+                f"{pair.baseline_started_at_utc.isoformat()}"
+            )
+            print(
+                f"Baseline observer:  "
+                f"{pair.baseline_observer_id or 'n/a'}"
+            )
+            print(
+                f"Observed from baseline:  "
+                f"{pair.baseline_region_code or 'n/a'}"
+            )
+            print(
                 f"Candidate session:  "
                 f"{pair.candidate_session_id}"
+            )
+            print(
+                f"Candidate observed: "
+                f"{pair.candidate_started_at_utc.isoformat()}"
+            )
+            print(
+                f"Candidate observer: "
+                f"{pair.candidate_observer_id or 'n/a'}"
+            )
+            print(
+                f"Observed from candidate: "
+                f"{pair.candidate_region_code or 'n/a'}"
             )
             print(
                 f"Comparable:         "

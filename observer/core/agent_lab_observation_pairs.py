@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from itertools import combinations
 from uuid import UUID
 
@@ -18,6 +18,12 @@ from schemas.agent_lab import AgentLabRunArtifact
 class TemporalAgentObservationPair:
     baseline_session_id: UUID
     candidate_session_id: UUID
+    baseline_started_at_utc: datetime
+    candidate_started_at_utc: datetime
+    baseline_observer_id: str | None
+    candidate_observer_id: str | None
+    baseline_region_code: str | None
+    candidate_region_code: str | None
     comparable: bool
     reasons: tuple[str, ...]
 
@@ -26,6 +32,12 @@ class TemporalAgentObservationPair:
 class GeographicAgentObservationPair:
     baseline_session_id: UUID
     candidate_session_id: UUID
+    baseline_started_at_utc: datetime
+    candidate_started_at_utc: datetime
+    baseline_observer_id: str | None
+    candidate_observer_id: str | None
+    baseline_region_code: str | None
+    candidate_region_code: str | None
     comparable: bool
     reasons: tuple[str, ...]
 
@@ -73,6 +85,24 @@ def discover_temporal_agent_observation_pairs(
                 candidate_session_id=(
                     candidate.session.session_id
                 ),
+                baseline_started_at_utc=(
+                    baseline.session.started_at_utc
+                ),
+                candidate_started_at_utc=(
+                    candidate.session.started_at_utc
+                ),
+                baseline_observer_id=(
+                    baseline.session.observer_id
+                ),
+                candidate_observer_id=(
+                    candidate.session.observer_id
+                ),
+                baseline_region_code=(
+                    baseline.session.region_code
+                ),
+                candidate_region_code=(
+                    candidate.session.region_code
+                ),
                 comparable=comparable,
                 reasons=reasons,
             )
@@ -119,6 +149,24 @@ def discover_geographic_agent_observation_pairs(
                 ),
                 candidate_session_id=(
                     candidate.session.session_id
+                ),
+                baseline_started_at_utc=(
+                    baseline.session.started_at_utc
+                ),
+                candidate_started_at_utc=(
+                    candidate.session.started_at_utc
+                ),
+                baseline_observer_id=(
+                    baseline.session.observer_id
+                ),
+                candidate_observer_id=(
+                    candidate.session.observer_id
+                ),
+                baseline_region_code=(
+                    baseline.session.region_code
+                ),
+                candidate_region_code=(
+                    candidate.session.region_code
                 ),
                 comparable=comparable,
                 reasons=reasons,
