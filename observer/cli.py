@@ -33,11 +33,19 @@ from consumer_probe.telemetry_analytics import (
     summarize_local_telemetry_records,
 )
 from observer.core.agent_lab_artifact_io import (
+    AgentLabArtifactIOError,
+    load_agent_lab_run_artifact,
     write_agent_lab_run_artifact,
 )
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
+)
+from observer.core.agent_lab_run_comparison import (
+    compare_agent_lab_runs,
+)
+from observer.core.agent_lab_run_history import (
+    AgentLabRunHistory,
 )
 from observer.core.benchmark_runner import BenchmarkRunner
 from observer.core.config import ObserverConfig, ObserverConfigError
@@ -553,6 +561,48 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional path for the Agent Lab run "
             "artifact JSON"
         ),
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab run comparison
+    # -----------------------------------------------------
+
+    agent_compare_parser = subparsers.add_parser(
+        "agent-compare",
+        help="Compare two Agent Lab run artifacts",
+    )
+
+    agent_compare_parser.add_argument(
+        "baseline",
+        type=Path,
+        help="Baseline Agent Lab run artifact JSON",
+    )
+
+    agent_compare_parser.add_argument(
+        "candidate",
+        type=Path,
+        help="Candidate Agent Lab run artifact JSON",
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab run history
+    # -----------------------------------------------------
+
+    agent_history_parser = subparsers.add_parser(
+        "agent-history",
+        help="List persisted Agent Lab run artifacts",
+    )
+
+    agent_history_parser.add_argument(
+        "history_root",
+        type=Path,
+        help="Directory containing Agent Lab run artifacts",
+    )
+
+    agent_history_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optional target ID filter",
     )
 
     # -----------------------------------------------------
@@ -1663,6 +1713,201 @@ def agent_test(
         return 2
 
 
+
+def agent_compare(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        baseline = load_agent_lab_run_artifact(
+            args.baseline,
+        )
+        candidate = load_agent_lab_run_artifact(
+            args.candidate,
+        )
+
+        comparison = compare_agent_lab_runs(
+            candidate,
+            baseline,
+        )
+
+        pass_rate_delta = (
+            "n/a"
+            if comparison.pass_rate_delta is None
+            else f"{comparison.pass_rate_delta:+.1%}"
+        )
+        latency_delta = (
+            "n/a"
+            if comparison.median_latency_ms_delta
+            is None
+            else (
+                f"{comparison.median_latency_ms_delta:+.1f} ms"
+            )
+        )
+
+        print("=== DLLO AGENT COMPARISON ===")
+        print(
+            f"Target:             "
+            f"{baseline.session.target.target_id}"
+        )
+        print(
+            f"Suite:              "
+            f"{baseline.session.suite_id} "
+            f"v{baseline.session.suite_version}"
+        )
+        print(
+            f"Baseline session:   "
+            f"{comparison.baseline_session_id}"
+        )
+        print(
+            f"Candidate session:  "
+            f"{comparison.candidate_session_id}"
+        )
+        print()
+        print(
+            f"Tasks compared:     "
+            f"{comparison.total_tasks}"
+        )
+        print(
+            f"Improved:           "
+            f"{comparison.improvements}"
+        )
+        print(
+            f"Regressed:          "
+            f"{comparison.regressions}"
+        )
+        print(
+            f"Unchanged:          "
+            f"{comparison.unchanged}"
+        )
+        print()
+        print(
+            f"Pass rate delta:    "
+            f"{pass_rate_delta}"
+        )
+        print(
+            f"Median latency:     "
+            f"{latency_delta}"
+        )
+        print(
+            f"Retries:            "
+            f"{comparison.retry_delta:+d}"
+        )
+        print(
+            f"Human interventions:"
+            f"{comparison.human_intervention_delta:+d}"
+        )
+        print()
+        print("Changed tasks:")
+
+        changed = [
+            change
+            for change in comparison.task_changes
+            if change.transition.value
+            in {
+                "pass-to-fail",
+                "fail-to-pass",
+            }
+        ]
+
+        if not changed:
+            print("  None")
+
+        for change in changed:
+            transition = {
+                "pass-to-fail": "PASS -> FAIL",
+                "fail-to-pass": "FAIL -> PASS",
+            }[change.transition.value]
+
+            print(
+                f"  {change.task_id}: "
+                f"{transition}"
+            )
+
+        return 0
+
+    except (
+        AgentLabArtifactIOError,
+        ValueError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
+
+def agent_history(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        history = AgentLabRunHistory(
+            args.history_root
+        )
+
+        if args.target is None:
+            artifacts = history.load_all()
+        else:
+            artifacts = history.for_target(
+                args.target
+            )
+
+        print("=== DLLO AGENT RUN HISTORY ===")
+        print(
+            f"Runs:               "
+            f"{len(artifacts)}"
+        )
+
+        if args.target is not None:
+            print(
+                f"Target filter:      "
+                f"{args.target}"
+            )
+
+        if not artifacts:
+            print()
+            print("No Agent Lab runs found.")
+            return 0
+
+        for artifact in artifacts:
+            session = artifact.session
+            report = artifact.technical_report
+
+            print()
+            print(
+                f"Started:            "
+                f"{session.started_at_utc.isoformat()}"
+            )
+            print(
+                f"Session:            "
+                f"{session.session_id}"
+            )
+            print(
+                f"Target:             "
+                f"{session.target.target_id}"
+            )
+            print(
+                f"Suite:              "
+                f"{session.suite_id} "
+                f"v{session.suite_version}"
+            )
+            print(
+                f"Tasks:              "
+                f"{report.total_tasks}"
+            )
+            print(
+                f"Pass rate:          "
+                f"{format_rate(report.pass_rate)}"
+            )
+
+        return 0
+
+    except AgentLabArtifactIOError as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
 def task_list(
     args: argparse.Namespace,
 ) -> int:
@@ -1802,6 +2047,12 @@ def main() -> int:
 
     if args.command == "agent-test":
         return agent_test(args)
+
+    if args.command == "agent-compare":
+        return agent_compare(args)
+
+    if args.command == "agent-history":
+        return agent_history(args)
 
     if args.command == "task-list":
         return task_list(args)

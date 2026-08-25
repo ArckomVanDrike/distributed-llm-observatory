@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from observer.core.agent_lab_artifact_io import (
+    AgentLabArtifactIOError,
+    load_agent_lab_run_artifact,
     write_agent_lab_run_artifact,
 )
 from schemas.agent_lab import (
@@ -109,3 +113,67 @@ def test_writer_replaces_existing_file(
     assert "obsolete-content" not in output_path.read_text(
         encoding="utf-8",
     )
+
+
+
+def test_loader_restores_written_artifact(
+    tmp_path: Path,
+):
+    artifact = build_artifact()
+    output_path = tmp_path / "agent-run.json"
+
+    write_agent_lab_run_artifact(
+        artifact,
+        output_path,
+    )
+
+    restored = load_agent_lab_run_artifact(
+        output_path,
+    )
+
+    assert restored == artifact
+
+
+
+def test_loader_rejects_missing_artifact(
+    tmp_path: Path,
+):
+    path = tmp_path / "missing-agent-run.json"
+
+    with pytest.raises(
+        AgentLabArtifactIOError,
+        match="Unable to read Agent Lab run artifact",
+    ):
+        load_agent_lab_run_artifact(path)
+
+
+def test_loader_rejects_malformed_json(
+    tmp_path: Path,
+):
+    path = tmp_path / "malformed-agent-run.json"
+    path.write_text(
+        "{not-json",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AgentLabArtifactIOError,
+        match="Invalid JSON in Agent Lab run artifact",
+    ):
+        load_agent_lab_run_artifact(path)
+
+
+def test_loader_rejects_invalid_artifact_schema(
+    tmp_path: Path,
+):
+    path = tmp_path / "invalid-agent-run.json"
+    path.write_text(
+        "{}",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AgentLabArtifactIOError,
+        match="Invalid Agent Lab run artifact",
+    ):
+        load_agent_lab_run_artifact(path)
