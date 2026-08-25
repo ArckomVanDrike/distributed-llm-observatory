@@ -1,0 +1,65 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-action-sequence-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Persist an item named delta with count 4, then inspect that item.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-calls-observed",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-sequence-length-match",
+      "description": "The observed tool-call sequence length matches."
+    },
+    {
+      "criterion_id": "tool-sequence-order-match",
+      "description": "The observed tool order matches the expected sequence."
+    },
+    {
+      "criterion_id": "tool-sequence-arguments-match",
+      "description": "The observed tool arguments match the expected sequence."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "record_item",
+      "description": "Persist an item with its count.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "description": "Inspect an existing item by name.",
+      "parameters": {
+        "name": "string"
+      }
+    }
+  ],
+  "expected_actions": [
+    {
+      "tool_name": "record_item",
+      "arguments": {
+        "name": "delta",
+        "count": 4
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "arguments": {
+        "name": "delta"
+      }
+    }
+  ],
+  "enabled": true
+}
