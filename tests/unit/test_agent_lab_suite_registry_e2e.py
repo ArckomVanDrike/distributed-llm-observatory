@@ -203,7 +203,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
         )
 
         assert resolved.suite.suite_id == "agent-protocol-core"
-        assert resolved.suite.suite_version == "0.3"
+        assert resolved.suite.suite_version == "0.4"
         assert (
             resolved.suite.harness_profile
             is BenchmarkHarnessProfile.SUT_PROTOCOL
@@ -216,6 +216,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
             "agent-protocol-smoke-001",
             "agent-protocol-instruction-001",
             "agent-protocol-structured-output-001",
+            "agent-protocol-action-001",
         ]
 
         task_runner = BenchmarkTaskRunner(
@@ -261,6 +262,27 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
 
         assert len(session.results) == 3
 
+        action_selection = next(
+            selection
+            for selection in session.selections
+            if (
+                selection.task_id
+                == "agent-protocol-action-001"
+            )
+        )
+
+        assert (
+            action_selection.status.value
+            == "incompatible"
+        )
+        assert {
+            capability.value
+            for capability
+            in action_selection.missing_capabilities
+        } == {
+            "tools",
+        }
+
         for result in session.results:
             assert result.task_completed is sut_task_completed
 
@@ -279,7 +301,7 @@ def test_agent_lab_resolves_canonical_protocol_suite_and_runs_http_session(
 
         assert report.target_id == "auto-suite-agent"
         assert report.suite_id == "agent-protocol-core"
-        assert report.suite_version == "0.3"
+        assert report.suite_version == "0.4"
         assert report.total_tasks == 3
         assert report.passed_tasks == 3 * int(expected_pass)
         assert report.pass_rate == float(expected_pass)

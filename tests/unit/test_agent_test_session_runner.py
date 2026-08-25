@@ -627,6 +627,109 @@ def test_session_runner_routes_task_specific_evidence_collector():
 
 
 
+
+def test_session_runner_routes_task_specific_metadata():
+    requests: list[SUTRequest] = []
+
+    class RecordingMetadataAdapter(SUTAdapter):
+        manifest = TargetManifest(
+            target_id="metadata-agent",
+            display_name="Metadata Agent",
+            target_type=TargetType.AGENT,
+            capabilities={
+                TargetCapability.TEXT,
+            },
+        )
+
+        def execute(
+            self,
+            context: SUTExecutionContext,
+            request: SUTRequest,
+        ) -> SUTExecutionResult:
+            requests.append(request)
+
+            now = datetime.now(timezone.utc)
+
+            return SUTExecutionResult(
+                context=context,
+                started_at_utc=now,
+                finished_at_utc=now,
+                latency_ms=0.0,
+                task_completed=True,
+            )
+
+    def make_task(task_id: str) -> BenchmarkTask:
+        return BenchmarkTask(
+            task_id=task_id,
+            benchmark_version="0.1",
+            evaluator_id="passing-evaluator-v0-1",
+            family=BenchmarkFamily.AGENT,
+            category=BenchmarkCategory.TECHNICAL,
+            difficulty=BenchmarkDifficulty.EASY,
+            task="Complete the metadata routing test.",
+            required_capabilities={
+                TargetCapability.TEXT,
+            },
+            success_criteria=[
+                BenchmarkSuccessCriterion(
+                    criterion_id="completed",
+                    description="The task is complete.",
+                ),
+            ],
+        )
+
+    task_a = make_task("agent-metadata-a-001")
+    task_b = make_task("agent-metadata-b-001")
+
+    task_runner = BenchmarkTaskRunner(
+        RecordingMetadataAdapter(),
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )
+
+    registry = TaskEvaluatorRegistry()
+    registry.register(
+        "passing-evaluator-v0-1",
+        PassingEvaluator(),
+    )
+
+    assessment_runner = BenchmarkTaskAssessmentRunner(
+        task_runner=task_runner,
+        registry=registry,
+    )
+
+    runner = AgentTestSessionRunner(
+        assessment_runner=assessment_runner,
+    )
+
+    runner.run(
+        suite_id="agent-core",
+        suite_version="0.1",
+        tasks=[
+            task_a,
+            task_b,
+        ],
+        task_metadata={
+            task_a.task_id: {
+                "dllo_tools": [
+                    {
+                        "name": "record_item",
+                    },
+                ],
+            },
+        },
+    )
+
+    assert len(requests) == 2
+    assert requests[0].metadata == {
+        "dllo_tools": [
+            {
+                "name": "record_item",
+            },
+        ],
+    }
+    assert requests[1].metadata is None
+
 def test_session_runner_rejects_duplicate_task_ids():
     task = BenchmarkTask(
         task_id="agent-duplicate-001",

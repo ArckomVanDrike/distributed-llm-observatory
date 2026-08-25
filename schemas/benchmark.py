@@ -70,6 +70,36 @@ class BenchmarkSuccessCriterion(BaseModel):
     description: str = Field(min_length=1)
 
 
+class BenchmarkToolContract(BaseModel):
+    tool_name: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+
+    parameters: dict[
+        str,
+        Literal[
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "null",
+        ],
+    ] = Field(default_factory=dict)
+
+
+class BenchmarkExpectedAction(BaseModel):
+    tool_name: str = Field(min_length=1)
+
+    arguments: dict[
+        str,
+        str | int | float | bool | None,
+    ] = Field(default_factory=dict)
+
+    call_count: int = Field(
+        default=1,
+        ge=1,
+    )
+
+
 class BenchmarkTask(BaseModel):
     schema_version: str = "0.1"
 
@@ -117,6 +147,12 @@ class BenchmarkTask(BaseModel):
         | None
     ) = None
 
+    available_tools: list[BenchmarkToolContract] = Field(
+        default_factory=list,
+    )
+
+    expected_action: BenchmarkExpectedAction | None = None
+
     enabled: bool = True
 
     @model_validator(mode="after")
@@ -128,6 +164,65 @@ class BenchmarkTask(BaseModel):
                 "BenchmarkTask cannot use the "
                 "foundation_model family."
             )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_expected_action_capability(
+        self,
+    ) -> BenchmarkTask:
+        if (
+            self.expected_action is not None
+            and TargetCapability.TOOLS
+            not in self.required_capabilities
+        ):
+            raise ValueError(
+                "BenchmarkTask with expected_action "
+                "requires the tools capability."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_available_tools_contract(
+        self,
+    ) -> BenchmarkTask:
+        if (
+            self.available_tools
+            and TargetCapability.TOOLS
+            not in self.required_capabilities
+        ):
+            raise ValueError(
+                "BenchmarkTask with available_tools "
+                "requires the tools capability."
+            )
+
+        tool_names = [
+            tool.tool_name
+            for tool in self.available_tools
+        ]
+
+        if len(tool_names) != len(set(tool_names)):
+            raise ValueError(
+                "BenchmarkTask available_tools "
+                "tool names must be unique."
+            )
+
+        if self.expected_action is not None:
+            if not self.available_tools:
+                raise ValueError(
+                    "BenchmarkTask expected_action "
+                    "requires available_tools."
+                )
+
+            if (
+                self.expected_action.tool_name
+                not in tool_names
+            ):
+                raise ValueError(
+                    "BenchmarkTask expected_action tool_name "
+                    "must reference an available_tools entry."
+                )
 
         return self
 

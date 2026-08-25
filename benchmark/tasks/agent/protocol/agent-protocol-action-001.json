@@ -1,0 +1,51 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-action-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Use the available record_item tool exactly once with name delta and count 4.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-called",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-name-match",
+      "description": "The observed tool name matches."
+    },
+    {
+      "criterion_id": "tool-arguments-match",
+      "description": "The observed tool arguments match."
+    },
+    {
+      "criterion_id": "tool-call-count-match",
+      "description": "The observed tool call count matches."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "record_item",
+      "description": "Record one item.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    }
+  ],
+  "expected_action": {
+    "tool_name": "record_item",
+    "arguments": {
+      "name": "delta",
+      "count": 4
+    },
+    "call_count": 1
+  },
+  "enabled": true
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from observer.core.benchmark_compatibility import (
     target_supports_task,
@@ -37,6 +38,10 @@ class AgentTestSessionRunner:
             str,
             TaskEvidenceCollector,
         ] | None = None,
+        task_metadata: dict[
+            str,
+            dict[str, Any],
+        ] | None = None,
     ) -> AgentTestSession:
         started_at_utc = datetime.now(timezone.utc)
 
@@ -48,6 +53,7 @@ class AgentTestSessionRunner:
         )
 
         collectors = evidence_collectors or {}
+        metadata_by_task = task_metadata or {}
 
         task_ids = [
             task.task_id
@@ -107,6 +113,9 @@ class AgentTestSessionRunner:
 
             assessed = self.assessment_runner.run(
                 task,
+                metadata=metadata_by_task.get(
+                    task.task_id,
+                ),
                 evidence_collector=collectors.get(
                     task.task_id,
                 ),
