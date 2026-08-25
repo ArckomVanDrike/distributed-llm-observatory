@@ -126,6 +126,15 @@ class AgentTestSession(BaseModel):
     schema_version: Literal["0.1"] = "0.1"
     session_id: UUID = Field(default_factory=uuid4)
 
+    observer_id: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+    region_code: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
     target: TargetManifest
 
     suite_id: str = Field(

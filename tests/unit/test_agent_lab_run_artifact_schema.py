@@ -28,6 +28,8 @@ def build_artifact() -> AgentLabRunArtifact:
     )
 
     session = AgentTestSession(
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
         target=TargetManifest(
             target_id="artifact-agent",
             display_name="Artifact Agent",
@@ -87,6 +89,8 @@ def test_agent_lab_run_artifact_round_trips_json():
         restored.technical_report.session_id
         == restored.session.session_id
     )
+    assert restored.session.observer_id == "observer-test"
+    assert restored.session.region_code == "CL-Los-Lagos"
 
 
 def test_agent_lab_run_artifact_rejects_mismatched_session_id():
@@ -195,3 +199,26 @@ def test_agent_lab_run_artifact_rejects_report_summary_mismatch():
             session=artifact.session,
             technical_report=mismatched_report,
         )
+
+
+def test_agent_lab_run_artifact_accepts_legacy_session_without_provenance():
+    artifact = build_artifact()
+
+    payload = artifact.model_dump(
+        mode="json",
+    )
+    payload["session"].pop(
+        "observer_id",
+        None,
+    )
+    payload["session"].pop(
+        "region_code",
+        None,
+    )
+
+    restored = AgentLabRunArtifact.model_validate(
+        payload
+    )
+
+    assert restored.session.observer_id is None
+    assert restored.session.region_code is None

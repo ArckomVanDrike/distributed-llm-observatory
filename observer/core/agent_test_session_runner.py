@@ -147,6 +147,16 @@ class AgentTestSessionRunner:
         completed_at_utc = datetime.now(timezone.utc)
 
         return AgentTestSession(
+            observer_id=(
+                self.assessment_runner
+                .task_runner
+                .observer_id
+            ),
+            region_code=(
+                self.assessment_runner
+                .task_runner
+                .region_code
+            ),
             target=target,
             suite_id=suite_id,
             suite_version=suite_version,
