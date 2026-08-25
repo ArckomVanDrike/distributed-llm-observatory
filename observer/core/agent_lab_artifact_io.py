@@ -1,9 +1,42 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from pydantic import ValidationError
+
 from schemas.agent_lab import AgentLabRunArtifact
+
+
+class AgentLabArtifactIOError(Exception):
+    """Raised when an Agent Lab run artifact cannot be loaded safely."""
+
+
+def load_agent_lab_run_artifact(
+    path: Path,
+) -> AgentLabRunArtifact:
+    try:
+        raw_data = json.loads(
+            path.read_text(encoding="utf-8")
+        )
+    except OSError as exc:
+        raise AgentLabArtifactIOError(
+            f"Unable to read Agent Lab run artifact: {path}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise AgentLabArtifactIOError(
+            f"Invalid JSON in Agent Lab run artifact: {path}"
+        ) from exc
+
+    try:
+        return AgentLabRunArtifact.model_validate(
+            raw_data
+        )
+    except ValidationError as exc:
+        raise AgentLabArtifactIOError(
+            f"Invalid Agent Lab run artifact: {path}"
+        ) from exc
 
 
 def write_agent_lab_run_artifact(
