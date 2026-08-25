@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from observer.core.agent_lab_artifact_io import (
     write_agent_lab_run_artifact,
 )
@@ -208,3 +210,53 @@ def test_history_filters_runs_by_target(
         first.session.session_id,
         second.session.session_id,
     ]
+
+
+def test_history_rejects_duplicate_session_ids(
+    tmp_path: Path,
+):
+    shared_session_id = (
+        "00000000-0000-0000-0000-000000000099"
+    )
+
+    first = build_artifact(
+        session_id=shared_session_id,
+        target_id="duplicate-session-agent",
+        started_at_utc=datetime(
+            2026,
+            8,
+            24,
+            12,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+    second = build_artifact(
+        session_id=shared_session_id,
+        target_id="duplicate-session-agent",
+        started_at_utc=datetime(
+            2026,
+            8,
+            25,
+            12,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    write_agent_lab_run_artifact(
+        first,
+        tmp_path / "first.json",
+    )
+    write_agent_lab_run_artifact(
+        second,
+        tmp_path / "second.json",
+    )
+
+    history = AgentLabRunHistory(tmp_path)
+
+    with pytest.raises(
+        ValueError,
+        match="duplicate session_id",
+    ):
+        history.load_all()

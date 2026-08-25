@@ -25,6 +25,19 @@ class AgentLabRunHistory:
             )
         ]
 
+        seen_session_ids = set()
+
+        for artifact in artifacts:
+            session_id = artifact.session.session_id
+
+            if session_id in seen_session_ids:
+                raise ValueError(
+                    "Agent Lab run history contains "
+                    f"duplicate session_id: {session_id}"
+                )
+
+            seen_session_ids.add(session_id)
+
         artifacts.sort(
             key=lambda artifact: (
                 artifact.session.started_at_utc,
