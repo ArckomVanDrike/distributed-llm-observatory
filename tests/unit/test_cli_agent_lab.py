@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import observer.cli as cli_module
 from observer.cli import (
+    agent_compare,
     agent_test,
     build_parser,
 )
@@ -551,3 +552,207 @@ def test_agent_test_returns_two_when_artifact_write_fails(
     assert result == 2
     assert captured.out == ""
     assert "Error: Cannot write artifact." in captured.err
+
+
+def test_parser_exposes_agent_compare_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-compare",
+            "runs/baseline.json",
+            "runs/candidate.json",
+        ]
+    )
+
+    assert args.command == "agent-compare"
+    assert args.baseline == Path(
+        "runs/baseline.json"
+    )
+    assert args.candidate == Path(
+        "runs/candidate.json"
+    )
+
+
+def test_main_dispatches_agent_compare(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_compare(args):
+        captured["command"] = args.command
+        captured["baseline"] = args.baseline
+        captured["candidate"] = args.candidate
+        return 19
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_compare",
+        fake_agent_compare,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dllo",
+            "agent-compare",
+            "baseline.json",
+            "candidate.json",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 19
+    assert captured["command"] == "agent-compare"
+    assert captured["baseline"] == Path(
+        "baseline.json"
+    )
+    assert captured["candidate"] == Path(
+        "candidate.json"
+    )
+
+
+def test_agent_compare_loads_runs_and_prints_changes(
+    monkeypatch,
+    capsys,
+):
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id="baseline-session",
+            target=SimpleNamespace(
+                target_id="comparison-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id="candidate-session",
+            target=SimpleNamespace(
+                target_id="comparison-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+
+        if path == Path("candidate.json"):
+            return candidate
+
+        raise AssertionError(f"Unexpected path: {path}")
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        return SimpleNamespace(
+            baseline_session_id="baseline-session",
+            candidate_session_id="candidate-session",
+            total_tasks=4,
+            improvements=1,
+            regressions=1,
+            unchanged=2,
+            pass_rate_delta=0.25,
+            median_latency_ms_delta=150.0,
+            retry_delta=-1,
+            human_intervention_delta=2,
+            task_changes=(
+                SimpleNamespace(
+                    task_id="task-fail-to-pass",
+                    transition=SimpleNamespace(
+                        value="fail-to-pass",
+                    ),
+                ),
+                SimpleNamespace(
+                    task_id="task-pass-to-fail",
+                    transition=SimpleNamespace(
+                        value="pass-to-fail",
+                    ),
+                ),
+                SimpleNamespace(
+                    task_id="task-unchanged-pass",
+                    transition=SimpleNamespace(
+                        value="unchanged-pass",
+                    ),
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_agent_lab_runs",
+        fake_compare,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+    )
+
+    result = agent_compare(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "=== DLLO AGENT COMPARISON ===" in output
+    assert "Target:             comparison-agent" in output
+    assert "Suite:              agent-protocol-core v1.0" in output
+    assert "Tasks compared:     4" in output
+    assert "Improved:           1" in output
+    assert "Regressed:          1" in output
+    assert "Unchanged:          2" in output
+    assert "Pass rate delta:    +25.0%" in output
+    assert "Median latency:     +150.0 ms" in output
+    assert "Retries:            -1" in output
+    assert "Human interventions:+2" in output
+    assert "task-fail-to-pass: FAIL -> PASS" in output
+    assert "task-pass-to-fail: PASS -> FAIL" in output
+    assert "task-unchanged-pass" not in output
+
+
+def test_agent_compare_returns_two_on_invalid_artifact(
+    monkeypatch,
+    capsys,
+):
+    def failing_load(path):
+        raise ValueError(
+            f"Invalid Agent Lab run artifact: {path}"
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        failing_load,
+        raising=False,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+    )
+
+    result = agent_compare(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Invalid Agent Lab run artifact"
+        in captured.err
+    )
