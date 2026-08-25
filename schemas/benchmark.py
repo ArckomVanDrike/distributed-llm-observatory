@@ -120,6 +120,13 @@ class BenchmarkExpectedRecovery(BaseModel):
     recovery_action_index: int = Field(ge=0)
 
 
+class BenchmarkExpectedBranch(BaseModel):
+    source_action_index: int = Field(ge=0)
+    source_result_field: str = Field(min_length=1)
+    expected_value: str | int | float | bool | None
+    branch_action_index: int = Field(ge=0)
+
+
 class BenchmarkExpectedActionCall(BaseModel):
     tool_name: str = Field(min_length=1)
 
@@ -215,6 +222,10 @@ class BenchmarkTask(BaseModel):
 
     expected_recovery: (
         BenchmarkExpectedRecovery | None
+    ) = None
+
+    expected_branch: (
+        BenchmarkExpectedBranch | None
     ) = None
 
     enabled: bool = True
@@ -382,6 +393,83 @@ class BenchmarkTask(BaseModel):
             raise ValueError(
                 "BenchmarkTask tool_results tool names "
                 "must reference available_tools entries."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_expected_branch(
+        self,
+    ) -> BenchmarkTask:
+        if self.expected_branch is None:
+            return self
+
+        if self.expected_actions is None:
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "requires expected_actions."
+            )
+
+        if not self.tool_results:
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "requires tool_results."
+            )
+
+        actions = self.expected_actions
+        branch = self.expected_branch
+
+        source_index = branch.source_action_index
+        branch_index = branch.branch_action_index
+
+        if (
+            source_index >= len(actions)
+            or branch_index >= len(actions)
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "action indices must reference "
+                "expected_actions entries."
+            )
+
+        if source_index >= branch_index:
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "must flow from a source action "
+                "to a later branch action."
+            )
+
+        source_action = actions[source_index]
+
+        results_by_tool = {
+            result.tool_name: result
+            for result in self.tool_results
+        }
+
+        source_result = results_by_tool.get(
+            source_action.tool_name
+        )
+
+        if (
+            source_result is None
+            or branch.source_result_field
+            not in source_result.result
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "source_result_field must exist in "
+                "the source tool result."
+            )
+
+        source_value = source_result.result[
+            branch.source_result_field
+        ]
+
+        if source_value != branch.expected_value:
+            raise ValueError(
+                "BenchmarkTask expected_branch "
+                "expected_value must match the "
+                "configured source tool result."
             )
 
         return self

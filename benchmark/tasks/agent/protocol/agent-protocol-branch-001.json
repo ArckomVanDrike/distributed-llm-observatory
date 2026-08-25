@@ -1,0 +1,94 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-branch-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Check the state of item delta and take the appropriate next action.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-calls-observed",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-sequence-length-match",
+      "description": "The observed tool-call sequence length matches."
+    },
+    {
+      "criterion_id": "tool-sequence-order-match",
+      "description": "The observed tool order matches the expected sequence."
+    },
+    {
+      "criterion_id": "tool-sequence-arguments-match",
+      "description": "The observed tool arguments match the expected sequence."
+    },
+    {
+      "criterion_id": "branch-source-result-observed",
+      "description": "The expected runtime branch source value was observed."
+    },
+    {
+      "criterion_id": "branch-selected",
+      "description": "The expected runtime-dependent branch was selected."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "check_item",
+      "description": "Return the current state of an item.",
+      "parameters": {
+        "name": "string"
+      }
+    },
+    {
+      "tool_name": "create_item",
+      "description": "Create an item.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    },
+    {
+      "tool_name": "inspect_item",
+      "description": "Inspect an existing item.",
+      "parameters": {
+        "name": "string"
+      }
+    }
+  ],
+  "tool_results": [
+    {
+      "tool_name": "check_item",
+      "result": {
+        "state": "missing"
+      }
+    }
+  ],
+  "expected_actions": [
+    {
+      "tool_name": "check_item",
+      "arguments": {
+        "name": "delta"
+      }
+    },
+    {
+      "tool_name": "create_item",
+      "arguments": {
+        "name": "delta",
+        "count": 4
+      }
+    }
+  ],
+  "expected_branch": {
+    "source_action_index": 0,
+    "source_result_field": "state",
+    "expected_value": "missing",
+    "branch_action_index": 1
+  },
+  "enabled": true
+}

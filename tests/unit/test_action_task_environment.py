@@ -550,3 +550,78 @@ def test_action_task_environment_uses_recovery_collector():
         assert "tool_failures" not in metadata_text
         assert "temporary_unavailable" not in metadata_text
         assert "503" not in metadata_text
+
+
+def test_action_task_environment_uses_branch_collector():
+    from observer.core.observed_action_branch_evidence import (
+        ObservedActionBranchEvidenceCollector,
+    )
+
+    base_task = make_sequence_task()
+
+    task = BenchmarkTask.model_validate(
+        {
+            **base_task.model_dump(),
+            "available_tools": [
+                {
+                    "tool_name": "record_item",
+                    "description": (
+                        "Record an item and return its state."
+                    ),
+                    "parameters": {
+                        "name": "string",
+                        "count": "integer",
+                    },
+                },
+                {
+                    "tool_name": "inspect_item",
+                    "description": "Inspect an item.",
+                    "parameters": {
+                        "name": "string",
+                    },
+                },
+            ],
+            "tool_results": [
+                {
+                    "tool_name": "record_item",
+                    "result": {
+                        "state": "missing",
+                    },
+                },
+            ],
+            "expected_branch": {
+                "source_action_index": 0,
+                "source_result_field": "state",
+                "expected_value": "missing",
+                "branch_action_index": 1,
+            },
+        }
+    )
+
+    with ActionTaskEnvironment(task) as environment:
+        assert isinstance(
+            environment.collector,
+            ObservedActionBranchEvidenceCollector,
+        )
+
+        assert (
+            environment.collector.expected_actions
+            == tuple(task.expected_actions)
+        )
+        assert (
+            environment.collector.tool_results
+            == tuple(task.tool_results)
+        )
+        assert (
+            environment.collector.expected_branch
+            == task.expected_branch
+        )
+
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "expected_branch" not in metadata_text
+        assert "tool_results" not in metadata_text
+        assert '"state": "missing"' not in metadata_text

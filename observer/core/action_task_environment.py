@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from observer.core.action_gateway import ActionGateway
+from observer.core.observed_action_branch_evidence import (
+    ObservedActionBranchEvidenceCollector,
+)
 from observer.core.observed_action_data_flow_evidence import (
     ObservedActionDataFlowEvidenceCollector,
 )
@@ -84,6 +87,28 @@ class ActionTaskEnvironment:
                     ),
                     expected_recovery=(
                         task.expected_recovery
+                    ),
+                    calls_provider=(
+                        lambda: self.gateway.calls
+                    ),
+                    outcomes_provider=(
+                        lambda: self.gateway.outcomes
+                    ),
+                )
+            )
+        elif task.expected_branch is not None:
+            assert task.expected_actions is not None
+
+            self.collector = (
+                ObservedActionBranchEvidenceCollector(
+                    expected_actions=tuple(
+                        task.expected_actions
+                    ),
+                    tool_results=tuple(
+                        task.tool_results
+                    ),
+                    expected_branch=(
+                        task.expected_branch
                     ),
                     calls_provider=(
                         lambda: self.gateway.calls

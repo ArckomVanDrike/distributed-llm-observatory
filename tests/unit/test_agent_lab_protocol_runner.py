@@ -175,7 +175,7 @@ def test_protocol_runner_builds_session_and_report():
             == "protocol-runner-agent"
         )
         assert result.session.suite_id == "agent-protocol-core"
-        assert result.session.suite_version == "0.8"
+        assert result.session.suite_version == "0.9"
 
         assert [
             request["context"]["task_id"]
@@ -293,6 +293,27 @@ def test_protocol_runner_builds_session_and_report():
             "tools",
         }
 
+        branch_selection = next(
+            selection
+            for selection in result.session.selections
+            if (
+                selection.task_id
+                == "agent-protocol-branch-001"
+            )
+        )
+
+        assert (
+            branch_selection.status.value
+            == "incompatible"
+        )
+        assert {
+            capability.value
+            for capability
+            in branch_selection.missing_capabilities
+        } == {
+            "tools",
+        }
+
         assert all(
             task_result.task_completed is False
             for task_result in result.session.results
@@ -305,7 +326,7 @@ def test_protocol_runner_builds_session_and_report():
         assert result.report.session_id == result.session.session_id
         assert result.report.target_id == "protocol-runner-agent"
         assert result.report.suite_id == "agent-protocol-core"
-        assert result.report.suite_version == "0.8"
+        assert result.report.suite_version == "0.9"
         assert result.report.generated_at_utc == generated_at
         assert result.report.total_tasks == 3
         assert result.report.passed_tasks == 3
