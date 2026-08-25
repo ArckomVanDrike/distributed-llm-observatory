@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from urllib.request import Request, urlopen
 
 from observer.core.action_task_environment import (
@@ -10,6 +11,7 @@ from observer.core.observed_action_data_flow_evidence import (
 from observer.core.observed_action_sequence_evidence import (
     ObservedActionSequenceEvidenceCollector,
 )
+from observer.core.task_bank import TaskBank
 from schemas.benchmark import (
     BenchmarkCategory,
     BenchmarkDifficulty,
@@ -731,3 +733,204 @@ def test_action_task_environment_uses_multi_branch_collector():
         assert "tool_results" not in metadata_text
         assert '"state": "missing"' not in metadata_text
         assert '"state": "present"' not in metadata_text
+
+
+def test_action_metadata_v1_information_boundary():
+    task = make_sequence_task()
+
+    with ActionTaskEnvironment(task) as environment:
+        metadata = environment.metadata
+
+        assert set(metadata) == {
+            "dllo_action_gateway",
+        }
+
+        gateway_metadata = metadata[
+            "dllo_action_gateway"
+        ]
+
+        assert set(gateway_metadata) == {
+            "schema_version",
+            "tools",
+        }
+
+        assert (
+            gateway_metadata["schema_version"]
+            == "0.1"
+        )
+
+        public_tools = gateway_metadata["tools"]
+
+        assert len(public_tools) == len(
+            task.available_tools
+        )
+
+        expected_tools = {
+            tool.tool_name: tool
+            for tool in task.available_tools
+        }
+
+        for public_tool in public_tools:
+            assert set(public_tool) == {
+                "tool_name",
+                "description",
+                "parameters",
+                "endpoint",
+                "authorization",
+            }
+
+            tool_name = public_tool["tool_name"]
+            source_tool = expected_tools[tool_name]
+
+            assert (
+                public_tool["description"]
+                == source_tool.description
+            )
+            assert (
+                public_tool["parameters"]
+                == dict(source_tool.parameters)
+            )
+            assert (
+                public_tool["endpoint"]
+                == environment.gateway.tool_url(
+                    tool_name
+                )
+            )
+
+            authorization = public_tool[
+                "authorization"
+            ]
+
+            assert set(authorization) == {
+                "scheme",
+                "token",
+            }
+            assert (
+                authorization["scheme"]
+                == "bearer"
+            )
+            assert (
+                authorization["token"]
+                == environment.gateway.token
+            )
+
+
+
+def test_canonical_advanced_action_tasks_preserve_v1_information_boundary():
+    task_ids = {
+        "agent-protocol-data-flow-001",
+        "agent-protocol-recovery-001",
+        "agent-protocol-branch-001",
+        "agent-protocol-multi-branch-001",
+        "agent-protocol-multi-branch-002",
+    }
+
+    tasks = [
+        task
+        for task in TaskBank(
+            Path("benchmark/tasks")
+        ).load_all()
+        if task.task_id in task_ids
+    ]
+
+    assert {
+        task.task_id
+        for task in tasks
+    } == task_ids
+
+    for task in tasks:
+        with ActionTaskEnvironment(task) as environment:
+            metadata = environment.metadata
+
+            assert set(metadata) == {
+                "dllo_action_gateway",
+            }
+
+            gateway_metadata = metadata[
+                "dllo_action_gateway"
+            ]
+
+            assert set(gateway_metadata) == {
+                "schema_version",
+                "tools",
+            }
+
+            assert (
+                gateway_metadata["schema_version"]
+                == "0.1"
+            )
+
+            public_tools = gateway_metadata["tools"]
+
+            assert len(public_tools) == len(
+                task.available_tools
+            )
+
+            source_tools = {
+                tool.tool_name: tool
+                for tool in task.available_tools
+            }
+
+            for public_tool in public_tools:
+                assert set(public_tool) == {
+                    "tool_name",
+                    "description",
+                    "parameters",
+                    "endpoint",
+                    "authorization",
+                }
+
+                tool_name = public_tool["tool_name"]
+                source_tool = source_tools[tool_name]
+
+                assert (
+                    public_tool["description"]
+                    == source_tool.description
+                )
+                assert (
+                    public_tool["parameters"]
+                    == dict(source_tool.parameters)
+                )
+                assert (
+                    public_tool["endpoint"]
+                    == environment.gateway.tool_url(
+                        tool_name
+                    )
+                )
+
+                authorization = public_tool[
+                    "authorization"
+                ]
+
+                assert set(authorization) == {
+                    "scheme",
+                    "token",
+                }
+                assert (
+                    authorization["scheme"]
+                    == "bearer"
+                )
+                assert (
+                    authorization["token"]
+                    == environment.gateway.token
+                )
+
+            metadata_text = json.dumps(
+                metadata,
+                sort_keys=True,
+            )
+
+            for observer_only_field in (
+                "tool_results",
+                "tool_failures",
+                "expected_action",
+                "expected_actions",
+                "expected_propagations",
+                "expected_recovery",
+                "expected_branch",
+                "expected_branches",
+            ):
+                assert (
+                    observer_only_field
+                    not in metadata_text
+                )

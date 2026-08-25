@@ -305,6 +305,36 @@ class BenchmarkTask(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_action_evaluation_mode_exclusivity(
+        self,
+    ) -> BenchmarkTask:
+        evaluation_modes = {
+            "expected_propagations": (
+                self.expected_propagations
+            ),
+            "expected_recovery": self.expected_recovery,
+            "expected_branch": self.expected_branch,
+            "expected_branches": self.expected_branches,
+        }
+
+        active_modes = [
+            mode_name
+            for mode_name, value
+            in evaluation_modes.items()
+            if value is not None
+        ]
+
+        if len(active_modes) > 1:
+            raise ValueError(
+                "BenchmarkTask action evaluation modes "
+                "are mutually exclusive; received: "
+                + ", ".join(active_modes)
+                + "."
+            )
+
+        return self
+
+    @model_validator(mode="after")
     def validate_tool_failures_contract(
         self,
     ) -> BenchmarkTask:
@@ -603,7 +633,10 @@ class BenchmarkTask(BaseModel):
             branch.source_result_field
         ]
 
-        if source_value != branch.expected_value:
+        if not _json_scalar_equal(
+            source_value,
+            branch.expected_value,
+        ):
             raise ValueError(
                 "BenchmarkTask expected_branch "
                 "expected_value must match the "

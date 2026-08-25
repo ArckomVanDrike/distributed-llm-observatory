@@ -208,3 +208,48 @@ def test_expected_branch_value_must_match_configured_result():
                 "branch_action_index": 1,
             },
         )
+
+
+def test_expected_branch_accepts_equivalent_json_numbers():
+    task = make_task(
+        tool_results=[
+            {
+                "tool_name": "check_item",
+                "result": {
+                    "state": 1.0,
+                },
+            },
+        ],
+        expected_branch={
+            "source_action_index": 0,
+            "source_result_field": "state",
+            "expected_value": 1,
+            "branch_action_index": 1,
+        },
+    )
+
+    assert task.expected_branch is not None
+    assert task.expected_branch.expected_value == 1
+
+
+def test_expected_branch_does_not_equate_boolean_and_number():
+    with pytest.raises(
+        ValidationError,
+        match="expected_branch",
+    ):
+        make_task(
+            tool_results=[
+                {
+                    "tool_name": "check_item",
+                    "result": {
+                        "state": True,
+                    },
+                },
+            ],
+            expected_branch={
+                "source_action_index": 0,
+                "source_result_field": "state",
+                "expected_value": 1,
+                "branch_action_index": 1,
+            },
+        )
