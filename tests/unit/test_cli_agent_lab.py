@@ -837,6 +837,8 @@ def test_agent_history_prints_persisted_runs(
         SimpleNamespace(
             session=SimpleNamespace(
                 session_id="session-001",
+                observer_id=None,
+                region_code=None,
                 started_at_utc=datetime(
                     2026,
                     8,
@@ -859,6 +861,8 @@ def test_agent_history_prints_persisted_runs(
         SimpleNamespace(
             session=SimpleNamespace(
                 session_id="session-002",
+                observer_id=None,
+                region_code=None,
                 started_at_utc=datetime(
                     2026,
                     8,
@@ -931,6 +935,8 @@ def test_agent_history_uses_explicit_target_filter(
     artifact = SimpleNamespace(
         session=SimpleNamespace(
             session_id="filtered-session",
+            observer_id=None,
+            region_code=None,
             started_at_utc=datetime(
                 2026,
                 8,
@@ -1480,3 +1486,166 @@ def test_main_dispatches_agent_compare_geographic(
     result = cli_module.main()
 
     assert result is sentinel
+
+
+def test_agent_history_reports_observatory_qualification(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="modern-session",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                observer_id="observer-castro",
+                region_code="CL-Los-Lagos",
+                target=SimpleNamespace(
+                    target_id="history-agent",
+                ),
+                suite_id="agent-protocol-core",
+                suite_version="1.0",
+            ),
+            technical_report=SimpleNamespace(
+                total_tasks=11,
+                pass_rate=1.0,
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id="legacy-session",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                observer_id=None,
+                region_code=None,
+                target=SimpleNamespace(
+                    target_id="history-agent",
+                ),
+                suite_id="agent-protocol-core",
+                suite_version="1.0",
+            ),
+            technical_report=SimpleNamespace(
+                total_tasks=11,
+                pass_rate=0.5,
+            ),
+        ),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+        def for_target(self, target_id):
+            raise AssertionError(
+                "Target filter must not be used."
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = agent_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    assert "Observer:            observer-castro" in output
+    assert "Observed from:       CL-Los-Lagos" in output
+    assert (
+        "Observatory:         "
+        "temporal=yes geographic=yes"
+        in output
+    )
+
+    assert "Observer:            n/a" in output
+    assert "Observed from:       n/a" in output
+    assert (
+        "Observatory:         "
+        "temporal=no geographic=no"
+        in output
+    )
+
+
+def test_agent_history_reports_observatory_qualification_reasons(
+    monkeypatch,
+    capsys,
+):
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id="legacy-session",
+            started_at_utc=datetime(
+                2026,
+                8,
+                24,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            observer_id=None,
+            region_code=None,
+            target=SimpleNamespace(
+                target_id="history-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+        technical_report=SimpleNamespace(
+            total_tasks=11,
+            pass_rate=0.5,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return [artifact]
+
+        def for_target(self, target_id):
+            raise AssertionError(
+                "Target filter must not be used."
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = agent_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "Observatory reasons: missing observer_id, "
+        "missing region_code"
+        in output
+    )
