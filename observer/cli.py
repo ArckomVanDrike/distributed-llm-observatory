@@ -40,6 +40,9 @@ from observer.core.agent_lab_artifact_io import (
 from observer.core.agent_lab_geographic_comparison import (
     compare_geographic_agent_observations,
 )
+from observer.core.agent_lab_observation_qualification import (
+    qualify_agent_observation,
+)
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
@@ -2183,6 +2186,35 @@ def agent_history(
                 f"{session.suite_id} "
                 f"v{session.suite_version}"
             )
+
+            qualification = qualify_agent_observation(
+                artifact
+            )
+
+            print(
+                f"Observer:            "
+                f"{session.observer_id or 'n/a'}"
+            )
+            print(
+                f"Observed from:       "
+                f"{session.region_code or 'n/a'}"
+            )
+            print(
+                f"Observatory:         "
+                f"temporal="
+                f"{'yes' if qualification.temporal_eligible else 'no'} "
+                f"geographic="
+                f"{'yes' if qualification.geographic_eligible else 'no'}"
+            )
+
+            if qualification.reasons:
+                print(
+                    "Observatory reasons: "
+                    + ", ".join(
+                        qualification.reasons
+                    )
+                )
+
             print(
                 f"Tasks:              "
                 f"{report.total_tasks}"
