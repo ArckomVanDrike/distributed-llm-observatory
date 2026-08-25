@@ -47,6 +47,12 @@ def test_agent_test_runs_protocol_runner_and_prints_summary(
     capsys,
 ):
     captured = {}
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+    )
 
     class FakeProtocolRunner:
         def __init__(
@@ -73,6 +79,8 @@ def test_agent_test_runs_protocol_runner_and_prints_summary(
 
             return SimpleNamespace(
                 session=SimpleNamespace(
+                    observer_id="observer-test",
+                    region_code="CL-Los-Lagos",
                     target=SimpleNamespace(
                         target_id="example-agent",
                     ),
@@ -85,6 +93,7 @@ def test_agent_test_runs_protocol_runner_and_prints_summary(
                     pass_rate=1.0,
                     median_latency_ms=4.5,
                 ),
+                to_artifact=lambda: artifact,
             )
 
     monkeypatch.setattr(
@@ -134,6 +143,12 @@ def test_agent_test_runs_protocol_runner_and_prints_summary(
         "Suite:             agent-protocol-core v0.1"
         in output
     )
+    assert "Observer:          observer-test" in output
+    assert "Observed from:     CL-Los-Lagos" in output
+    assert (
+        "Observatory:       temporal=yes geographic=yes"
+        in output
+    )
     assert "Tasks:             1" in output
     assert "Passed:            1" in output
     assert "Pass rate:         100.00%" in output
@@ -144,6 +159,13 @@ def test_agent_test_returns_zero_when_benchmark_fails(
     monkeypatch,
     capsys,
 ):
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+    )
+
     class FakeProtocolRunner:
         def __init__(
             self,
@@ -163,6 +185,8 @@ def test_agent_test_returns_zero_when_benchmark_fails(
         ):
             return SimpleNamespace(
                 session=SimpleNamespace(
+                    observer_id="observer-test",
+                    region_code="CL-Los-Lagos",
                     target=SimpleNamespace(
                         target_id="failing-agent",
                     ),
@@ -175,6 +199,7 @@ def test_agent_test_returns_zero_when_benchmark_fails(
                     pass_rate=0.0,
                     median_latency_ms=7.25,
                 ),
+                to_artifact=lambda: artifact,
             )
 
     monkeypatch.setattr(
@@ -325,7 +350,12 @@ def test_agent_test_writes_artifact_when_output_is_requested(
     tmp_path: Path,
 ):
     captured = {}
-    artifact = object()
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+    )
     output_path = tmp_path / "agent-run.json"
 
     class FakeProtocolRunner:
@@ -347,6 +377,8 @@ def test_agent_test_writes_artifact_when_output_is_requested(
         ):
             return SimpleNamespace(
                 session=SimpleNamespace(
+                    observer_id="observer-test",
+                    region_code="CL-Los-Lagos",
                     target=SimpleNamespace(
                         target_id="export-agent",
                     ),
@@ -408,6 +440,13 @@ def test_agent_test_does_not_write_artifact_without_output(
     monkeypatch,
     capsys,
 ):
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+    )
+
     class FakeProtocolRunner:
         def __init__(
             self,
@@ -427,6 +466,8 @@ def test_agent_test_does_not_write_artifact_without_output(
         ):
             return SimpleNamespace(
                 session=SimpleNamespace(
+                    observer_id="observer-test",
+                    region_code="CL-Los-Lagos",
                     target=SimpleNamespace(
                         target_id="no-export-agent",
                     ),
@@ -439,6 +480,7 @@ def test_agent_test_does_not_write_artifact_without_output(
                     pass_rate=1.0,
                     median_latency_ms=5.0,
                 ),
+                to_artifact=lambda: artifact,
             )
 
     def fail_if_writer_is_called(*args, **kwargs):
@@ -483,6 +525,13 @@ def test_agent_test_returns_two_when_artifact_write_fails(
     capsys,
     tmp_path: Path,
 ):
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+    )
+
     class FakeProtocolRunner:
         def __init__(
             self,
@@ -502,6 +551,8 @@ def test_agent_test_returns_two_when_artifact_write_fails(
         ):
             return SimpleNamespace(
                 session=SimpleNamespace(
+                    observer_id="observer-test",
+                    region_code="CL-Los-Lagos",
                     target=SimpleNamespace(
                         target_id="export-agent",
                     ),
@@ -514,7 +565,7 @@ def test_agent_test_returns_two_when_artifact_write_fails(
                     pass_rate=1.0,
                     median_latency_ms=5.0,
                 ),
-                to_artifact=lambda: object(),
+                to_artifact=lambda: artifact,
             )
 
     def failing_writer(
