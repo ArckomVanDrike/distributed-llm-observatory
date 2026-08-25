@@ -86,7 +86,7 @@ class BenchmarkToolContract(BaseModel):
     ] = Field(default_factory=dict)
 
 
-class BenchmarkExpectedAction(BaseModel):
+class BenchmarkExpectedActionCall(BaseModel):
     tool_name: str = Field(min_length=1)
 
     arguments: dict[
@@ -94,6 +94,10 @@ class BenchmarkExpectedAction(BaseModel):
         str | int | float | bool | None,
     ] = Field(default_factory=dict)
 
+
+class BenchmarkExpectedAction(
+    BenchmarkExpectedActionCall
+):
     call_count: int = Field(
         default=1,
         ge=1,
@@ -153,6 +157,13 @@ class BenchmarkTask(BaseModel):
 
     expected_action: BenchmarkExpectedAction | None = None
 
+    expected_actions: (
+        list[BenchmarkExpectedActionCall] | None
+    ) = Field(
+        default=None,
+        min_length=1,
+    )
+
     enabled: bool = True
 
     @model_validator(mode="after")
@@ -173,11 +184,25 @@ class BenchmarkTask(BaseModel):
     ) -> BenchmarkTask:
         if (
             self.expected_action is not None
+            and self.expected_actions is not None
+        ):
+            raise ValueError(
+                "BenchmarkTask cannot define both "
+                "expected_action and expected_actions."
+            )
+
+        has_expected_actions = (
+            self.expected_action is not None
+            or self.expected_actions is not None
+        )
+
+        if (
+            has_expected_actions
             and TargetCapability.TOOLS
             not in self.required_capabilities
         ):
             raise ValueError(
-                "BenchmarkTask with expected_action "
+                "BenchmarkTask with expected action data "
                 "requires the tools capability."
             )
 
@@ -222,6 +247,24 @@ class BenchmarkTask(BaseModel):
                 raise ValueError(
                     "BenchmarkTask expected_action tool_name "
                     "must reference an available_tools entry."
+                )
+
+        if self.expected_actions is not None:
+            if not self.available_tools:
+                raise ValueError(
+                    "BenchmarkTask expected_actions "
+                    "requires available_tools."
+                )
+
+            unknown_tool_names = {
+                action.tool_name
+                for action in self.expected_actions
+            } - set(tool_names)
+
+            if unknown_tool_names:
+                raise ValueError(
+                    "BenchmarkTask expected_actions tool names "
+                    "must reference available_tools entries."
                 )
 
         return self

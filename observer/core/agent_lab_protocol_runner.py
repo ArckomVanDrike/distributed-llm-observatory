@@ -126,7 +126,10 @@ class AgentLabProtocolRunner:
                 evidence_collectors = {}
 
                 for task in resolved.tasks:
-                    if task.expected_action is None:
+                    if (
+                        task.expected_action is None
+                        and task.expected_actions is None
+                    ):
                         continue
 
                     environment = stack.enter_context(

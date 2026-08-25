@@ -6,6 +6,9 @@ from observer.core.action_gateway import ActionGateway
 from observer.core.observed_action_evidence import (
     ObservedActionEvidenceCollector,
 )
+from observer.core.observed_action_sequence_evidence import (
+    ObservedActionSequenceEvidenceCollector,
+)
 from schemas.benchmark import BenchmarkTask
 
 
@@ -21,10 +24,13 @@ class ActionTaskEnvironment:
         self,
         task: BenchmarkTask,
     ) -> None:
-        if task.expected_action is None:
+        if (
+            task.expected_action is None
+            and task.expected_actions is None
+        ):
             raise ValueError(
                 "ActionTaskEnvironment requires "
-                "task.expected_action."
+                "expected action data."
             )
 
         if not task.available_tools:
@@ -36,10 +42,24 @@ class ActionTaskEnvironment:
         self.task = task
         self.gateway = ActionGateway()
 
-        self.collector = ObservedActionEvidenceCollector(
-            expected_action=task.expected_action,
-            calls_provider=lambda: self.gateway.calls,
-        )
+        if task.expected_action is not None:
+            self.collector = ObservedActionEvidenceCollector(
+                expected_action=task.expected_action,
+                calls_provider=lambda: self.gateway.calls,
+            )
+        else:
+            assert task.expected_actions is not None
+
+            self.collector = (
+                ObservedActionSequenceEvidenceCollector(
+                    expected_actions=tuple(
+                        task.expected_actions
+                    ),
+                    calls_provider=(
+                        lambda: self.gateway.calls
+                    ),
+                )
+            )
 
     @property
     def metadata(self) -> dict[str, Any]:
