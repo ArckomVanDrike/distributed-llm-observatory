@@ -1350,4 +1350,46 @@ def test_canonical_agent_protocol_suite_v0_10():
         "agent-protocol-multi-branch-002",
     ]
 
+    assert suite.enabled is False
+
+
+def test_canonical_agent_protocol_suite_v1_0():
+    suite_bank = SuiteBank(
+        Path("benchmark/suites"),
+    )
+
+    matches = [
+        suite
+        for suite in suite_bank.load_all()
+        if (
+            suite.suite_id
+            == "agent-protocol-core"
+            and suite.suite_version == "1.0"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family is BenchmarkFamily.AGENT
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
+        "agent-protocol-tool-selection-001",
+        "agent-protocol-action-sequence-001",
+        "agent-protocol-data-flow-001",
+        "agent-protocol-recovery-001",
+        "agent-protocol-branch-001",
+        "agent-protocol-multi-branch-001",
+        "agent-protocol-multi-branch-002",
+    ]
+
     assert suite.enabled is True

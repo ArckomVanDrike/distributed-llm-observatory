@@ -15,6 +15,7 @@ PROTOCOL_SUITE_VERSIONS = (
     "0.8",
     "0.9",
     "0.10",
+    "1.0",
 )
 
 
@@ -72,7 +73,7 @@ def test_protocol_core_has_exactly_one_active_suite():
     ]
 
     assert len(active) == 1
-    assert active[0].suite_version == "0.10"
+    assert active[0].suite_version == "1.0"
 
 
 def test_protocol_suite_history_is_monotonic():
@@ -100,3 +101,42 @@ def test_protocol_suite_history_is_monotonic():
         )
 
         previous_task_ids = current_task_ids
+
+
+
+def test_protocol_v1_freezes_v0_10_behavior():
+    registry = build_registry()
+
+    v0_10 = registry.resolve(
+        suite_id="agent-protocol-core",
+        suite_version="0.10",
+    )
+    v1_0 = registry.resolve(
+        suite_id="agent-protocol-core",
+        suite_version="1.0",
+    )
+
+    assert (
+        v1_0.suite.family
+        is v0_10.suite.family
+    )
+    assert (
+        v1_0.suite.harness_profile
+        is v0_10.suite.harness_profile
+    )
+
+    assert (
+        v1_0.suite.task_ids
+        == v0_10.suite.task_ids
+    )
+
+    assert [
+        task.task_id
+        for task in v1_0.tasks
+    ] == [
+        task.task_id
+        for task in v0_10.tasks
+    ]
+
+    assert v0_10.suite.enabled is False
+    assert v1_0.suite.enabled is True

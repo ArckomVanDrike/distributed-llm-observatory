@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1",
   "suite_id": "agent-protocol-core",
-  "suite_version": "0.10",
+  "suite_version": "1.0",
   "family": "agent",
   "harness_profile": "sut_protocol",
   "task_ids": [
@@ -17,5 +17,5 @@
     "agent-protocol-multi-branch-001",
     "agent-protocol-multi-branch-002"
   ],
-  "enabled": false
+  "enabled": true
 }
