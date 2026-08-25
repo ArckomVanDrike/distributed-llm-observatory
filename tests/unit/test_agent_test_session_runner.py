@@ -161,6 +161,8 @@ def test_session_runner_executes_compatible_task():
 
     assert session.status is AgentTestSessionStatus.COMPLETED
     assert session.target == HappyPathAdapter.manifest
+    assert session.observer_id == "observer-test"
+    assert session.region_code == "CL-Los-Lagos"
 
     assert len(session.selections) == 1
     assert (
