@@ -175,7 +175,7 @@ def test_protocol_runner_builds_session_and_report():
             == "protocol-runner-agent"
         )
         assert result.session.suite_id == "agent-protocol-core"
-        assert result.session.suite_version == "0.10"
+        assert result.session.suite_version == "1.0"
 
         assert [
             request["context"]["task_id"]
@@ -351,7 +351,7 @@ def test_protocol_runner_builds_session_and_report():
         assert result.report.session_id == result.session.session_id
         assert result.report.target_id == "protocol-runner-agent"
         assert result.report.suite_id == "agent-protocol-core"
-        assert result.report.suite_version == "0.10"
+        assert result.report.suite_version == "1.0"
         assert result.report.generated_at_utc == generated_at
         assert result.report.total_tasks == 3
         assert result.report.passed_tasks == 3
