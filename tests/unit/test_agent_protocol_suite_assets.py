@@ -938,4 +938,161 @@ def test_canonical_agent_protocol_suite_v0_8():
         "agent-protocol-recovery-001",
     ]
 
+    assert suite.enabled is False
+
+
+
+def test_canonical_agent_protocol_branch_task():
+    task_bank = TaskBank(
+        Path("benchmark/tasks"),
+    )
+
+    matches = [
+        task
+        for task in task_bank.load_all()
+        if (
+            task.task_id
+            == "agent-protocol-branch-001"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    task = matches[0]
+
+    assert task.benchmark_version == "0.1"
+    assert task.family is BenchmarkFamily.AGENT
+    assert (
+        task.category
+        is BenchmarkCategory.TECHNICAL
+    )
+    assert (
+        task.evaluator_id
+        == "deterministic-evidence-v0-1"
+    )
+
+    assert task.required_capabilities == {
+        TargetCapability.TEXT,
+        TargetCapability.TOOLS,
+    }
+
+    # The prompt states the goal without exposing
+    # observer-side branch expectations or results.
+    assert "check_item" not in task.task
+    assert "create_item" not in task.task
+    assert "inspect_item" not in task.task
+    assert "missing" not in task.task
+
+    assert [
+        tool.tool_name
+        for tool in task.available_tools
+    ] == [
+        "check_item",
+        "create_item",
+        "inspect_item",
+    ]
+
+    assert task.available_tools[0].parameters == {
+        "name": "string",
+    }
+    assert task.available_tools[1].parameters == {
+        "name": "string",
+        "count": "integer",
+    }
+    assert task.available_tools[2].parameters == {
+        "name": "string",
+    }
+
+    assert len(task.tool_results) == 1
+
+    assert (
+        task.tool_results[0].tool_name
+        == "check_item"
+    )
+    assert task.tool_results[0].result == {
+        "state": "missing",
+    }
+
+    assert task.tool_failures == []
+    assert task.expected_action is None
+    assert task.expected_actions is not None
+
+    assert [
+        action.tool_name
+        for action in task.expected_actions
+    ] == [
+        "check_item",
+        "create_item",
+    ]
+
+    assert task.expected_actions[0].arguments == {
+        "name": "delta",
+    }
+    assert task.expected_actions[1].arguments == {
+        "name": "delta",
+        "count": 4,
+    }
+
+    assert task.expected_propagations is None
+    assert task.expected_recovery is None
+    assert task.expected_branch is not None
+
+    branch = task.expected_branch
+
+    assert branch.source_action_index == 0
+    assert branch.source_result_field == "state"
+    assert branch.expected_value == "missing"
+    assert branch.branch_action_index == 1
+
+    assert [
+        criterion.criterion_id
+        for criterion in task.success_criteria
+    ] == [
+        "tool-calls-observed",
+        "tool-sequence-length-match",
+        "tool-sequence-order-match",
+        "tool-sequence-arguments-match",
+        "branch-source-result-observed",
+        "branch-selected",
+    ]
+
+    assert task.enabled is True
+
+
+def test_canonical_agent_protocol_suite_v0_9():
+    suite_bank = SuiteBank(
+        Path("benchmark/suites"),
+    )
+
+    matches = [
+        suite
+        for suite in suite_bank.load_all()
+        if (
+            suite.suite_id == "agent-protocol-core"
+            and suite.suite_version == "0.9"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    suite = matches[0]
+
+    assert suite.family is BenchmarkFamily.AGENT
+    assert (
+        suite.harness_profile
+        is BenchmarkHarnessProfile.SUT_PROTOCOL
+    )
+
+    assert suite.task_ids == [
+        "agent-protocol-smoke-001",
+        "agent-protocol-instruction-001",
+        "agent-protocol-structured-output-001",
+        "agent-protocol-action-001",
+        "agent-protocol-tool-selection-001",
+        "agent-protocol-action-sequence-001",
+        "agent-protocol-data-flow-001",
+        "agent-protocol-recovery-001",
+        "agent-protocol-branch-001",
+    ]
+
     assert suite.enabled is True
