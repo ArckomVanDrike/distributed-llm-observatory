@@ -446,7 +446,7 @@ def test_action_task_environment_wires_tool_failures_to_gateway():
 
         assert "tool_failures" not in metadata_text
         assert "temporary_unavailable" not in metadata_text
-        assert "503" not in metadata_text
+        assert "status_code" not in metadata_text
 
         request = Request(
             environment.gateway.tool_url(
@@ -551,7 +551,7 @@ def test_action_task_environment_uses_recovery_collector():
         assert "expected_recovery" not in metadata_text
         assert "tool_failures" not in metadata_text
         assert "temporary_unavailable" not in metadata_text
-        assert "503" not in metadata_text
+        assert "status_code" not in metadata_text
 
 
 def test_action_task_environment_uses_branch_collector():

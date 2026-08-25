@@ -273,7 +273,7 @@ def test_protocol_runner_evaluates_recovery_after_tool_failure(
                 "temporary_unavailable"
                 not in metadata_text
             )
-            assert "503" not in metadata_text
+            assert "status_code" not in metadata_text
 
             tools = {
                 tool["tool_name"]: tool
