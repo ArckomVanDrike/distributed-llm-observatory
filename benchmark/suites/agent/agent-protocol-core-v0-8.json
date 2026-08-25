@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1",
   "suite_id": "agent-protocol-core",
-  "suite_version": "0.7",
+  "suite_version": "0.8",
   "family": "agent",
   "harness_profile": "sut_protocol",
   "task_ids": [
@@ -11,7 +11,8 @@
     "agent-protocol-action-001",
     "agent-protocol-tool-selection-001",
     "agent-protocol-action-sequence-001",
-    "agent-protocol-data-flow-001"
+    "agent-protocol-data-flow-001",
+    "agent-protocol-recovery-001"
   ],
-  "enabled": false
+  "enabled": true
 }

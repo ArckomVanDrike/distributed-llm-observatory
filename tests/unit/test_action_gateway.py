@@ -229,3 +229,170 @@ def test_action_gateway_returns_configured_tool_result():
             "name": "delta",
             "count": 4,
         }
+
+
+def test_action_gateway_returns_configured_tool_failure():
+    from urllib.error import HTTPError
+
+    with ActionGateway(
+        tool_failures={
+            "persist_primary": {
+                "status_code": 503,
+                "error": {
+                    "code": "temporary_unavailable",
+                },
+            },
+        },
+    ) as gateway:
+        request = Request(
+            gateway.tool_url("persist_primary"),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    f"Bearer {gateway.token}"
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            urlopen(
+                request,
+                timeout=2,
+            )
+        except HTTPError as exc:
+            payload = json.loads(
+                exc.read().decode("utf-8")
+            )
+
+            assert exc.code == 503
+        else:
+            raise AssertionError(
+                "Expected configured tool failure."
+            )
+
+        assert payload == {
+            "schema_version": "0.1",
+            "accepted": True,
+            "error": {
+                "code": "temporary_unavailable",
+            },
+        }
+
+        calls = gateway.calls
+
+        assert len(calls) == 1
+        assert calls[0].tool_name == "persist_primary"
+        assert calls[0].arguments == {
+            "name": "delta",
+            "count": 4,
+        }
+
+
+def test_action_gateway_records_failed_tool_outcome():
+    from urllib.error import HTTPError
+
+    with ActionGateway(
+        tool_failures={
+            "persist_primary": {
+                "status_code": 503,
+                "error": {
+                    "code": "temporary_unavailable",
+                },
+            },
+        },
+    ) as gateway:
+        request = Request(
+            gateway.tool_url("persist_primary"),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    f"Bearer {gateway.token}"
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            urlopen(
+                request,
+                timeout=2,
+            )
+        except HTTPError:
+            pass
+        else:
+            raise AssertionError(
+                "Expected configured tool failure."
+            )
+
+        outcomes = gateway.outcomes
+
+        assert len(outcomes) == 1
+
+        outcome = outcomes[0]
+
+        assert outcome.tool_name == "persist_primary"
+        assert outcome.status_code == 503
+        assert outcome.succeeded is False
+        assert outcome.result is None
+        assert outcome.error == {
+            "code": "temporary_unavailable",
+        }
+
+
+def test_action_gateway_records_successful_tool_outcome():
+    with ActionGateway(
+        tool_results={
+            "persist_fallback": {
+                "stored": True,
+            },
+        },
+    ) as gateway:
+        request = Request(
+            gateway.tool_url("persist_fallback"),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    f"Bearer {gateway.token}"
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            assert response.status == 200
+
+        outcomes = gateway.outcomes
+
+        assert len(outcomes) == 1
+
+        outcome = outcomes[0]
+
+        assert outcome.tool_name == "persist_fallback"
+        assert outcome.status_code == 200
+        assert outcome.succeeded is True
+        assert outcome.result == {
+            "stored": True,
+        }
+        assert outcome.error is None

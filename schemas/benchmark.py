@@ -95,11 +95,29 @@ class BenchmarkToolResult(BaseModel):
     ] = Field(default_factory=dict)
 
 
+class BenchmarkToolFailure(BaseModel):
+    tool_name: str = Field(min_length=1)
+    status_code: int = Field(
+        ge=400,
+        le=599,
+    )
+
+    error: dict[
+        str,
+        str | int | float | bool | None,
+    ] = Field(default_factory=dict)
+
+
 class BenchmarkExpectedPropagation(BaseModel):
     source_action_index: int = Field(ge=0)
     source_result_field: str = Field(min_length=1)
     target_action_index: int = Field(ge=0)
     target_argument: str = Field(min_length=1)
+
+
+class BenchmarkExpectedRecovery(BaseModel):
+    failed_action_index: int = Field(ge=0)
+    recovery_action_index: int = Field(ge=0)
 
 
 class BenchmarkExpectedActionCall(BaseModel):
@@ -175,6 +193,10 @@ class BenchmarkTask(BaseModel):
         default_factory=list,
     )
 
+    tool_failures: list[BenchmarkToolFailure] = Field(
+        default_factory=list,
+    )
+
     expected_action: BenchmarkExpectedAction | None = None
 
     expected_actions: (
@@ -190,6 +212,10 @@ class BenchmarkTask(BaseModel):
         default=None,
         min_length=1,
     )
+
+    expected_recovery: (
+        BenchmarkExpectedRecovery | None
+    ) = None
 
     enabled: bool = True
 
@@ -231,6 +257,77 @@ class BenchmarkTask(BaseModel):
             raise ValueError(
                 "BenchmarkTask with expected action data "
                 "requires the tools capability."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_tool_failures_contract(
+        self,
+    ) -> BenchmarkTask:
+        if not self.tool_failures:
+            return self
+
+        if (
+            TargetCapability.TOOLS
+            not in self.required_capabilities
+        ):
+            raise ValueError(
+                "BenchmarkTask with tool_failures "
+                "requires the tools capability."
+            )
+
+        if not self.available_tools:
+            raise ValueError(
+                "BenchmarkTask tool_failures "
+                "requires available_tools."
+            )
+
+        available_tool_names = {
+            tool.tool_name
+            for tool in self.available_tools
+        }
+
+        failure_tool_names = [
+            failure.tool_name
+            for failure in self.tool_failures
+        ]
+
+        if (
+            len(failure_tool_names)
+            != len(set(failure_tool_names))
+        ):
+            raise ValueError(
+                "BenchmarkTask tool_failures "
+                "tool names must be unique."
+            )
+
+        unknown_tool_names = (
+            set(failure_tool_names)
+            - available_tool_names
+        )
+
+        if unknown_tool_names:
+            raise ValueError(
+                "BenchmarkTask tool_failures tool names "
+                "must reference available_tools entries."
+            )
+
+        result_tool_names = {
+            result.tool_name
+            for result in self.tool_results
+        }
+
+        overlapping_tool_names = (
+            set(failure_tool_names)
+            & result_tool_names
+        )
+
+        if overlapping_tool_names:
+            raise ValueError(
+                "BenchmarkTask tool_results and "
+                "tool_failures must reference "
+                "different tools."
             )
 
         return self
@@ -285,6 +382,67 @@ class BenchmarkTask(BaseModel):
             raise ValueError(
                 "BenchmarkTask tool_results tool names "
                 "must reference available_tools entries."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_expected_recovery(
+        self,
+    ) -> BenchmarkTask:
+        if self.expected_recovery is None:
+            return self
+
+        if self.expected_actions is None:
+            raise ValueError(
+                "BenchmarkTask expected_recovery "
+                "requires expected_actions."
+            )
+
+        if not self.tool_failures:
+            raise ValueError(
+                "BenchmarkTask expected_recovery "
+                "requires tool_failures."
+            )
+
+        actions = self.expected_actions
+        recovery = self.expected_recovery
+
+        failed_index = recovery.failed_action_index
+        recovery_index = recovery.recovery_action_index
+
+        if (
+            failed_index >= len(actions)
+            or recovery_index >= len(actions)
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_recovery "
+                "action indices must reference "
+                "expected_actions entries."
+            )
+
+        if failed_index >= recovery_index:
+            raise ValueError(
+                "BenchmarkTask expected_recovery "
+                "must flow from a failed action "
+                "to a later recovery action."
+            )
+
+        failed_action = actions[failed_index]
+
+        failure_tool_names = {
+            failure.tool_name
+            for failure in self.tool_failures
+        }
+
+        if (
+            failed_action.tool_name
+            not in failure_tool_names
+        ):
+            raise ValueError(
+                "BenchmarkTask expected_recovery "
+                "failed action must reference a tool "
+                "configured in tool_failures."
             )
 
         return self

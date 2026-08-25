@@ -9,6 +9,9 @@ from observer.core.observed_action_data_flow_evidence import (
 from observer.core.observed_action_evidence import (
     ObservedActionEvidenceCollector,
 )
+from observer.core.observed_action_recovery_evidence import (
+    ObservedActionRecoveryEvidenceCollector,
+)
 from observer.core.observed_action_sequence_evidence import (
     ObservedActionSequenceEvidenceCollector,
 )
@@ -50,12 +53,45 @@ class ActionTaskEnvironment:
                 )
                 for tool_result in task.tool_results
             },
+            tool_failures={
+                tool_failure.tool_name: {
+                    "status_code": (
+                        tool_failure.status_code
+                    ),
+                    "error": dict(
+                        tool_failure.error
+                    ),
+                }
+                for tool_failure in task.tool_failures
+            },
         )
 
         if task.expected_action is not None:
             self.collector = ObservedActionEvidenceCollector(
                 expected_action=task.expected_action,
                 calls_provider=lambda: self.gateway.calls,
+            )
+        elif task.expected_recovery is not None:
+            assert task.expected_actions is not None
+
+            self.collector = (
+                ObservedActionRecoveryEvidenceCollector(
+                    expected_actions=tuple(
+                        task.expected_actions
+                    ),
+                    tool_failures=tuple(
+                        task.tool_failures
+                    ),
+                    expected_recovery=(
+                        task.expected_recovery
+                    ),
+                    calls_provider=(
+                        lambda: self.gateway.calls
+                    ),
+                    outcomes_provider=(
+                        lambda: self.gateway.outcomes
+                    ),
+                )
             )
         elif task.expected_propagations is not None:
             assert task.expected_actions is not None
