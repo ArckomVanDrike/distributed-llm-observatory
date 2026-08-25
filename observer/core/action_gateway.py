@@ -17,6 +17,15 @@ class ObservedActionCall:
     arguments: dict[str, object]
 
 
+@dataclass(frozen=True)
+class ObservedActionOutcome:
+    tool_name: str
+    status_code: int
+    succeeded: bool
+    result: dict[str, object] | None = None
+    error: dict[str, object] | None = None
+
+
 class ActionGateway:
     """
     Local Observatory-owned HTTP gateway for observing tool calls.
@@ -31,15 +40,24 @@ class ActionGateway:
         tool_results: (
             dict[str, dict[str, object]] | None
         ) = None,
+        tool_failures: (
+            dict[str, dict[str, object]] | None
+        ) = None,
     ) -> None:
         self.token = secrets.token_urlsafe(32)
 
         self._calls: list[ObservedActionCall] = []
+        self._outcomes: list[ObservedActionOutcome] = []
         self._lock = threading.Lock()
         self._tool_results = {
             tool_name: dict(result)
             for tool_name, result
             in (tool_results or {}).items()
+        }
+        self._tool_failures = {
+            tool_name: dict(failure)
+            for tool_name, failure
+            in (tool_failures or {}).items()
         }
 
         gateway = self
@@ -131,22 +149,69 @@ class ActionGateway:
                     arguments=dict(payload),
                 )
 
-                with gateway._lock:
-                    gateway._calls.append(call)
-
                 response_payload: dict[str, object] = {
                     "schema_version": "0.1",
                     "accepted": True,
                 }
 
+                tool_failure = (
+                    gateway._tool_failures.get(
+                        tool_name
+                    )
+                )
+
+                if tool_failure is not None:
+                    status_code = int(
+                        tool_failure["status_code"]
+                    )
+                    error = dict(
+                        tool_failure["error"]
+                    )
+
+                    response_payload["error"] = error
+
+                    outcome = ObservedActionOutcome(
+                        tool_name=tool_name,
+                        status_code=status_code,
+                        succeeded=False,
+                        error=error,
+                    )
+
+                    with gateway._lock:
+                        gateway._calls.append(call)
+                        gateway._outcomes.append(
+                            outcome
+                        )
+
+                    self._send_json(
+                        response_payload,
+                        status=status_code,
+                    )
+                    return
+
                 tool_result = gateway._tool_results.get(
                     tool_name
                 )
 
-                if tool_result is not None:
-                    response_payload["result"] = dict(
-                        tool_result
-                    )
+                result = (
+                    dict(tool_result)
+                    if tool_result is not None
+                    else None
+                )
+
+                if result is not None:
+                    response_payload["result"] = result
+
+                outcome = ObservedActionOutcome(
+                    tool_name=tool_name,
+                    status_code=200,
+                    succeeded=True,
+                    result=result,
+                )
+
+                with gateway._lock:
+                    gateway._calls.append(call)
+                    gateway._outcomes.append(outcome)
 
                 self._send_json(
                     response_payload,
@@ -199,6 +264,11 @@ class ActionGateway:
     def calls(self) -> tuple[ObservedActionCall, ...]:
         with self._lock:
             return tuple(self._calls)
+
+    @property
+    def outcomes(self) -> tuple[ObservedActionOutcome, ...]:
+        with self._lock:
+            return tuple(self._outcomes)
 
     def tool_url(
         self,

@@ -414,3 +414,139 @@ def test_action_task_environment_uses_data_flow_collector():
         assert "tool_results" not in metadata_text
         assert "expected_propagations" not in metadata_text
         assert "item-742" not in metadata_text
+
+
+def test_action_task_environment_wires_tool_failures_to_gateway():
+    from urllib.error import HTTPError
+
+    base_task = make_sequence_task()
+
+    task = BenchmarkTask.model_validate(
+        {
+            **base_task.model_dump(),
+            "tool_failures": [
+                {
+                    "tool_name": "record_item",
+                    "status_code": 503,
+                    "error": {
+                        "code": "temporary_unavailable",
+                    },
+                },
+            ],
+        }
+    )
+
+    with ActionTaskEnvironment(task) as environment:
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "tool_failures" not in metadata_text
+        assert "temporary_unavailable" not in metadata_text
+        assert "503" not in metadata_text
+
+        request = Request(
+            environment.gateway.tool_url(
+                "record_item"
+            ),
+            data=json.dumps(
+                {
+                    "name": "delta",
+                    "count": 4,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": (
+                    "Bearer "
+                    + environment.gateway.token
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            urlopen(
+                request,
+                timeout=2,
+            )
+        except HTTPError as exc:
+            payload = json.loads(
+                exc.read().decode("utf-8")
+            )
+            assert exc.code == 503
+        else:
+            raise AssertionError(
+                "Expected configured tool failure."
+            )
+
+        assert payload == {
+            "schema_version": "0.1",
+            "accepted": True,
+            "error": {
+                "code": "temporary_unavailable",
+            },
+        }
+
+        assert len(environment.gateway.calls) == 1
+        assert (
+            environment.gateway.calls[0].tool_name
+            == "record_item"
+        )
+
+
+def test_action_task_environment_uses_recovery_collector():
+    from observer.core.observed_action_recovery_evidence import (
+        ObservedActionRecoveryEvidenceCollector,
+    )
+
+    base_task = make_sequence_task()
+
+    task = BenchmarkTask.model_validate(
+        {
+            **base_task.model_dump(),
+            "tool_failures": [
+                {
+                    "tool_name": "record_item",
+                    "status_code": 503,
+                    "error": {
+                        "code": "temporary_unavailable",
+                    },
+                },
+            ],
+            "expected_recovery": {
+                "failed_action_index": 0,
+                "recovery_action_index": 1,
+            },
+        }
+    )
+
+    with ActionTaskEnvironment(task) as environment:
+        assert isinstance(
+            environment.collector,
+            ObservedActionRecoveryEvidenceCollector,
+        )
+
+        assert (
+            environment.collector.expected_actions
+            == tuple(task.expected_actions)
+        )
+        assert (
+            environment.collector.tool_failures
+            == tuple(task.tool_failures)
+        )
+        assert (
+            environment.collector.expected_recovery
+            == task.expected_recovery
+        )
+
+        metadata_text = json.dumps(
+            environment.metadata,
+            sort_keys=True,
+        )
+
+        assert "expected_recovery" not in metadata_text
+        assert "tool_failures" not in metadata_text
+        assert "temporary_unavailable" not in metadata_text
+        assert "503" not in metadata_text

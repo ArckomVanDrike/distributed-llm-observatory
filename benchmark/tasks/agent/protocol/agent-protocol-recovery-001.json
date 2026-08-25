@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1",
+  "task_id": "agent-protocol-recovery-001",
+  "benchmark_version": "0.1",
+  "evaluator_id": "deterministic-evidence-v0-1",
+  "family": "agent",
+  "category": "technical",
+  "difficulty": "easy",
+  "task": "Persist an item named delta with count 4. If an attempt fails, recover using the available tools.",
+  "required_capabilities": [
+    "text",
+    "tools"
+  ],
+  "success_criteria": [
+    {
+      "criterion_id": "tool-calls-observed",
+      "description": "At least one tool call was observed."
+    },
+    {
+      "criterion_id": "tool-sequence-length-match",
+      "description": "The observed tool-call sequence length matches."
+    },
+    {
+      "criterion_id": "tool-sequence-order-match",
+      "description": "The observed tool order matches the expected sequence."
+    },
+    {
+      "criterion_id": "tool-sequence-arguments-match",
+      "description": "The observed tool arguments match the expected sequence."
+    },
+    {
+      "criterion_id": "tool-failure-observed",
+      "description": "The configured runtime tool failure was observed."
+    },
+    {
+      "criterion_id": "recovery-after-failure",
+      "description": "A successful recovery action followed the runtime failure."
+    }
+  ],
+  "available_tools": [
+    {
+      "tool_name": "persist_primary",
+      "description": "Persist an item using the primary backend.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    },
+    {
+      "tool_name": "persist_fallback",
+      "description": "Persist an item using the fallback backend.",
+      "parameters": {
+        "name": "string",
+        "count": "integer"
+      }
+    }
+  ],
+  "tool_failures": [
+    {
+      "tool_name": "persist_primary",
+      "status_code": 503,
+      "error": {
+        "code": "temporary_unavailable"
+      }
+    }
+  ],
+  "expected_actions": [
+    {
+      "tool_name": "persist_primary",
+      "arguments": {
+        "name": "delta",
+        "count": 4
+      }
+    },
+    {
+      "tool_name": "persist_fallback",
+      "arguments": {
+        "name": "delta",
+        "count": 4
+      }
+    }
+  ],
+  "expected_recovery": {
+    "failed_action_index": 0,
+    "recovery_action_index": 1
+  },
+  "enabled": true
+}
