@@ -101,6 +101,14 @@ def test_temporal_pair_discovery_reports_comparable_and_rejected_pairs():
     assert pairs[0].candidate_session_id == second.session.session_id
     assert pairs[0].comparable is True
     assert pairs[0].reasons == ()
+    assert pairs[0].baseline_started_at_utc == BASE_TIME
+    assert pairs[0].candidate_started_at_utc == (
+        BASE_TIME + timedelta(hours=1)
+    )
+    assert pairs[0].baseline_observer_id == "observer-test"
+    assert pairs[0].candidate_observer_id == "observer-test"
+    assert pairs[0].baseline_region_code == "CL-Los-Lagos"
+    assert pairs[0].candidate_region_code == "CL-Los-Lagos"
 
     assert pairs[1].baseline_session_id == first.session.session_id
     assert pairs[1].candidate_session_id == third.session.session_id
@@ -160,6 +168,26 @@ def test_geographic_pair_discovery_reports_comparable_and_rejected_pairs():
     assert pairs[0].candidate_session_id == second.session.session_id
     assert pairs[0].comparable is True
     assert pairs[0].reasons == ()
+    assert pairs[0].baseline_started_at_utc == BASE_TIME
+    assert pairs[0].candidate_started_at_utc == (
+        BASE_TIME + timedelta(minutes=5)
+    )
+    assert (
+        pairs[0].baseline_observer_id
+        == "observer-los-lagos"
+    )
+    assert (
+        pairs[0].candidate_observer_id
+        == "observer-aysen-one"
+    )
+    assert (
+        pairs[0].baseline_region_code
+        == "CL-Los-Lagos"
+    )
+    assert (
+        pairs[0].candidate_region_code
+        == "CL-Aysen"
+    )
 
     assert pairs[1].baseline_session_id == first.session.session_id
     assert pairs[1].candidate_session_id == third.session.session_id
