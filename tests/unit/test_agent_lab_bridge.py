@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Thread
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
@@ -19,6 +20,7 @@ from observer.core.agent_lab_artifact_io import (
 )
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRun,
+    AgentLabProtocolRunnerError,
 )
 from schemas.agent_lab import (
     AgentTechnicalReport,
@@ -288,6 +290,192 @@ def test_agent_lab_bridge_runs_and_persists_test(
         )
 
         assert persisted == protocol_run.to_artifact()
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+
+def test_agent_lab_bridge_rejects_invalid_json(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    from http.server import ThreadingHTTPServer
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(config),
+    )
+
+    thread = Thread(
+        target=server.serve_forever,
+        daemon=True,
+    )
+    thread.start()
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            f"http://{host}:{port}/v1/agent-tests",
+            data=b"{not-json",
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "bad_request",
+            "message": "Invalid JSON request body.",
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_requires_base_url(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    from http.server import ThreadingHTTPServer
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(config),
+    )
+
+    thread = Thread(
+        target=server.serve_forever,
+        daemon=True,
+    )
+    thread.start()
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            f"http://{host}:{port}/v1/agent-tests",
+            data=json.dumps({}).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "bad_request",
+            "message": "base_url is required.",
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_reports_runner_failure(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+
+    class FailingRunner:
+        def run(
+            self,
+            *,
+            base_url: str,
+            generated_at_utc: datetime,
+        ):
+            raise AgentLabProtocolRunnerError(
+                "Unable to load agent manifest."
+            )
+
+    def runner_factory(
+        _config: AgentLabBridgeConfig,
+    ):
+        return FailingRunner()
+
+    from http.server import ThreadingHTTPServer
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(
+            config,
+            runner_factory=runner_factory,
+        ),
+    )
+
+    thread = Thread(
+        target=server.serve_forever,
+        daemon=True,
+    )
+    thread.start()
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            f"http://{host}:{port}/v1/agent-tests",
+            data=json.dumps(
+                {
+                    "base_url":
+                        "http://127.0.0.1:8000",
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert error.value.code == 500
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "agent_test_failed",
+            "message": "Unable to load agent manifest.",
+        }
+
+        assert not config.history_root.exists()
 
     finally:
         server.shutdown()

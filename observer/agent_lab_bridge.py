@@ -19,6 +19,7 @@ from observer.core.agent_lab_observation_qualification import (
 )
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
+    AgentLabProtocolRunnerError,
 )
 
 
@@ -102,18 +103,36 @@ def make_handler(
                     "Content-Length is required."
                 )
 
-            length = int(raw_length)
+            try:
+                length = int(raw_length)
+            except ValueError as exc:
+                raise ValueError(
+                    "Invalid Content-Length."
+                ) from exc
 
             if length <= 0:
                 raise ValueError(
                     "Request body is required."
                 )
 
+            if length > 4096:
+                raise ValueError(
+                    "Request body is too large."
+                )
+
             raw_body = self.rfile.read(length)
 
-            payload = json.loads(
-                raw_body.decode("utf-8")
-            )
+            try:
+                payload = json.loads(
+                    raw_body.decode("utf-8")
+                )
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+            ) as exc:
+                raise ValueError(
+                    "Invalid JSON request body."
+                ) from exc
 
             if not isinstance(
                 payload,
@@ -128,30 +147,52 @@ def make_handler(
         def _handle_agent_test(
             self,
         ) -> None:
-            payload = self._read_json_body()
+            try:
+                payload = self._read_json_body()
 
-            base_url = payload.get(
-                "base_url"
-            )
-
-            if not isinstance(
-                base_url,
-                str,
-            ):
-                raise ValueError(
-                    "base_url is required."
+                base_url = payload.get(
+                    "base_url"
                 )
+
+                if not isinstance(
+                    base_url,
+                    str,
+                ):
+                    raise ValueError(
+                        "base_url is required."
+                    )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+                return
 
             runner = runner_factory(
                 config
             )
 
-            result = runner.run(
-                base_url=base_url,
-                generated_at_utc=datetime.now(
-                    timezone.utc
-                ),
-            )
+            try:
+                result = runner.run(
+                    base_url=base_url,
+                    generated_at_utc=datetime.now(
+                        timezone.utc
+                    ),
+                )
+
+            except AgentLabProtocolRunnerError as exc:
+                self._send_json(
+                    500,
+                    {
+                        "error": "agent_test_failed",
+                        "message": str(exc),
+                    },
+                )
+                return
 
             artifact = result.to_artifact()
 
