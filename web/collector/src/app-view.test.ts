@@ -71,3 +71,26 @@ describe('renderAppView', () => {
     expect(html).toContain('In development')
   })
 })
+
+
+it('renders Test Your Agent from external state', () => {
+  const html = renderAppView(
+    'agent-lab-test',
+    '',
+    {
+      agentTest: {
+        state: 'running',
+        baseUrl: 'http://127.0.0.1:9000',
+      },
+    },
+  )
+
+  expect(html).toContain('Test running')
+  expect(html).toContain(
+    'data-agent-test-state="running"',
+  )
+  expect(html).toContain(
+    'http://127.0.0.1:9000',
+  )
+  expect(html).toContain('Running test...')
+})

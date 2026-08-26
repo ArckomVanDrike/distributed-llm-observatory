@@ -6,6 +6,10 @@ import {
   renderAgentTestPage,
 } from './agent-test-page'
 
+import type {
+  AgentTestPageOptions,
+} from './agent-test-page'
+
 import {
   renderAppShell,
 } from './app-shell'
@@ -17,6 +21,10 @@ import {
 import type {
   AppRoute,
 } from './navigation'
+
+export interface AppViewOptions {
+  agentTest?: AgentTestPageOptions
+}
 
 function renderObservatoryPage(): string {
   return `
@@ -63,6 +71,7 @@ function renderAgentStarterPage(): string {
 export function renderAppView(
   route: AppRoute,
   currentProbeHtml: string,
+  options: AppViewOptions = {},
 ): string {
   if (route === 'consumer-probe') {
     return renderCollectorPage(
@@ -80,10 +89,12 @@ export function renderAppView(
   if (route === 'agent-lab-test') {
     return renderAppShell(
       route,
-      renderAgentTestPage({
-        state: 'disconnected',
-        baseUrl: 'http://127.0.0.1:8000',
-      }),
+      renderAgentTestPage(
+        options.agentTest ?? {
+          state: 'disconnected',
+          baseUrl: 'http://127.0.0.1:8000',
+        },
+      ),
     )
   }
 

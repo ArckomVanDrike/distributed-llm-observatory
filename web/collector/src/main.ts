@@ -4,6 +4,10 @@ import {
   renderAppView,
 } from './app-view'
 
+import type {
+  AgentTestPageState,
+} from './agent-test-page'
+
 import {
   resolveAppRoute,
 } from './navigation'
@@ -58,6 +62,13 @@ type CollectorState =
   | 'completed'
 
 let state: CollectorState = 'idle'
+
+let agentTestState: AgentTestPageState =
+  'disconnected'
+
+let agentBaseUrl =
+  'http://127.0.0.1:8000'
+
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
 let observationHistory: ObservationHistory =
@@ -452,6 +463,12 @@ function render(): void {
   app.innerHTML = renderAppView(
     route,
     renderCurrentProbe(),
+    {
+      agentTest: {
+        state: agentTestState,
+        baseUrl: agentBaseUrl,
+      },
+    },
   )
 
   if (route === 'consumer-probe') {
