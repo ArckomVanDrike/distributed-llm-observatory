@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "file": "experiment-failed.webp",
+      "category": "state",
+      "purpose": "Experiment failed / error state",
+      "width": 1466,
+      "height": 1073,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_33_39.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "experiment-complete.webp",
+      "category": "state",
+      "purpose": "Experiment completed / success state",
+      "width": 1466,
+      "height": 1073,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_33_14.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "no-agent.webp",
+      "category": "state",
+      "purpose": "No agent connected / agent not configured",
+      "width": 1466,
+      "height": 1073,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_33_07.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "no-data.webp",
+      "category": "state",
+      "purpose": "No observations or data available yet",
+      "width": 1466,
+      "height": 1073,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_33_01.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "network-background.webp",
+      "category": "background",
+      "purpose": "Distributed network background",
+      "width": 1672,
+      "height": 941,
+      "alpha": false,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_32_56.png",
+      "source_mode": "RGB"
+    },
+    {
+      "file": "starfield-background.webp",
+      "category": "background",
+      "purpose": "Neutral Observatory starfield background",
+      "width": 1536,
+      "height": 1024,
+      "alpha": false,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_32_35.png",
+      "source_mode": "RGB"
+    },
+    {
+      "file": "observatory-poster.webp",
+      "category": "hero",
+      "purpose": "DLLO Observatory overview / promotional hero",
+      "width": 1536,
+      "height": 1024,
+      "alpha": false,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_32_27.png",
+      "source_mode": "RGB"
+    },
+    {
+      "file": "technical-report.webp",
+      "category": "feature",
+      "purpose": "Agent technical report illustration",
+      "width": 1536,
+      "height": 1024,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_32_08.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "benchmark-lab.webp",
+      "category": "feature",
+      "purpose": "Benchmark and model measurement laboratory",
+      "width": 1536,
+      "height": 1024,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_31_29.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "distributed-observer-node.webp",
+      "category": "feature",
+      "purpose": "Distributed observer station / observation node",
+      "width": 1536,
+      "height": 1024,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_31_17.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "agent-lab.webp",
+      "category": "feature",
+      "purpose": "Agent Lab experimentation illustration",
+      "width": 1536,
+      "height": 1024,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_56.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "observatory-hero.webp",
+      "category": "hero",
+      "purpose": "Primary Observatory hero illustration",
+      "width": 1536,
+      "height": 1024,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_48.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "network-globe-eurasia.webp",
+      "category": "geographic",
+      "purpose": "Geographic network globe, Eurasia-facing",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_35.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "network-globe-americas.webp",
+      "category": "geographic",
+      "purpose": "Geographic network globe, Americas-facing",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_20.png",
+      "source_mode": "RGBA"
+    },
+    {
+      "file": "earth-horizon.webp",
+      "category": "background",
+      "purpose": "Earth horizon full-width background",
+      "width": 1672,
+      "height": 941,
+      "alpha": false,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_09.png",
+      "source_mode": "RGB"
+    },
+    {
+      "file": "observatory-mark.webp",
+      "category": "brand",
+      "purpose": "Detailed circular DLLO Observatory brand mark",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "source_file": "ChatGPT Image 26 ago 2026, 13_30_02.png",
+      "source_mode": "RGBA"
+    }
+  ]
+}
