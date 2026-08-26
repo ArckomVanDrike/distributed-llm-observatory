@@ -4934,3 +4934,678 @@ def test_agent_compare_geographic_emits_machine_readable_json(
             "human_intervention_delta": 2,
         },
     }
+
+
+def test_parser_exposes_agent_observatory_summary():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-observatory-summary",
+            "runs",
+        ]
+    )
+
+    assert args.command == "agent-observatory-summary"
+    assert args.history_root == Path("runs")
+    assert args.target is None
+
+
+def test_agent_observatory_summary_reports_empty_history(
+    monkeypatch,
+    capsys,
+):
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return []
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+    assert captured.out == (
+        "=== DLLO AGENT OBSERVATORY SUMMARY ===\n"
+        "Runs:                 0\n"
+        "Targets:              0\n"
+        "Observers:            0\n"
+        "Observed regions:     0\n"
+        "Temporal eligible:    0\n"
+        "Geographic eligible:  0\n"
+        "Temporal pairs:\n"
+        "  Comparable: 0\n"
+        "  Rejected:   0\n"
+        "Observation window:   n/a\n"
+    )
+
+
+def test_agent_observatory_summary_reports_observation_inventory(
+    monkeypatch,
+    capsys,
+):
+    first = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000901"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-1",
+            region_code="CL-Los-Lagos",
+            started_at_utc=datetime(
+                2026,
+                8,
+                20,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    second = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000902"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-2",
+            region_code="CL-Aysen",
+            started_at_utc=datetime(
+                2026,
+                8,
+                22,
+                15,
+                30,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    legacy = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000903"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-b",
+            ),
+            observer_id=None,
+            region_code=None,
+            started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                9,
+                45,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    artifacts = [first, second, legacy]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_qualify(artifact):
+        if artifact is first:
+            return SimpleNamespace(
+                temporal_eligible=True,
+                geographic_eligible=True,
+            )
+
+        if artifact is second:
+            return SimpleNamespace(
+                temporal_eligible=True,
+                geographic_eligible=True,
+            )
+
+        if artifact is legacy:
+            return SimpleNamespace(
+                temporal_eligible=False,
+                geographic_eligible=False,
+            )
+
+        raise AssertionError("Unexpected artifact")
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        lambda artifacts: [
+            SimpleNamespace(comparable=True),
+            SimpleNamespace(comparable=True),
+            SimpleNamespace(comparable=False),
+        ],
+    )
+
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        fake_qualify,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+    assert captured.out == (
+        "=== DLLO AGENT OBSERVATORY SUMMARY ===\n"
+        "Runs:                 3\n"
+        "Targets:              2\n"
+        "Observers:            2\n"
+        "Observed regions:     2\n"
+        "Temporal eligible:    2\n"
+        "Geographic eligible:  2\n"
+        "Temporal pairs:\n"
+        "  Comparable: 2\n"
+        "  Rejected:   1\n"
+        "Observation window:\n"
+        "  First: 2026-08-20T12:00:00+00:00\n"
+        "  Last:  2026-08-26T09:45:00+00:00\n"
+    )
+
+
+def test_agent_observatory_summary_applies_target_filter(
+    monkeypatch,
+    capsys,
+):
+    first = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000911"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-1",
+            region_code="CL-Los-Lagos",
+            started_at_utc=datetime(
+                2026,
+                8,
+                20,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    second = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000912"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-1",
+            region_code="CL-Los-Lagos",
+            started_at_utc=datetime(
+                2026,
+                8,
+                21,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            raise AssertionError(
+                "load_all must not be used with target filter"
+            )
+
+        def for_target(self, target_id):
+            assert target_id == "agent-a"
+            return [first, second]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        lambda artifacts: [],
+    )
+
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda artifact: SimpleNamespace(
+            temporal_eligible=True,
+            geographic_eligible=True,
+        ),
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="agent-a",
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+    assert captured.out == (
+        "=== DLLO AGENT OBSERVATORY SUMMARY ===\n"
+        "Runs:                 2\n"
+        "Targets:              1\n"
+        "Observers:            1\n"
+        "Observed regions:     1\n"
+        "Temporal eligible:    2\n"
+        "Geographic eligible:  2\n"
+        "Temporal pairs:\n"
+        "  Comparable: 0\n"
+        "  Rejected:   0\n"
+        "Observation window:\n"
+        "  First: 2026-08-20T12:00:00+00:00\n"
+        "  Last:  2026-08-21T12:00:00+00:00\n"
+    )
+
+
+def test_main_dispatches_agent_observatory_summary(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_observatory_summary(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["target"] = args.target
+        return 29
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_observatory_summary",
+        fake_agent_observatory_summary,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dllo",
+            "agent-observatory-summary",
+            "runs",
+            "--target",
+            "agent-a",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 29
+    assert captured["command"] == "agent-observatory-summary"
+    assert captured["history_root"] == Path("runs")
+    assert captured["target"] == "agent-a"
+
+
+def test_parser_exposes_agent_observatory_summary_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-observatory-summary",
+            "runs",
+            "--target",
+            "agent-a",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-observatory-summary"
+    assert args.history_root == Path("runs")
+    assert args.target == "agent-a"
+    assert args.json_output is True
+
+
+def test_agent_observatory_summary_emits_empty_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return []
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        json_output=True,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_filter": None,
+        "runs": 0,
+        "targets": 0,
+        "observers": 0,
+        "observed_regions": 0,
+        "temporal_eligible": 0,
+        "geographic_eligible": 0,
+        "temporal_pairs": {
+            "comparable": 0,
+            "rejected": 0,
+        },
+        "observation_window": None,
+    }
+
+
+def test_agent_observatory_summary_emits_machine_readable_inventory(
+    monkeypatch,
+    capsys,
+):
+    first = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000921"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-1",
+            region_code="CL-Los-Lagos",
+            started_at_utc=datetime(
+                2026,
+                8,
+                20,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    second = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000922"
+            ),
+            target=SimpleNamespace(
+                target_id="agent-a",
+            ),
+            observer_id="observer-2",
+            region_code="CL-Aysen",
+            started_at_utc=datetime(
+                2026,
+                8,
+                22,
+                15,
+                30,
+                tzinfo=timezone.utc,
+            ),
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            raise AssertionError(
+                "load_all must not be used with target filter"
+            )
+
+        def for_target(self, target_id):
+            assert target_id == "agent-a"
+            return [first, second]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        lambda artifacts: [],
+    )
+
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda artifact: SimpleNamespace(
+            temporal_eligible=True,
+            geographic_eligible=True,
+        ),
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="agent-a",
+        json_output=True,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_filter": "agent-a",
+        "runs": 2,
+        "targets": 1,
+        "observers": 2,
+        "observed_regions": 2,
+        "temporal_eligible": 2,
+        "geographic_eligible": 2,
+        "temporal_pairs": {
+            "comparable": 0,
+            "rejected": 0,
+        },
+        "observation_window": {
+            "first_started_at_utc": (
+                "2026-08-20T12:00:00+00:00"
+            ),
+            "last_started_at_utc": (
+                "2026-08-22T15:30:00+00:00"
+            ),
+        },
+    }
+
+
+def test_agent_observatory_summary_counts_temporal_pairs(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id=UUID(
+                    "00000000-0000-0000-0000-000000000931"
+                ),
+                target=SimpleNamespace(
+                    target_id="agent-a",
+                ),
+                observer_id="observer-1",
+                region_code="CL-Los-Lagos",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    20,
+                    12,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+            ),
+        ),
+        SimpleNamespace(
+            session=SimpleNamespace(
+                session_id=UUID(
+                    "00000000-0000-0000-0000-000000000932"
+                ),
+                target=SimpleNamespace(
+                    target_id="agent-a",
+                ),
+                observer_id="observer-1",
+                region_code="CL-Los-Lagos",
+                started_at_utc=datetime(
+                    2026,
+                    8,
+                    21,
+                    12,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+            ),
+        ),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    fake_pairs = [
+        SimpleNamespace(
+            comparable=True,
+            reasons=(),
+        ),
+        SimpleNamespace(
+            comparable=True,
+            reasons=(),
+        ),
+        SimpleNamespace(
+            comparable=False,
+            reasons=("not comparable",),
+        ),
+    ]
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+        return fake_pairs
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda artifact: SimpleNamespace(
+            temporal_eligible=True,
+            geographic_eligible=True,
+        ),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        json_output=True,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload["temporal_pairs"] == {
+        "comparable": 2,
+        "rejected": 1,
+    }
+
+
+def test_agent_observatory_summary_returns_two_on_invalid_artifact(
+    monkeypatch,
+    capsys,
+):
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            raise cli_module.AgentLabArtifactIOError(
+                "Invalid Agent Lab run artifact"
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+    )
+
+    result = cli_module.agent_observatory_summary(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert captured.err == (
+        "Error: Invalid Agent Lab run artifact\n"
+    )

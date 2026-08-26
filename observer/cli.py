@@ -759,6 +759,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # -----------------------------------------------------
+    # Agent Observatory summary
+    # -----------------------------------------------------
+
+    agent_observatory_summary_parser = subparsers.add_parser(
+        "agent-observatory-summary",
+        help="Summarize Agent Lab Observatory history",
+    )
+
+    agent_observatory_summary_parser.add_argument(
+        "history_root",
+        type=Path,
+        help="Directory containing Agent Lab run artifacts",
+    )
+
+    agent_observatory_summary_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optional target ID filter",
+    )
+
+    agent_observatory_summary_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
+    )
+
+    # -----------------------------------------------------
     # Agent Lab run history
     # -----------------------------------------------------
 
@@ -2920,6 +2948,165 @@ def agent_pairs_temporal(
         return 2
 
 
+def _agent_observatory_summary_payload(
+    artifacts: list[AgentLabRunArtifact],
+    *,
+    target_filter: str | None,
+) -> dict[str, object]:
+    if not artifacts:
+        return {
+            "target_filter": target_filter,
+            "runs": 0,
+            "targets": 0,
+            "observers": 0,
+            "observed_regions": 0,
+            "temporal_eligible": 0,
+            "geographic_eligible": 0,
+            "temporal_pairs": {
+                "comparable": 0,
+                "rejected": 0,
+            },
+            "observation_window": None,
+        }
+
+    qualifications = [
+        qualify_agent_observation(artifact)
+        for artifact in artifacts
+    ]
+
+    target_ids = {
+        artifact.session.target.target_id
+        for artifact in artifacts
+    }
+    observer_ids = {
+        artifact.session.observer_id
+        for artifact in artifacts
+        if artifact.session.observer_id is not None
+    }
+    region_codes = {
+        artifact.session.region_code
+        for artifact in artifacts
+        if artifact.session.region_code is not None
+    }
+
+    started_at_values = [
+        artifact.session.started_at_utc
+        for artifact in artifacts
+    ]
+    first_started_at = min(started_at_values)
+    last_started_at = max(started_at_values)
+
+    temporal_pairs = (
+        discover_temporal_agent_observation_pairs(
+            artifacts
+        )
+    )
+    comparable_temporal_pairs = sum(
+        pair.comparable
+        for pair in temporal_pairs
+    )
+    rejected_temporal_pairs = (
+        len(temporal_pairs)
+        - comparable_temporal_pairs
+    )
+
+    return {
+        "target_filter": target_filter,
+        "runs": len(artifacts),
+        "targets": len(target_ids),
+        "observers": len(observer_ids),
+        "observed_regions": len(region_codes),
+        "temporal_eligible": sum(
+            qualification.temporal_eligible
+            for qualification in qualifications
+        ),
+        "geographic_eligible": sum(
+            qualification.geographic_eligible
+            for qualification in qualifications
+        ),
+        "temporal_pairs": {
+            "comparable": comparable_temporal_pairs,
+            "rejected": rejected_temporal_pairs,
+        },
+        "observation_window": {
+            "first_started_at_utc": first_started_at.isoformat(),
+            "last_started_at_utc": last_started_at.isoformat(),
+        },
+    }
+
+
+def agent_observatory_summary(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        history = AgentLabRunHistory(args.history_root)
+
+        if args.target is None:
+            artifacts = history.load_all()
+        else:
+            artifacts = history.for_target(args.target)
+
+        payload = _agent_observatory_summary_payload(
+            artifacts,
+            target_filter=args.target,
+        )
+
+        if getattr(args, "json_output", False):
+            print(json.dumps(payload))
+            return 0
+
+        print("=== DLLO AGENT OBSERVATORY SUMMARY ===")
+        print(f"Runs:                 {payload['runs']}")
+        print(f"Targets:              {payload['targets']}")
+        print(f"Observers:            {payload['observers']}")
+        print(
+            f"Observed regions:     "
+            f"{payload['observed_regions']}"
+        )
+        print(
+            f"Temporal eligible:    "
+            f"{payload['temporal_eligible']}"
+        )
+        print(
+            f"Geographic eligible:  "
+            f"{payload['geographic_eligible']}"
+        )
+
+        temporal_pairs = payload["temporal_pairs"]
+        print("Temporal pairs:")
+        print(
+            f"  Comparable: "
+            f"{temporal_pairs['comparable']}"
+        )
+        print(
+            f"  Rejected:   "
+            f"{temporal_pairs['rejected']}"
+        )
+
+        observation_window = payload["observation_window"]
+
+        if observation_window is None:
+            print("Observation window:   n/a")
+        else:
+            print("Observation window:")
+            print(
+                "  First: "
+                f"{observation_window['first_started_at_utc']}"
+            )
+            print(
+                "  Last:  "
+                f"{observation_window['last_started_at_utc']}"
+            )
+
+        return 0
+
+    except AgentLabArtifactIOError as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+
 def agent_history(
     args: argparse.Namespace,
 ) -> int:
@@ -3238,6 +3425,9 @@ def main() -> int:
 
     if args.command == "agent-compare-geographic":
         return agent_compare_geographic(args)
+
+    if args.command == "agent-observatory-summary":
+        return agent_observatory_summary(args)
 
     if args.command == "agent-history":
         return agent_history(args)
