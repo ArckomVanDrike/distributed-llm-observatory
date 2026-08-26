@@ -1,3 +1,4 @@
+import shlex
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -3173,3 +3174,222 @@ def test_agent_pairs_geographic_quotes_history_root_in_compare_command(
         "--max-observation-skew-seconds 600.0"
         in output
     )
+
+
+def build_pair_roundtrip_artifact(
+    *,
+    session_id: UUID,
+    observed_at: datetime,
+    observer_id: str,
+    region_code: str,
+):
+    from observer.core.agent_technical_report import (
+        build_agent_technical_report,
+    )
+    from schemas.agent_lab import (
+        AgentLabRunArtifact,
+        AgentTestSession,
+        AgentTestSessionStatus,
+    )
+    from schemas.target import (
+        TargetCapability,
+        TargetManifest,
+        TargetType,
+    )
+
+    session = AgentTestSession(
+        session_id=session_id,
+        observer_id=observer_id,
+        region_code=region_code,
+        target=TargetManifest(
+            target_id="roundtrip-agent",
+            display_name="Roundtrip Agent",
+            target_type=TargetType.AGENT,
+            capabilities={
+                TargetCapability.TEXT,
+            },
+        ),
+        suite_id="agent-protocol-core",
+        suite_version="1.0",
+        status=AgentTestSessionStatus.COMPLETED,
+        started_at_utc=observed_at,
+        completed_at_utc=observed_at,
+    )
+
+    return AgentLabRunArtifact(
+        session=session,
+        technical_report=build_agent_technical_report(
+            session,
+            generated_at_utc=observed_at,
+        ),
+    )
+
+
+def test_agent_pairs_temporal_compare_command_round_trips_through_parser(
+    tmp_path,
+    capsys,
+):
+    from observer.core.agent_lab_artifact_io import (
+        write_agent_lab_run_artifact,
+    )
+
+    history_root = tmp_path / "run history"
+    history_root.mkdir()
+
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000501"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000502"
+    )
+
+    baseline = build_pair_roundtrip_artifact(
+        session_id=baseline_session_id,
+        observed_at=datetime(
+            2026,
+            8,
+            25,
+            20,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )
+    candidate = build_pair_roundtrip_artifact(
+        session_id=candidate_session_id,
+        observed_at=datetime(
+            2026,
+            8,
+            25,
+            21,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        observer_id="observer-test",
+        region_code="CL-Los-Lagos",
+    )
+
+    write_agent_lab_run_artifact(
+        baseline,
+        history_root / "baseline.json",
+    )
+    write_agent_lab_run_artifact(
+        candidate,
+        history_root / "candidate.json",
+    )
+
+    args = SimpleNamespace(
+        history_root=history_root,
+        target=None,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    command_line = next(
+        line.removeprefix("Compare command:    ")
+        for line in output.splitlines()
+        if line.startswith("Compare command:    ")
+    )
+
+    command_parts = shlex.split(command_line)
+
+    assert command_parts[0] == "dllo"
+
+    parsed = build_parser().parse_args(
+        command_parts[1:]
+    )
+
+    assert parsed.command == "agent-compare-temporal-history"
+    assert parsed.history_root == history_root
+    assert parsed.baseline_session_id == baseline_session_id
+    assert parsed.candidate_session_id == candidate_session_id
+
+
+def test_agent_pairs_geographic_compare_command_round_trips_through_parser(
+    tmp_path,
+    capsys,
+):
+    from observer.core.agent_lab_artifact_io import (
+        write_agent_lab_run_artifact,
+    )
+
+    history_root = tmp_path / "run history"
+    history_root.mkdir()
+
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000511"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000512"
+    )
+
+    baseline = build_pair_roundtrip_artifact(
+        session_id=baseline_session_id,
+        observed_at=datetime(
+            2026,
+            8,
+            25,
+            20,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        observer_id="observer-los-lagos",
+        region_code="CL-Los-Lagos",
+    )
+    candidate = build_pair_roundtrip_artifact(
+        session_id=candidate_session_id,
+        observed_at=datetime(
+            2026,
+            8,
+            25,
+            20,
+            5,
+            tzinfo=timezone.utc,
+        ),
+        observer_id="observer-aysen",
+        region_code="CL-Aysen",
+    )
+
+    write_agent_lab_run_artifact(
+        baseline,
+        history_root / "baseline.json",
+    )
+    write_agent_lab_run_artifact(
+        candidate,
+        history_root / "candidate.json",
+    )
+
+    args = SimpleNamespace(
+        history_root=history_root,
+        target=None,
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    command_line = next(
+        line.removeprefix("Compare command:    ")
+        for line in output.splitlines()
+        if line.startswith("Compare command:    ")
+    )
+
+    command_parts = shlex.split(command_line)
+
+    assert command_parts[0] == "dllo"
+
+    parsed = build_parser().parse_args(
+        command_parts[1:]
+    )
+
+    assert parsed.command == "agent-compare-geographic-history"
+    assert parsed.history_root == history_root
+    assert parsed.baseline_session_id == baseline_session_id
+    assert parsed.candidate_session_id == candidate_session_id
+    assert parsed.max_observation_skew_seconds == 600.0
