@@ -4252,3 +4252,685 @@ def test_agent_pairs_geographic_json_preserves_missing_provenance_as_null(
     assert pair["candidate"]["region_code"] == "CL-Aysen"
     assert pair["comparable"] is False
     assert "n/a" not in output
+
+
+def test_parser_exposes_agent_compare_temporal_history_json_output():
+    parser = build_parser()
+
+    baseline_session_id = (
+        "00000000-0000-0000-0000-000000000801"
+    )
+    candidate_session_id = (
+        "00000000-0000-0000-0000-000000000802"
+    )
+
+    args = parser.parse_args(
+        [
+            "agent-compare-temporal-history",
+            "runs",
+            baseline_session_id,
+            candidate_session_id,
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-compare-temporal-history"
+    assert args.history_root == Path("runs")
+    assert args.baseline_session_id == UUID(
+        baseline_session_id
+    )
+    assert args.candidate_session_id == UUID(
+        candidate_session_id
+    )
+    assert args.json_output is True
+
+
+def test_agent_compare_temporal_history_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000811"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000812"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=baseline_session_id,
+            target=SimpleNamespace(
+                target_id="history-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=candidate_session_id,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def get_by_session_id(self, session_id):
+            if session_id == baseline_session_id:
+                return baseline
+
+            if session_id == candidate_session_id:
+                return candidate
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        return SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_temporal_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+        json_output=True,
+    )
+
+    result = cli_module.agent_compare_temporal_history(
+        args
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_id": "history-agent",
+        "suite_id": "agent-protocol-core",
+        "suite_version": "1.0",
+        "observer_id": "observer-test",
+        "region_code": "CL-Los-Lagos",
+        "baseline": {
+            "session_id": str(baseline_session_id),
+            "started_at_utc": (
+                "2026-08-25T20:00:00+00:00"
+            ),
+        },
+        "candidate": {
+            "session_id": str(candidate_session_id),
+            "started_at_utc": (
+                "2026-08-26T20:00:00+00:00"
+            ),
+        },
+        "comparison": {
+            "total_tasks": 4,
+            "improvements": 1,
+            "regressions": 1,
+            "unchanged": 2,
+            "pass_rate_delta": 0.25,
+            "median_latency_ms_delta": 150.0,
+            "retry_delta": -1,
+            "human_intervention_delta": 2,
+        },
+    }
+
+
+def test_parser_exposes_agent_compare_temporal_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-compare-temporal",
+            "baseline.json",
+            "candidate.json",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-compare-temporal"
+    assert args.baseline == Path("baseline.json")
+    assert args.candidate == Path("candidate.json")
+    assert args.json_output is True
+
+
+def test_agent_compare_temporal_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000821"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000822"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=baseline_session_id,
+            target=SimpleNamespace(
+                target_id="path-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=candidate_session_id,
+        ),
+    )
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+
+        if path == Path("candidate.json"):
+            return candidate
+
+        raise AssertionError(
+            f"Unexpected artifact path: {path}"
+        )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        return SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_temporal_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+        json_output=True,
+    )
+
+    result = cli_module.agent_compare_temporal(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_id": "path-agent",
+        "suite_id": "agent-protocol-core",
+        "suite_version": "1.0",
+        "observer_id": "observer-test",
+        "region_code": "CL-Los-Lagos",
+        "baseline": {
+            "session_id": str(baseline_session_id),
+            "started_at_utc": (
+                "2026-08-25T20:00:00+00:00"
+            ),
+        },
+        "candidate": {
+            "session_id": str(candidate_session_id),
+            "started_at_utc": (
+                "2026-08-26T20:00:00+00:00"
+            ),
+        },
+        "comparison": {
+            "total_tasks": 4,
+            "improvements": 1,
+            "regressions": 1,
+            "unchanged": 2,
+            "pass_rate_delta": 0.25,
+            "median_latency_ms_delta": 150.0,
+            "retry_delta": -1,
+            "human_intervention_delta": 2,
+        },
+    }
+
+
+def test_parser_exposes_agent_compare_geographic_history_json_output():
+    parser = build_parser()
+
+    baseline_session_id = (
+        "00000000-0000-0000-0000-000000000831"
+    )
+    candidate_session_id = (
+        "00000000-0000-0000-0000-000000000832"
+    )
+
+    args = parser.parse_args(
+        [
+            "agent-compare-geographic-history",
+            "runs",
+            baseline_session_id,
+            candidate_session_id,
+            "--max-observation-skew-seconds",
+            "600",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-compare-geographic-history"
+    assert args.history_root == Path("runs")
+    assert args.baseline_session_id == UUID(
+        baseline_session_id
+    )
+    assert args.candidate_session_id == UUID(
+        candidate_session_id
+    )
+    assert args.max_observation_skew_seconds == 600.0
+    assert args.json_output is True
+
+
+def test_agent_compare_geographic_history_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000841"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000842"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=baseline_session_id,
+            target=SimpleNamespace(
+                target_id="history-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=candidate_session_id,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def get_by_session_id(self, session_id):
+            if session_id == baseline_session_id:
+                return baseline
+
+            if session_id == candidate_session_id:
+                return candidate
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+        *,
+        max_observation_skew,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return SimpleNamespace(
+            baseline_observer_id="observer-los-lagos",
+            candidate_observer_id="observer-aysen",
+            baseline_region_code="CL-Los-Lagos",
+            candidate_region_code="CL-Aysen",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                5,
+                tzinfo=timezone.utc,
+            ),
+            observation_skew=timedelta(
+                minutes=5,
+            ),
+            max_observation_skew=timedelta(
+                minutes=10,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_geographic_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+        max_observation_skew_seconds=600.0,
+        json_output=True,
+    )
+
+    result = cli_module.agent_compare_geographic_history(
+        args
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_id": "history-agent",
+        "suite_id": "agent-protocol-core",
+        "suite_version": "1.0",
+        "baseline": {
+            "session_id": str(baseline_session_id),
+            "observer_id": "observer-los-lagos",
+            "region_code": "CL-Los-Lagos",
+            "started_at_utc": (
+                "2026-08-26T20:00:00+00:00"
+            ),
+        },
+        "candidate": {
+            "session_id": str(candidate_session_id),
+            "observer_id": "observer-aysen",
+            "region_code": "CL-Aysen",
+            "started_at_utc": (
+                "2026-08-26T20:05:00+00:00"
+            ),
+        },
+        "observation_skew_seconds": 300.0,
+        "max_observation_skew_seconds": 600.0,
+        "comparison": {
+            "total_tasks": 4,
+            "improvements": 1,
+            "regressions": 1,
+            "unchanged": 2,
+            "pass_rate_delta": 0.25,
+            "median_latency_ms_delta": 150.0,
+            "retry_delta": -1,
+            "human_intervention_delta": 2,
+        },
+    }
+
+
+def test_parser_exposes_agent_compare_geographic_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-compare-geographic",
+            "baseline.json",
+            "candidate.json",
+            "--max-observation-skew-seconds",
+            "600",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-compare-geographic"
+    assert args.baseline == Path("baseline.json")
+    assert args.candidate == Path("candidate.json")
+    assert args.max_observation_skew_seconds == 600.0
+    assert args.json_output is True
+
+
+def test_agent_compare_geographic_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000851"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000852"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=baseline_session_id,
+            target=SimpleNamespace(
+                target_id="path-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=candidate_session_id,
+        ),
+    )
+
+    def fake_load(path):
+        if path == Path("baseline.json"):
+            return baseline
+
+        if path == Path("candidate.json"):
+            return candidate
+
+        raise AssertionError(
+            f"Unexpected artifact path: {path}"
+        )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+        *,
+        max_observation_skew,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return SimpleNamespace(
+            baseline_observer_id="observer-los-lagos",
+            candidate_observer_id="observer-aysen",
+            baseline_region_code="CL-Los-Lagos",
+            candidate_region_code="CL-Aysen",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                20,
+                5,
+                tzinfo=timezone.utc,
+            ),
+            observation_skew=timedelta(
+                minutes=5,
+            ),
+            max_observation_skew=timedelta(
+                minutes=10,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "load_agent_lab_run_artifact",
+        fake_load,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_geographic_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        baseline=Path("baseline.json"),
+        candidate=Path("candidate.json"),
+        max_observation_skew_seconds=600.0,
+        json_output=True,
+    )
+
+    result = cli_module.agent_compare_geographic(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "target_id": "path-agent",
+        "suite_id": "agent-protocol-core",
+        "suite_version": "1.0",
+        "baseline": {
+            "session_id": str(baseline_session_id),
+            "observer_id": "observer-los-lagos",
+            "region_code": "CL-Los-Lagos",
+            "started_at_utc": (
+                "2026-08-26T20:00:00+00:00"
+            ),
+        },
+        "candidate": {
+            "session_id": str(candidate_session_id),
+            "observer_id": "observer-aysen",
+            "region_code": "CL-Aysen",
+            "started_at_utc": (
+                "2026-08-26T20:05:00+00:00"
+            ),
+        },
+        "observation_skew_seconds": 300.0,
+        "max_observation_skew_seconds": 600.0,
+        "comparison": {
+            "total_tasks": 4,
+            "improvements": 1,
+            "regressions": 1,
+            "unchanged": 2,
+            "pass_rate_delta": 0.25,
+            "median_latency_ms_delta": 150.0,
+            "retry_delta": -1,
+            "human_intervention_delta": 2,
+        },
+    }

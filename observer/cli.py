@@ -626,6 +626,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Candidate Agent Lab run artifact JSON",
     )
 
+    agent_compare_temporal_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
+    )
+
     # -----------------------------------------------------
     # Agent Lab temporal history comparison
     # -----------------------------------------------------
@@ -656,6 +663,13 @@ def build_parser() -> argparse.ArgumentParser:
         "candidate_session_id",
         type=UUID,
         help="Candidate Agent Lab session ID",
+    )
+
+    agent_compare_temporal_history_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
     )
 
     # -----------------------------------------------------
@@ -700,6 +714,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    agent_compare_geographic_history_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
+    )
+
     agent_compare_geographic_parser = subparsers.add_parser(
         "agent-compare-geographic",
         help=(
@@ -728,6 +749,13 @@ def build_parser() -> argparse.ArgumentParser:
             "Maximum allowed observation time skew "
             "in seconds"
         ),
+    )
+
+    agent_compare_geographic_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
     )
 
     # -----------------------------------------------------
@@ -2081,6 +2109,54 @@ def agent_compare(
         return 2
 
 
+def _temporal_agent_comparison_payload(
+    baseline: AgentLabRunArtifact,
+    candidate: AgentLabRunArtifact,
+    temporal_comparison: AgentTemporalComparison,
+) -> dict[str, object]:
+    comparison = temporal_comparison.run_comparison
+
+    return {
+        "target_id": baseline.session.target.target_id,
+        "suite_id": baseline.session.suite_id,
+        "suite_version": baseline.session.suite_version,
+        "observer_id": temporal_comparison.observer_id,
+        "region_code": temporal_comparison.region_code,
+        "baseline": {
+            "session_id": str(
+                baseline.session.session_id
+            ),
+            "started_at_utc": (
+                temporal_comparison.baseline_started_at_utc.isoformat()
+            ),
+        },
+        "candidate": {
+            "session_id": str(
+                candidate.session.session_id
+            ),
+            "started_at_utc": (
+                temporal_comparison.candidate_started_at_utc.isoformat()
+            ),
+        },
+        "comparison": {
+            "total_tasks": comparison.total_tasks,
+            "improvements": comparison.improvements,
+            "regressions": comparison.regressions,
+            "unchanged": comparison.unchanged,
+            "pass_rate_delta": (
+                comparison.pass_rate_delta
+            ),
+            "median_latency_ms_delta": (
+                comparison.median_latency_ms_delta
+            ),
+            "retry_delta": comparison.retry_delta,
+            "human_intervention_delta": (
+                comparison.human_intervention_delta
+            ),
+        },
+    }
+
+
 def _print_temporal_agent_comparison(
     baseline: AgentLabRunArtifact,
     temporal_comparison: AgentTemporalComparison,
@@ -2183,10 +2259,21 @@ def agent_compare_temporal_history(
                 baseline,
             )
         )
-        _print_temporal_agent_comparison(
-            baseline,
-            temporal_comparison,
-        )
+        if getattr(args, "json_output", False):
+            print(
+                json.dumps(
+                    _temporal_agent_comparison_payload(
+                        baseline,
+                        candidate,
+                        temporal_comparison,
+                    )
+                )
+            )
+        else:
+            _print_temporal_agent_comparison(
+                baseline,
+                temporal_comparison,
+            )
 
         return 0
 
@@ -2218,10 +2305,21 @@ def agent_compare_temporal(
                 baseline,
             )
         )
-        _print_temporal_agent_comparison(
-            baseline,
-            temporal_comparison,
-        )
+        if getattr(args, "json_output", False):
+            print(
+                json.dumps(
+                    _temporal_agent_comparison_payload(
+                        baseline,
+                        candidate,
+                        temporal_comparison,
+                    )
+                )
+            )
+        else:
+            _print_temporal_agent_comparison(
+                baseline,
+                temporal_comparison,
+            )
 
         return 0
 
@@ -2234,6 +2332,68 @@ def agent_compare_temporal(
             file=sys.stderr,
         )
         return 2
+
+def _geographic_agent_comparison_payload(
+    baseline: AgentLabRunArtifact,
+    candidate: AgentLabRunArtifact,
+    geographic_comparison: AgentGeographicComparison,
+) -> dict[str, object]:
+    comparison = geographic_comparison.run_comparison
+
+    return {
+        "target_id": baseline.session.target.target_id,
+        "suite_id": baseline.session.suite_id,
+        "suite_version": baseline.session.suite_version,
+        "baseline": {
+            "session_id": str(
+                baseline.session.session_id
+            ),
+            "observer_id": (
+                geographic_comparison.baseline_observer_id
+            ),
+            "region_code": (
+                geographic_comparison.baseline_region_code
+            ),
+            "started_at_utc": (
+                geographic_comparison.baseline_started_at_utc.isoformat()
+            ),
+        },
+        "candidate": {
+            "session_id": str(
+                candidate.session.session_id
+            ),
+            "observer_id": (
+                geographic_comparison.candidate_observer_id
+            ),
+            "region_code": (
+                geographic_comparison.candidate_region_code
+            ),
+            "started_at_utc": (
+                geographic_comparison.candidate_started_at_utc.isoformat()
+            ),
+        },
+        "observation_skew_seconds": (
+            geographic_comparison.observation_skew.total_seconds()
+        ),
+        "max_observation_skew_seconds": (
+            geographic_comparison.max_observation_skew.total_seconds()
+        ),
+        "comparison": {
+            "total_tasks": comparison.total_tasks,
+            "improvements": comparison.improvements,
+            "regressions": comparison.regressions,
+            "unchanged": comparison.unchanged,
+            "pass_rate_delta": comparison.pass_rate_delta,
+            "median_latency_ms_delta": (
+                comparison.median_latency_ms_delta
+            ),
+            "retry_delta": comparison.retry_delta,
+            "human_intervention_delta": (
+                comparison.human_intervention_delta
+            ),
+        },
+    }
+
 
 def _print_geographic_agent_comparison(
     baseline: AgentLabRunArtifact,
@@ -2356,10 +2516,21 @@ def agent_compare_geographic_history(
                 ),
             )
         )
-        _print_geographic_agent_comparison(
-            baseline,
-            geographic_comparison,
-        )
+        if getattr(args, "json_output", False):
+            print(
+                json.dumps(
+                    _geographic_agent_comparison_payload(
+                        baseline,
+                        candidate,
+                        geographic_comparison,
+                    )
+                )
+            )
+        else:
+            _print_geographic_agent_comparison(
+                baseline,
+                geographic_comparison,
+            )
 
         return 0
 
@@ -2394,10 +2565,21 @@ def agent_compare_geographic(
                 ),
             )
         )
-        _print_geographic_agent_comparison(
-            baseline,
-            geographic_comparison,
-        )
+        if getattr(args, "json_output", False):
+            print(
+                json.dumps(
+                    _geographic_agent_comparison_payload(
+                        baseline,
+                        candidate,
+                        geographic_comparison,
+                    )
+                )
+            )
+        else:
+            _print_geographic_agent_comparison(
+                baseline,
+                geographic_comparison,
+            )
 
         return 0
 
