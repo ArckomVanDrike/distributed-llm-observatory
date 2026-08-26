@@ -348,3 +348,453 @@ footer {
     flex-direction: column;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* DLLO application shell                                                     */
+/* -------------------------------------------------------------------------- */
+
+.dllo-app-shell {
+  width: min(1280px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.25rem 0 3rem;
+}
+
+.dllo-app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 0.8rem 0 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dllo-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.dllo-brand span {
+  color: var(--accent);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dllo-brand small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.dllo-primary-nav,
+.dllo-agent-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dllo-primary-nav a,
+.dllo-agent-nav a {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.dllo-primary-nav a:hover,
+.dllo-agent-nav a:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.dllo-primary-nav a[aria-current="page"],
+.dllo-agent-nav a[aria-current="page"] {
+  color: var(--text);
+  border-color: rgba(144, 224, 192, 0.3);
+  background: var(--accent-soft);
+}
+
+.dllo-agent-nav {
+  justify-content: flex-end;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid rgba(38, 49, 61, 0.55);
+}
+
+.dllo-agent-nav::before {
+  margin-right: auto;
+  color: var(--muted);
+  content: "Agent Lab";
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dllo-page {
+  min-height: calc(100vh - 10rem);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Agent Lab                                                                  */
+/* -------------------------------------------------------------------------- */
+
+.agent-lab-page,
+.agent-test-page,
+.observatory-page,
+.agent-starter-page {
+  padding: 3.5rem 0 1rem;
+}
+
+.agent-lab-hero,
+.agent-test-hero {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 0.9fr)
+    minmax(420px, 1.1fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 5rem);
+  min-height: 520px;
+}
+
+.agent-lab-hero-copy,
+.agent-test-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.agent-lab-hero h1,
+.agent-test-hero h1,
+.observatory-page h1,
+.agent-starter-page h1 {
+  max-width: 760px;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+  font-size: clamp(2.6rem, 5vw, 4.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.agent-lab-hero-copy > p:not(.hero-label),
+.agent-test-copy > p:not(.hero-label) {
+  max-width: 680px;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+
+.agent-lab-hero-visual,
+.agent-test-visual {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+.agent-lab-hero-visual img,
+.agent-test-visual img {
+  display: block;
+  width: 100%;
+  max-width: 680px;
+  max-height: 620px;
+  object-fit: contain;
+}
+
+.agent-lab-workflows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.agent-lab-workflow-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  min-height: 330px;
+  padding: clamp(1.4rem, 3vw, 2rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(112, 92, 255, 0.12),
+      transparent 18rem
+    ),
+    var(--panel);
+}
+
+.agent-lab-workflow-card:first-child {
+  border-color: rgba(144, 224, 192, 0.28);
+}
+
+.agent-lab-workflow-card h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.65rem;
+}
+
+.agent-lab-workflow-card p:not(.section-label) {
+  max-width: 580px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.agent-lab-workflow-card ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1.25rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+
+.primary-action,
+.secondary-action {
+  align-self: flex-start;
+  border-radius: 0.55rem;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primary-action {
+  color: #07110d;
+  background: var(--accent);
+}
+
+.secondary-action {
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: transparent;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Test Your Agent                                                            */
+/* -------------------------------------------------------------------------- */
+
+.agent-test-console {
+  max-width: 920px;
+  margin: 2rem auto 0;
+  padding: clamp(1.4rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(116, 91, 255, 0.06),
+      transparent 45%
+    ),
+    var(--panel);
+}
+
+.agent-endpoint-field {
+  display: block;
+  margin: 1.8rem 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#agent-base-url {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  padding: 0.8rem 0.9rem;
+  color: var(--text);
+  background: var(--panel-soft);
+}
+
+#agent-base-url:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.agent-test-protocol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.4rem;
+}
+
+.agent-test-protocol div {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--panel-soft);
+}
+
+.agent-test-protocol span,
+.agent-test-protocol strong {
+  display: block;
+}
+
+.agent-test-protocol span {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-test-protocol strong {
+  font-size: 0.92rem;
+}
+
+.agent-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.agent-test-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.agent-test-advanced {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.agent-test-advanced summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.agent-test-advanced p {
+  max-width: 680px;
+  margin: 0.9rem 0 0;
+  line-height: 1.6;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Observatory / Agent Starter                                                */
+/* -------------------------------------------------------------------------- */
+
+.observatory-page .hero,
+.agent-starter-page .hero {
+  max-width: 900px;
+  padding: 4rem 0;
+}
+
+.observatory-page .hero-copy,
+.agent-starter-page .hero-copy {
+  max-width: 760px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive                                                                 */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .dllo-app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dllo-primary-nav {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+  }
+
+  .agent-lab-hero,
+  .agent-test-hero {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    min-height: 0;
+  }
+
+  .agent-lab-hero-visual,
+  .agent-test-visual {
+    order: -1;
+  }
+
+  .agent-lab-hero-visual img,
+  .agent-test-visual img {
+    max-width: 560px;
+    max-height: 460px;
+  }
+
+  .agent-lab-workflows {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dllo-app-shell {
+    width: min(100% - 1.25rem, 1280px);
+    padding-top: 0.65rem;
+  }
+
+  .dllo-brand {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .dllo-primary-nav,
+  .dllo-agent-nav {
+    gap: 0.15rem;
+  }
+
+  .dllo-primary-nav a,
+  .dllo-agent-nav a {
+    padding: 0.5rem 0.65rem;
+    white-space: nowrap;
+  }
+
+  .dllo-agent-nav {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .dllo-agent-nav::before {
+    display: none;
+  }
+
+  .agent-lab-page,
+  .agent-test-page,
+  .observatory-page,
+  .agent-starter-page {
+    padding-top: 2rem;
+  }
+
+  .agent-lab-hero h1,
+  .agent-test-hero h1,
+  .observatory-page h1,
+  .agent-starter-page h1 {
+    font-size: clamp(2.25rem, 12vw, 3.5rem);
+  }
+
+  .agent-test-protocol {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-test-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agent-test-actions button,
+  .agent-test-actions .secondary-action {
+    width: 100%;
+    text-align: center;
+  }
+}
