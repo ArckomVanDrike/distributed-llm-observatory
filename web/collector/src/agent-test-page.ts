@@ -1,3 +1,8 @@
+import type {
+  AgentTestBridgeResponse,
+} from './agent-test-bridge'
+
+
 export type AgentTestPageState =
   | 'disconnected'
   | 'running'
@@ -7,6 +12,7 @@ export type AgentTestPageState =
 export interface AgentTestPageOptions {
   state: AgentTestPageState
   baseUrl: string
+  result?: AgentTestBridgeResponse | null
 }
 
 const stateVisuals: Record<
@@ -40,6 +46,173 @@ const stateLabels: Record<
   success: 'Test completed',
   failed: 'Test failed',
 }
+
+function escapeHtml(
+  value: string,
+): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function renderRunningIndicator(): string {
+  return `
+    <div
+      class="agent-test-running"
+      data-agent-test-loader="running"
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        class="dllo-orbit"
+        aria-hidden="true"
+      >
+        <span class="dllo-orbit-ring dllo-orbit-ring-outer"></span>
+        <span class="dllo-orbit-ring dllo-orbit-ring-inner"></span>
+        <span class="dllo-orbit-core"></span>
+      </div>
+
+      <div class="agent-test-running-copy">
+        <strong>Running Agent Protocol</strong>
+        <span>
+          Collecting observer-owned evidence...
+        </span>
+      </div>
+    </div>
+  `
+}
+
+
+function renderTechnicalSummary(
+  result: AgentTestBridgeResponse,
+): string {
+  const passRate =
+    result.pass_rate === null
+      ? 'n/a'
+      : `${Math.round(result.pass_rate * 1000) / 10}%`
+
+  const medianLatency =
+    result.median_latency_ms === null
+      ? 'n/a'
+      : `${
+          Math.round(
+            result.median_latency_ms * 100,
+          ) / 100
+        } ms`
+
+  const findings = result.findings.length === 0
+    ? '<li>No findings.</li>'
+    : result.findings
+        .map(
+          (finding) => (
+            `<li>${escapeHtml(finding)}</li>`
+          ),
+        )
+        .join('')
+
+  const recommendations =
+    result.recommendations.length === 0
+      ? '<li>No recommendations.</li>'
+      : result.recommendations
+          .map(
+            (recommendation) => (
+              `<li>${escapeHtml(recommendation)}</li>`
+            ),
+          )
+          .join('')
+
+  return `
+    <section class="agent-technical-report">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">
+            Technical report
+          </p>
+
+          <h2>
+            ${escapeHtml(result.target_id)}
+          </h2>
+        </div>
+      </div>
+
+      <div class="agent-report-metrics">
+        <div>
+          <span>Protocol</span>
+          <strong>
+            ${escapeHtml(result.suite_id)}
+            ${escapeHtml(result.suite_version)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Tasks passed</span>
+          <strong>
+            ${result.passed_tasks} / ${result.total_tasks}
+          </strong>
+        </div>
+
+        <div>
+          <span>Pass rate</span>
+          <strong>${passRate}</strong>
+        </div>
+
+        <div>
+          <span>Median latency</span>
+          <strong>${medianLatency}</strong>
+        </div>
+      </div>
+
+      <div class="agent-report-observatory">
+        <p>
+          Observer
+          <strong>
+            ${escapeHtml(result.observer_id ?? 'n/a')}
+          </strong>
+        </p>
+
+        <p>
+          <strong>
+            Observed from ${escapeHtml(
+              result.region_code ?? 'n/a',
+            )}
+          </strong>
+        </p>
+
+        <p>
+          ${
+            result.observatory.temporal_eligible
+              ? 'Temporal eligible'
+              : 'Temporal not eligible'
+          }
+        </p>
+
+        <p>
+          ${
+            result.observatory.geographic_eligible
+              ? 'Geographic eligible'
+              : 'Geographic not eligible'
+          }
+        </p>
+      </div>
+
+      <div class="agent-report-notes">
+        <div>
+          <h3>Findings</h3>
+          <ul>${findings}</ul>
+        </div>
+
+        <div>
+          <h3>Recommendations</h3>
+          <ul>${recommendations}</ul>
+        </div>
+      </div>
+    </section>
+  `
+}
+
 
 export function renderAgentTestPage(
   options: AgentTestPageOptions,
@@ -128,6 +301,12 @@ export function renderAgentTestPage(
           </div>
         </div>
 
+        ${
+          options.state === 'running'
+            ? renderRunningIndicator()
+            : ''
+        }
+
         <div class="agent-test-actions">
           <button
             type="button"
@@ -163,6 +342,15 @@ export function renderAgentTestPage(
           </p>
         </details>
       </section>
+
+      ${
+        options.result === undefined
+        || options.result === null
+          ? ''
+          : renderTechnicalSummary(
+              options.result,
+            )
+      }
     </main>
   `
 }

@@ -9,6 +9,10 @@ import {
 } from './agent-test-flow'
 
 import type {
+  AgentTestBridgeResponse,
+} from './agent-test-bridge'
+
+import type {
   AgentTestPageState,
 } from './agent-test-page'
 
@@ -72,6 +76,9 @@ let agentTestState: AgentTestPageState =
 
 let agentBaseUrl =
   'http://127.0.0.1:8000'
+
+let agentTestResult:
+  AgentTestBridgeResponse | null = null
 
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
@@ -471,6 +478,7 @@ function render(): void {
       agentTest: {
         state: agentTestState,
         baseUrl: agentBaseUrl,
+        result: agentTestResult,
       },
     },
   )
@@ -545,8 +553,10 @@ function bindAgentTestEvents(): void {
     async () => {
       agentBaseUrl = input.value.trim()
 
+      agentTestResult = null
+
       try {
-        await executeAgentTest({
+        const result = await executeAgentTest({
           baseUrl: agentBaseUrl,
           fetchImpl: (
             request,
@@ -554,9 +564,15 @@ function bindAgentTestEvents(): void {
           ) => fetch(request, init),
           onStateChange(nextState) {
             agentTestState = nextState
-            render()
+
+            if (nextState !== 'success') {
+              render()
+            }
           },
         })
+
+        agentTestResult = result
+        render()
       } catch {
         // executeAgentTest already moved the
         // application into the failed state.

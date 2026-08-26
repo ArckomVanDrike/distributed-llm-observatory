@@ -652,6 +652,119 @@ footer {
   font-size: 0.92rem;
 }
 
+.agent-test-running {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  margin: 1.25rem 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background:
+    radial-gradient(
+      circle at 2.8rem 50%,
+      var(--accent-soft),
+      transparent 4.6rem
+    ),
+    var(--panel-soft);
+}
+
+.dllo-orbit {
+  position: relative;
+  width: 3.4rem;
+  height: 3.4rem;
+  flex: 0 0 3.4rem;
+}
+
+.dllo-orbit-ring,
+.dllo-orbit-core {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.dllo-orbit-ring {
+  inset: 0;
+  border: 2px solid transparent;
+}
+
+.dllo-orbit-ring-outer {
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  animation:
+    dllo-orbit-spin 1.5s linear infinite;
+}
+
+.dllo-orbit-ring-inner {
+  inset: 0.55rem;
+  border-bottom-color: #745bff;
+  border-left-color: #745bff;
+  animation:
+    dllo-orbit-spin-reverse 2.1s linear infinite;
+}
+
+.dllo-orbit-core {
+  inset: 1.18rem;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 0.3rem var(--accent-soft),
+    0 0 1.1rem var(--accent);
+  animation:
+    dllo-orbit-pulse 1.35s ease-in-out infinite;
+}
+
+.agent-test-running-copy {
+  min-width: 0;
+}
+
+.agent-test-running-copy strong,
+.agent-test-running-copy span {
+  display: block;
+}
+
+.agent-test-running-copy strong {
+  color: var(--text);
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+}
+
+.agent-test-running-copy span {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@keyframes dllo-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dllo-orbit-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes dllo-orbit-pulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dllo-orbit-ring,
+  .dllo-orbit-core {
+    animation: none;
+  }
+}
+
 .agent-test-actions {
   display: flex;
   align-items: center;
@@ -680,6 +793,146 @@ footer {
   max-width: 680px;
   margin: 0.9rem 0 0;
   line-height: 1.6;
+}
+
+/* Technical report --------------------------------------------------------- */
+
+.agent-technical-report {
+  max-width: 920px;
+  margin: 1rem auto 0;
+  padding: clamp(1.4rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(75, 215, 180, 0.055),
+      transparent 42%
+    ),
+    var(--panel);
+}
+
+.agent-technical-report .panel-heading {
+  margin-bottom: 1.4rem;
+}
+
+.agent-technical-report .panel-heading h2 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  overflow-wrap: anywhere;
+}
+
+.agent-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.agent-report-metrics > div {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--panel-soft);
+}
+
+.agent-report-metrics span,
+.agent-report-metrics strong {
+  display: block;
+}
+
+.agent-report-metrics span {
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-report-metrics strong {
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.agent-report-observatory {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1.4fr);
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.agent-report-observatory p {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.agent-report-observatory strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.agent-report-observatory p:nth-child(3),
+.agent-report-observatory p:nth-child(4) {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.agent-report-observatory p:nth-child(3)::before,
+.agent-report-observatory p:nth-child(4)::before {
+  content: "✓";
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 1.35rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #07110d;
+  background: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.agent-report-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.agent-report-notes > div {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--panel-soft);
+}
+
+.agent-report-notes h3 {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+}
+
+.agent-report-notes ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.agent-report-notes li + li {
+  margin-top: 0.3rem;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -796,5 +1049,29 @@ footer {
   .agent-test-actions .secondary-action {
     width: 100%;
     text-align: center;
+  }
+}
+
+/* Technical report responsive --------------------------------------------- */
+
+@media (max-width: 900px) {
+  .agent-report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-report-observatory {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .agent-technical-report {
+    padding: 1.2rem;
+  }
+
+  .agent-report-metrics,
+  .agent-report-observatory,
+  .agent-report-notes {
+    grid-template-columns: 1fr;
   }
 }
