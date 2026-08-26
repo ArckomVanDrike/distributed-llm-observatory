@@ -2,6 +2,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 
 import observer.cli as cli_module
 from observer.cli import (
@@ -2422,3 +2423,585 @@ def test_agent_pairs_geographic_reports_missing_provenance_as_na(
     assert "Candidate observer: observer-test" in output
     assert "Observed from candidate: CL-Aysen" in output
     assert "None" not in output
+
+
+def test_parser_exposes_agent_compare_temporal_history_command():
+    parser = build_parser()
+
+    baseline_session_id = (
+        "00000000-0000-0000-0000-000000000301"
+    )
+    candidate_session_id = (
+        "00000000-0000-0000-0000-000000000302"
+    )
+
+    args = parser.parse_args(
+        [
+            "agent-compare-temporal-history",
+            "runs",
+            baseline_session_id,
+            candidate_session_id,
+        ]
+    )
+
+    assert args.command == "agent-compare-temporal-history"
+    assert args.history_root == Path("runs")
+    assert args.baseline_session_id == UUID(
+        baseline_session_id
+    )
+    assert args.candidate_session_id == UUID(
+        candidate_session_id
+    )
+
+
+def test_main_dispatches_agent_compare_temporal_history(
+    monkeypatch,
+):
+    captured = {}
+
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000301"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000302"
+    )
+
+    def fake_agent_compare_temporal_history(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["baseline_session_id"] = (
+            args.baseline_session_id
+        )
+        captured["candidate_session_id"] = (
+            args.candidate_session_id
+        )
+        return 41
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_compare_temporal_history",
+        fake_agent_compare_temporal_history,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-compare-temporal-history",
+            "runs",
+            str(baseline_session_id),
+            str(candidate_session_id),
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 41
+    assert (
+        captured["command"]
+        == "agent-compare-temporal-history"
+    )
+    assert captured["history_root"] == Path("runs")
+    assert (
+        captured["baseline_session_id"]
+        == baseline_session_id
+    )
+    assert (
+        captured["candidate_session_id"]
+        == candidate_session_id
+    )
+
+
+def test_agent_compare_temporal_history_resolves_sessions_and_reports(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000311"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000312"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            target=SimpleNamespace(
+                target_id="history-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(),
+    )
+
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def get_by_session_id(self, session_id):
+            captured.setdefault(
+                "session_ids",
+                [],
+            ).append(session_id)
+
+            if session_id == baseline_session_id:
+                return baseline
+
+            if session_id == candidate_session_id:
+                return candidate
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+
+        return SimpleNamespace(
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                24,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_temporal_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+    )
+
+    result = cli_module.agent_compare_temporal_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["session_ids"] == [
+        baseline_session_id,
+        candidate_session_id,
+    ]
+
+    assert (
+        "=== DLLO AGENT TEMPORAL COMPARISON ==="
+        in output
+    )
+    assert "Target:             history-agent" in output
+    assert (
+        "Suite:              "
+        "agent-protocol-core v1.0"
+        in output
+    )
+    assert "Observer:           observer-test" in output
+    assert "Observed from:      CL-Los-Lagos" in output
+    assert (
+        "Baseline observed:  "
+        "2026-08-24T20:00:00+00:00"
+        in output
+    )
+    assert (
+        "Candidate observed: "
+        "2026-08-25T20:00:00+00:00"
+        in output
+    )
+    assert "Tasks compared:     4" in output
+    assert "Pass rate delta:    +25.0%" in output
+    assert "Median latency:     +150.0 ms" in output
+
+
+def test_agent_compare_temporal_history_returns_two_on_unknown_session(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000321"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000399"
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def get_by_session_id(self, session_id):
+            if session_id == baseline_session_id:
+                return SimpleNamespace()
+
+            if session_id == candidate_session_id:
+                raise ValueError(
+                    "Agent Lab run history does not contain "
+                    f"session_id: {session_id}"
+                )
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+    )
+
+    result = cli_module.agent_compare_temporal_history(args)
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Agent Lab run history does not contain "
+        f"session_id: {candidate_session_id}"
+        in captured.err
+    )
+
+
+def test_parser_exposes_agent_compare_geographic_history_command():
+    parser = build_parser()
+
+    baseline_session_id = (
+        "00000000-0000-0000-0000-000000000401"
+    )
+    candidate_session_id = (
+        "00000000-0000-0000-0000-000000000402"
+    )
+
+    args = parser.parse_args(
+        [
+            "agent-compare-geographic-history",
+            "runs",
+            baseline_session_id,
+            candidate_session_id,
+            "--max-observation-skew-seconds",
+            "600",
+        ]
+    )
+
+    assert args.command == "agent-compare-geographic-history"
+    assert args.history_root == Path("runs")
+    assert args.baseline_session_id == UUID(
+        baseline_session_id
+    )
+    assert args.candidate_session_id == UUID(
+        candidate_session_id
+    )
+    assert args.max_observation_skew_seconds == 600.0
+
+
+def test_main_dispatches_agent_compare_geographic_history(
+    monkeypatch,
+):
+    captured = {}
+
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000401"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000402"
+    )
+
+    def fake_agent_compare_geographic_history(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        captured["baseline_session_id"] = (
+            args.baseline_session_id
+        )
+        captured["candidate_session_id"] = (
+            args.candidate_session_id
+        )
+        captured["max_skew"] = (
+            args.max_observation_skew_seconds
+        )
+        return 43
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_compare_geographic_history",
+        fake_agent_compare_geographic_history,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-compare-geographic-history",
+            "runs",
+            str(baseline_session_id),
+            str(candidate_session_id),
+            "--max-observation-skew-seconds",
+            "600",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 43
+    assert (
+        captured["command"]
+        == "agent-compare-geographic-history"
+    )
+    assert captured["history_root"] == Path("runs")
+    assert (
+        captured["baseline_session_id"]
+        == baseline_session_id
+    )
+    assert (
+        captured["candidate_session_id"]
+        == candidate_session_id
+    )
+    assert captured["max_skew"] == 600.0
+
+
+def test_agent_compare_geographic_history_resolves_sessions_and_reports(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000411"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000412"
+    )
+
+    baseline = SimpleNamespace(
+        session=SimpleNamespace(
+            target=SimpleNamespace(
+                target_id="history-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+        ),
+    )
+    candidate = SimpleNamespace(
+        session=SimpleNamespace(),
+    )
+
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            captured["root"] = root
+
+        def get_by_session_id(self, session_id):
+            captured.setdefault(
+                "session_ids",
+                [],
+            ).append(session_id)
+
+            if session_id == baseline_session_id:
+                return baseline
+
+            if session_id == candidate_session_id:
+                return candidate
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    def fake_compare(
+        received_candidate,
+        received_baseline,
+        *,
+        max_observation_skew,
+    ):
+        assert received_candidate is candidate
+        assert received_baseline is baseline
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return SimpleNamespace(
+            baseline_observer_id="observer-los-lagos",
+            candidate_observer_id="observer-aysen",
+            baseline_region_code="CL-Los-Lagos",
+            candidate_region_code="CL-Aysen",
+            baseline_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            candidate_started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                20,
+                5,
+                tzinfo=timezone.utc,
+            ),
+            observation_skew=timedelta(
+                minutes=5,
+            ),
+            max_observation_skew=timedelta(
+                minutes=10,
+            ),
+            run_comparison=SimpleNamespace(
+                total_tasks=4,
+                improvements=1,
+                regressions=1,
+                unchanged=2,
+                pass_rate_delta=0.25,
+                median_latency_ms_delta=150.0,
+                retry_delta=-1,
+                human_intervention_delta=2,
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "compare_geographic_agent_observations",
+        fake_compare,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_compare_geographic_history(
+        args
+    )
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["root"] == Path("runs")
+    assert captured["session_ids"] == [
+        baseline_session_id,
+        candidate_session_id,
+    ]
+
+    assert (
+        "=== DLLO AGENT GEOGRAPHIC COMPARISON ==="
+        in output
+    )
+    assert "Target:                history-agent" in output
+    assert (
+        "Suite:                 "
+        "agent-protocol-core v1.0"
+        in output
+    )
+    assert "Baseline observer:     observer-los-lagos" in output
+    assert "Candidate observer:    observer-aysen" in output
+    assert "Observed from baseline:  CL-Los-Lagos" in output
+    assert "Observed from candidate: CL-Aysen" in output
+    assert "Observation skew:      300.00 s" in output
+    assert "Maximum allowed skew: 600.00 s" in output
+    assert "Tasks compared:        4" in output
+    assert "Pass rate delta:       +25.0%" in output
+    assert "Median latency:        +150.0 ms" in output
+
+
+def test_agent_compare_geographic_history_returns_two_on_unknown_session(
+    monkeypatch,
+    capsys,
+):
+    baseline_session_id = UUID(
+        "00000000-0000-0000-0000-000000000421"
+    )
+    candidate_session_id = UUID(
+        "00000000-0000-0000-0000-000000000499"
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def get_by_session_id(self, session_id):
+            if session_id == baseline_session_id:
+                return SimpleNamespace()
+
+            if session_id == candidate_session_id:
+                raise ValueError(
+                    "Agent Lab run history does not contain "
+                    f"session_id: {session_id}"
+                )
+
+            raise AssertionError(
+                f"Unexpected session_id: {session_id}"
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        baseline_session_id=baseline_session_id,
+        candidate_session_id=candidate_session_id,
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_compare_geographic_history(
+        args
+    )
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert (
+        "Error: Agent Lab run history does not contain "
+        f"session_id: {candidate_session_id}"
+        in captured.err
+    )

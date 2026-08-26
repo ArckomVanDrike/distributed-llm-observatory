@@ -260,3 +260,94 @@ def test_history_rejects_duplicate_session_ids(
         match="duplicate session_id",
     ):
         history.load_all()
+
+
+def test_history_resolves_run_by_session_id(
+    tmp_path: Path,
+):
+    first = build_artifact(
+        target_id="agent-one",
+        started_at_utc=datetime(
+            2026,
+            8,
+            25,
+            18,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        session_id=UUID(
+            "00000000-0000-0000-0000-000000000201"
+        ),
+    )
+    expected = build_artifact(
+        target_id="agent-two",
+        started_at_utc=datetime(
+            2026,
+            8,
+            25,
+            19,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        session_id=UUID(
+            "00000000-0000-0000-0000-000000000202"
+        ),
+    )
+
+    write_agent_lab_run_artifact(
+        first,
+        tmp_path / "first.json",
+    )
+    write_agent_lab_run_artifact(
+        expected,
+        tmp_path / "expected.json",
+    )
+
+    history = AgentLabRunHistory(tmp_path)
+
+    resolved = history.get_by_session_id(
+        expected.session.session_id,
+    )
+
+    assert resolved == expected
+
+
+def test_history_rejects_unknown_session_id(
+    tmp_path: Path,
+):
+    known = build_artifact(
+        target_id="agent-one",
+        started_at_utc=datetime(
+            2026,
+            8,
+            25,
+            18,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        session_id=UUID(
+            "00000000-0000-0000-0000-000000000211"
+        ),
+    )
+
+    write_agent_lab_run_artifact(
+        known,
+        tmp_path / "known.json",
+    )
+
+    history = AgentLabRunHistory(tmp_path)
+
+    missing_session_id = UUID(
+        "00000000-0000-0000-0000-000000000299"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Agent Lab run history does not contain "
+            "session_id"
+        ),
+    ):
+        history.get_by_session_id(
+            missing_session_id,
+        )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 from observer.core.agent_lab_artifact_io import (
     load_agent_lab_run_artifact,
@@ -46,6 +47,20 @@ class AgentLabRunHistory:
         )
 
         return artifacts
+
+
+    def get_by_session_id(
+        self,
+        session_id: UUID,
+    ) -> AgentLabRunArtifact:
+        for artifact in self.load_all():
+            if artifact.session.session_id == session_id:
+                return artifact
+
+        raise ValueError(
+            "Agent Lab run history does not contain "
+            f"session_id: {session_id}"
+        )
 
 
     def for_target(
