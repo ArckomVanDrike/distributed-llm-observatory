@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import Thread
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -10,6 +12,23 @@ from observer.agent_lab_bridge import (
     AgentLabBridgeConfig,
     make_handler,
     serve,
+)
+
+from observer.core.agent_lab_artifact_io import (
+    load_agent_lab_run_artifact,
+)
+from observer.core.agent_lab_protocol_runner import (
+    AgentLabProtocolRun,
+)
+from schemas.agent_lab import (
+    AgentTechnicalReport,
+    AgentTestSession,
+    AgentTestSessionStatus,
+)
+from schemas.target import (
+    TargetCapability,
+    TargetManifest,
+    TargetType,
 )
 
 
@@ -84,3 +103,193 @@ def test_agent_lab_bridge_rejects_non_local_bind(
             host="0.0.0.0",
             port=8766,
         )
+
+
+
+def build_protocol_run() -> AgentLabProtocolRun:
+    now = datetime(
+        2026,
+        8,
+        26,
+        19,
+        45,
+        tzinfo=timezone.utc,
+    )
+
+    session = AgentTestSession(
+        observer_id="observer-test",
+        region_code="CL-LL",
+        target=TargetManifest(
+            target_id="bridge-agent",
+            display_name="Bridge Agent",
+            target_type=TargetType.AGENT,
+            capabilities={
+                TargetCapability.TEXT,
+            },
+        ),
+        suite_id="agent-protocol-core",
+        suite_version="1.0",
+        status=AgentTestSessionStatus.COMPLETED,
+        started_at_utc=now,
+        completed_at_utc=now,
+        selections=[],
+        results=[],
+    )
+
+    report = AgentTechnicalReport(
+        session_id=session.session_id,
+        target_id=session.target.target_id,
+        suite_id=session.suite_id,
+        suite_version=session.suite_version,
+        generated_at_utc=now,
+        total_tasks=0,
+        passed_tasks=0,
+        failed_tasks=0,
+        task_completion_rate=0.0,
+        pass_rate=None,
+        median_latency_ms=None,
+        total_retries=0,
+        total_human_interventions=0,
+        findings=[
+            "No benchmark task results are present."
+        ],
+        recommendations=[
+            "Run compatible benchmark tasks."
+        ],
+    )
+
+    return AgentLabProtocolRun(
+        session=session,
+        report=report,
+    )
+
+
+def test_agent_lab_bridge_runs_and_persists_test(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    protocol_run = build_protocol_run()
+    runner_calls = []
+
+    class FakeRunner:
+        def run(
+            self,
+            *,
+            base_url: str,
+            generated_at_utc: datetime,
+        ) -> AgentLabProtocolRun:
+            runner_calls.append(
+                {
+                    "base_url": base_url,
+                    "generated_at_utc": generated_at_utc,
+                }
+            )
+            return protocol_run
+
+    def runner_factory(
+        received_config: AgentLabBridgeConfig,
+    ):
+        assert received_config is config
+        return FakeRunner()
+
+    from http.server import ThreadingHTTPServer
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(
+            config,
+            runner_factory=runner_factory,
+        ),
+    )
+
+    thread = Thread(
+        target=server.serve_forever,
+        daemon=True,
+    )
+    thread.start()
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            f"http://{host}:{port}/v1/agent-tests",
+            data=json.dumps(
+                {
+                    "base_url":
+                        "http://127.0.0.1:8000",
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 201
+        assert payload["schema_version"] == "0.1"
+        assert payload["status"] == "completed"
+
+        assert payload["session_id"] == str(
+            protocol_run.session.session_id
+        )
+        assert payload["target_id"] == "bridge-agent"
+        assert payload["suite_id"] == "agent-protocol-core"
+        assert payload["suite_version"] == "1.0"
+
+        assert payload["observer_id"] == "observer-test"
+        assert payload["region_code"] == "CL-LL"
+
+        assert payload["observatory"] == {
+            "provenance_complete": True,
+            "temporal_eligible": True,
+            "geographic_eligible": True,
+            "reasons": [],
+        }
+
+        assert payload["total_tasks"] == 0
+        assert payload["passed_tasks"] == 0
+        assert payload["failed_tasks"] == 0
+        assert payload["pass_rate"] is None
+        assert payload["median_latency_ms"] is None
+
+        assert payload["findings"] == [
+            "No benchmark task results are present."
+        ]
+        assert payload["recommendations"] == [
+            "Run compatible benchmark tasks."
+        ]
+
+        assert len(runner_calls) == 1
+        assert runner_calls[0]["base_url"] == (
+            "http://127.0.0.1:8000"
+        )
+        assert (
+            runner_calls[0]["generated_at_utc"].tzinfo
+            is not None
+        )
+
+        artifact_path = (
+            config.history_root
+            / f"{protocol_run.session.session_id}.json"
+        )
+
+        assert artifact_path.is_file()
+
+        persisted = load_agent_lab_run_artifact(
+            artifact_path
+        )
+
+        assert persisted == protocol_run.to_artifact()
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
