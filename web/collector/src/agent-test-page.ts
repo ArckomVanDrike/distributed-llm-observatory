@@ -13,6 +13,7 @@ export interface AgentTestPageOptions {
   state: AgentTestPageState
   baseUrl: string
   result?: AgentTestBridgeResponse | null
+  error?: string | null
 }
 
 const stateVisuals: Record<
@@ -80,6 +81,40 @@ function renderRunningIndicator(): string {
         <span>
           Collecting observer-owned evidence...
         </span>
+      </div>
+    </div>
+  `
+}
+
+
+function renderFailureMessage(
+  error: string,
+  baseUrl: string,
+): string {
+  return `
+    <div
+      class="agent-test-error"
+      data-agent-test-error="failed"
+      role="alert"
+    >
+      <div class="agent-test-error-copy">
+        <p class="section-label">
+          Agent test error
+        </p>
+
+        <strong>
+          ${escapeHtml(error)}
+        </strong>
+
+        <p>
+          Verify that the agent is running and exposes
+          the DLLO Local SUT Protocol.
+        </p>
+      </div>
+
+      <div class="agent-test-error-endpoint">
+        <span>Endpoint</span>
+        <code>${escapeHtml(baseUrl)}</code>
       </div>
     </div>
   `
@@ -307,6 +342,16 @@ export function renderAgentTestPage(
             : ''
         }
 
+        ${
+          options.state === 'failed'
+          && options.error
+            ? renderFailureMessage(
+                options.error,
+                options.baseUrl,
+              )
+            : ''
+        }
+
         <div class="agent-test-actions">
           <button
             type="button"
@@ -320,7 +365,9 @@ export function renderAgentTestPage(
             ${
               options.state === 'running'
                 ? 'Running test...'
-                : 'Run Agent Test'
+                : options.state === 'failed'
+                  ? 'Retry Agent Test'
+                  : 'Run Agent Test'
             }
           </button>
 

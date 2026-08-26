@@ -107,7 +107,6 @@ it('rejects Agent Lab bridge HTTP errors', async () => {
     async json() {
       return {
         error: 'agent_test_failed',
-        message: 'Unable to load agent manifest.',
       }
     },
   })
@@ -143,5 +142,24 @@ it('rejects malformed Agent Lab bridge payloads', async () => {
     ),
   ).rejects.toThrow(
     'Invalid Agent Lab bridge payload.',
+  )
+})
+
+
+it('surfaces controlled Agent Lab bridge error messages', async () => {
+  await expect(
+    runAgentTest(
+      async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: 'agent_test_failed',
+          message: 'Unable to load agent manifest.',
+        }),
+      }),
+      'http://127.0.0.1:8000',
+    ),
+  ).rejects.toThrow(
+    'Unable to load agent manifest.',
   )
 })

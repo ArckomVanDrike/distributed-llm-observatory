@@ -130,3 +130,25 @@ it('renders the DLLO running indicator while the agent test runs', () => {
     'Collecting observer-owned evidence',
   )
 })
+
+
+it('renders an actionable failure message for a failed agent test', () => {
+  const html = renderAgentTestPage({
+    state: 'failed',
+    baseUrl: 'http://127.0.0.1:8000',
+    error: 'Unable to load agent manifest.',
+  })
+
+  expect(html).toContain(
+    'data-agent-test-error="failed"',
+  )
+  expect(html).toContain(
+    'Unable to load agent manifest.',
+  )
+  expect(html).toContain(
+    'http://127.0.0.1:8000',
+  )
+  expect(html).toContain(
+    'Retry Agent Test',
+  )
+})

@@ -80,6 +80,8 @@ let agentBaseUrl =
 let agentTestResult:
   AgentTestBridgeResponse | null = null
 
+let agentTestError: string | null = null
+
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
 let observationHistory: ObservationHistory =
@@ -479,6 +481,7 @@ function render(): void {
         state: agentTestState,
         baseUrl: agentBaseUrl,
         result: agentTestResult,
+        error: agentTestError,
       },
     },
   )
@@ -554,6 +557,7 @@ function bindAgentTestEvents(): void {
       agentBaseUrl = input.value.trim()
 
       agentTestResult = null
+      agentTestError = null
 
       try {
         const result = await executeAgentTest({
@@ -565,7 +569,7 @@ function bindAgentTestEvents(): void {
           onStateChange(nextState) {
             agentTestState = nextState
 
-            if (nextState !== 'success') {
+            if (nextState === 'running') {
               render()
             }
           },
@@ -573,9 +577,13 @@ function bindAgentTestEvents(): void {
 
         agentTestResult = result
         render()
-      } catch {
-        // executeAgentTest already moved the
-        // application into the failed state.
+      } catch (error) {
+        agentTestError =
+          error instanceof Error
+            ? error.message
+            : 'Agent test failed.'
+
+        render()
       }
     },
   )

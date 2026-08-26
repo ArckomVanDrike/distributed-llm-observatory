@@ -145,9 +145,25 @@ export async function runAgentTest(
   )
 
   if (!response.ok) {
-    throw new Error(
-      `Agent Lab bridge request failed with HTTP ${response.status}.`,
-    )
+    let message =
+      `Agent Lab bridge request failed with HTTP ${response.status}.`
+
+    try {
+      const payload = await response.json()
+
+      if (
+        isRecord(payload)
+        && typeof payload.message === 'string'
+        && payload.message.trim() !== ''
+      ) {
+        message = payload.message
+      }
+    } catch {
+      // Keep the HTTP fallback when the bridge body
+      // is missing or is not valid JSON.
+    }
+
+    throw new Error(message)
   }
 
   const payload = await response.json()
