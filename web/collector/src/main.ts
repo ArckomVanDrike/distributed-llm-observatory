@@ -4,6 +4,10 @@ import {
   renderAppView,
 } from './app-view'
 
+import {
+  executeAgentTest,
+} from './agent-test-flow'
+
 import type {
   AgentTestPageState,
 } from './agent-test-page'
@@ -474,6 +478,10 @@ function render(): void {
   if (route === 'consumer-probe') {
     bindEvents()
   }
+
+  if (route === 'agent-lab-test') {
+    bindAgentTestEvents()
+  }
 }
 
 function downloadCompletedRecord(): void {
@@ -513,6 +521,50 @@ function downloadCompletedRecord(): void {
 
   URL.revokeObjectURL(url)
 }
+
+function bindAgentTestEvents(): void {
+  const button =
+    document.querySelector<HTMLButtonElement>(
+      '#run-agent-test',
+    )
+
+  const input =
+    document.querySelector<HTMLInputElement>(
+      '#agent-base-url',
+    )
+
+  if (
+    button === null
+    || input === null
+  ) {
+    return
+  }
+
+  button.addEventListener(
+    'click',
+    async () => {
+      agentBaseUrl = input.value.trim()
+
+      try {
+        await executeAgentTest({
+          baseUrl: agentBaseUrl,
+          fetchImpl: (
+            request,
+            init,
+          ) => fetch(request, init),
+          onStateChange(nextState) {
+            agentTestState = nextState
+            render()
+          },
+        })
+      } catch {
+        // executeAgentTest already moved the
+        // application into the failed state.
+      }
+    },
+  )
+}
+
 
 function bindEvents(): void {
   document
