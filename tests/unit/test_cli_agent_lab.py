@@ -1,3 +1,4 @@
+import json
 import shlex
 import sys
 from datetime import datetime, timedelta, timezone
@@ -3393,3 +3394,861 @@ def test_agent_pairs_geographic_compare_command_round_trips_through_parser(
     assert parsed.baseline_session_id == baseline_session_id
     assert parsed.candidate_session_id == candidate_session_id
     assert parsed.max_observation_skew_seconds == 600.0
+
+
+def test_parser_exposes_agent_history_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-history",
+            "runs",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-history"
+    assert args.history_root == Path("runs")
+    assert args.json_output is True
+
+
+def test_agent_history_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    session_id = UUID(
+        "00000000-0000-0000-0000-000000000601"
+    )
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=session_id,
+            started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                1,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            target=SimpleNamespace(
+                target_id="json-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+        technical_report=SimpleNamespace(
+            total_tasks=11,
+            pass_rate=0.75,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return [artifact]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda received: SimpleNamespace(
+            provenance_complete=True,
+            temporal_eligible=True,
+            geographic_eligible=True,
+            reasons=(),
+        ),
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        json_output=True,
+    )
+
+    result = cli_module.agent_history(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "count": 1,
+        "target_filter": None,
+        "runs": [
+            {
+                "started_at_utc": (
+                    "2026-08-26T01:00:00+00:00"
+                ),
+                "session_id": str(session_id),
+                "target_id": "json-agent",
+                "suite_id": "agent-protocol-core",
+                "suite_version": "1.0",
+                "observer_id": "observer-test",
+                "region_code": "CL-Los-Lagos",
+                "observatory": {
+                    "provenance_complete": True,
+                    "temporal_eligible": True,
+                    "geographic_eligible": True,
+                    "reasons": [],
+                },
+                "total_tasks": 11,
+                "pass_rate": 0.75,
+            }
+        ],
+    }
+
+
+def test_agent_history_json_keeps_legacy_run_with_qualification_reasons(
+    monkeypatch,
+    capsys,
+):
+    session_id = UUID(
+        "00000000-0000-0000-0000-000000000611"
+    )
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=session_id,
+            started_at_utc=datetime(
+                2026,
+                8,
+                25,
+                22,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            target=SimpleNamespace(
+                target_id="legacy-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+            observer_id=None,
+            region_code=None,
+        ),
+        technical_report=SimpleNamespace(
+            total_tasks=11,
+            pass_rate=0.5,
+        ),
+    )
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return [artifact]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda received: SimpleNamespace(
+            provenance_complete=False,
+            temporal_eligible=False,
+            geographic_eligible=False,
+            reasons=(
+                "Observation is missing observer provenance.",
+            ),
+        ),
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        json_output=True,
+    )
+
+    result = cli_module.agent_history(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload["count"] == 1
+    assert len(payload["runs"]) == 1
+
+    run = payload["runs"][0]
+
+    assert run["session_id"] == str(session_id)
+    assert run["target_id"] == "legacy-agent"
+    assert run["observer_id"] is None
+    assert run["region_code"] is None
+    assert run["observatory"] == {
+        "provenance_complete": False,
+        "temporal_eligible": False,
+        "geographic_eligible": False,
+        "reasons": [
+            "Observation is missing observer provenance.",
+        ],
+    }
+
+
+def test_agent_history_json_reports_explicit_target_filter(
+    monkeypatch,
+    capsys,
+):
+    artifact = SimpleNamespace(
+        session=SimpleNamespace(
+            session_id=UUID(
+                "00000000-0000-0000-0000-000000000621"
+            ),
+            started_at_utc=datetime(
+                2026,
+                8,
+                26,
+                2,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            target=SimpleNamespace(
+                target_id="filtered-agent",
+            ),
+            suite_id="agent-protocol-core",
+            suite_version="1.0",
+            observer_id="observer-test",
+            region_code="CL-Los-Lagos",
+        ),
+        technical_report=SimpleNamespace(
+            total_tasks=11,
+            pass_rate=1.0,
+        ),
+    )
+
+    captured = {}
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            raise AssertionError(
+                "load_all must not be used with target filter"
+            )
+
+        def for_target(self, target_id):
+            captured["target"] = target_id
+            return [artifact]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "qualify_agent_observation",
+        lambda received: SimpleNamespace(
+            provenance_complete=True,
+            temporal_eligible=True,
+            geographic_eligible=True,
+            reasons=(),
+        ),
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="filtered-agent",
+        json_output=True,
+    )
+
+    result = cli_module.agent_history(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert captured["target"] == "filtered-agent"
+
+    payload = json.loads(output)
+
+    assert payload["count"] == 1
+    assert payload["target_filter"] == "filtered-agent"
+    assert [
+        run["target_id"]
+        for run in payload["runs"]
+    ] == ["filtered-agent"]
+
+
+def test_parser_exposes_agent_pairs_temporal_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-pairs-temporal",
+            "runs",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-pairs-temporal"
+    assert args.history_root == Path("runs")
+    assert args.target is None
+    assert args.json_output is True
+
+
+def test_agent_pairs_temporal_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def for_target(self, target_id):
+            assert target_id == "pair-agent"
+            return artifacts
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+
+        return [
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000701"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000702"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    21,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-test",
+                candidate_observer_id="observer-test",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Los-Lagos",
+                comparable=True,
+                reasons=(),
+            ),
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000701"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000703"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    22,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-test",
+                candidate_observer_id="observer-test",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
+                comparable=False,
+                reasons=(
+                    "Temporal comparison requires "
+                    "the same region_code.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="pair-agent",
+        json_output=True,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "count": 2,
+        "target_filter": "pair-agent",
+        "pairs": [
+            {
+                "baseline": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000701"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:00:00+00:00"
+                    ),
+                    "observer_id": "observer-test",
+                    "region_code": "CL-Los-Lagos",
+                },
+                "candidate": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000702"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T21:00:00+00:00"
+                    ),
+                    "observer_id": "observer-test",
+                    "region_code": "CL-Los-Lagos",
+                },
+                "comparable": True,
+                "reasons": [],
+            },
+            {
+                "baseline": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000701"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:00:00+00:00"
+                    ),
+                    "observer_id": "observer-test",
+                    "region_code": "CL-Los-Lagos",
+                },
+                "candidate": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000703"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T22:00:00+00:00"
+                    ),
+                    "observer_id": "observer-test",
+                    "region_code": "CL-Aysen",
+                },
+                "comparable": False,
+                "reasons": [
+                    "Temporal comparison requires "
+                    "the same region_code.",
+                ],
+            },
+        ],
+    }
+
+
+def test_parser_exposes_agent_pairs_geographic_json_output():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-pairs-geographic",
+            "runs",
+            "--max-observation-skew-seconds",
+            "600",
+            "--json",
+        ]
+    )
+
+    assert args.command == "agent-pairs-geographic"
+    assert args.history_root == Path("runs")
+    assert args.target is None
+    assert args.max_observation_skew_seconds == 600.0
+    assert args.json_output is True
+
+
+def test_agent_pairs_geographic_emits_machine_readable_json(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def for_target(self, target_id):
+            assert target_id == "pair-agent"
+            return artifacts
+
+    def fake_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return [
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000711"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000712"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    5,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-los-lagos",
+                candidate_observer_id="observer-aysen",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
+                comparable=True,
+                reasons=(),
+            ),
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000711"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000713"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    30,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-los-lagos",
+                candidate_observer_id="observer-aysen-two",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
+                comparable=False,
+                reasons=(
+                    "Geographic comparison observation skew "
+                    "exceeds max_observation_skew.",
+                ),
+            ),
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target="pair-agent",
+        max_observation_skew_seconds=600.0,
+        json_output=True,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.err == ""
+
+    payload = json.loads(captured.out)
+
+    assert payload == {
+        "count": 2,
+        "target_filter": "pair-agent",
+        "max_observation_skew_seconds": 600.0,
+        "pairs": [
+            {
+                "baseline": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000711"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:00:00+00:00"
+                    ),
+                    "observer_id": "observer-los-lagos",
+                    "region_code": "CL-Los-Lagos",
+                },
+                "candidate": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000712"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:05:00+00:00"
+                    ),
+                    "observer_id": "observer-aysen",
+                    "region_code": "CL-Aysen",
+                },
+                "comparable": True,
+                "reasons": [],
+            },
+            {
+                "baseline": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000711"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:00:00+00:00"
+                    ),
+                    "observer_id": "observer-los-lagos",
+                    "region_code": "CL-Los-Lagos",
+                },
+                "candidate": {
+                    "session_id": (
+                        "00000000-0000-0000-0000-000000000713"
+                    ),
+                    "started_at_utc": (
+                        "2026-08-25T20:30:00+00:00"
+                    ),
+                    "observer_id": "observer-aysen-two",
+                    "region_code": "CL-Aysen",
+                },
+                "comparable": False,
+                "reasons": [
+                    "Geographic comparison observation skew "
+                    "exceeds max_observation_skew.",
+                ],
+            },
+        ],
+    }
+
+
+def test_agent_pairs_temporal_json_preserves_missing_provenance_as_null(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(),
+        SimpleNamespace(),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+
+        return [
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000721"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000722"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    21,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id=None,
+                candidate_observer_id="observer-test",
+                baseline_region_code=None,
+                candidate_region_code="CL-Los-Lagos",
+                comparable=False,
+                reasons=(
+                    "Temporal comparison requires complete "
+                    "observer provenance.",
+                ),
+            )
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        json_output=True,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    payload = json.loads(output)
+    pair = payload["pairs"][0]
+
+    assert pair["baseline"]["observer_id"] is None
+    assert pair["baseline"]["region_code"] is None
+    assert pair["candidate"]["observer_id"] == "observer-test"
+    assert pair["candidate"]["region_code"] == "CL-Los-Lagos"
+    assert pair["comparable"] is False
+    assert "n/a" not in output
+
+
+def test_agent_pairs_geographic_json_preserves_missing_provenance_as_null(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [
+        SimpleNamespace(),
+        SimpleNamespace(),
+    ]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("runs")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return [
+            SimpleNamespace(
+                baseline_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000731"
+                ),
+                candidate_session_id=UUID(
+                    "00000000-0000-0000-0000-000000000732"
+                ),
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    5,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id=None,
+                candidate_observer_id="observer-aysen",
+                baseline_region_code=None,
+                candidate_region_code="CL-Aysen",
+                comparable=False,
+                reasons=(
+                    "Geographic comparison requires complete "
+                    "observer provenance.",
+                ),
+            )
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("runs"),
+        target=None,
+        max_observation_skew_seconds=600.0,
+        json_output=True,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+
+    payload = json.loads(output)
+    pair = payload["pairs"][0]
+
+    assert pair["baseline"]["observer_id"] is None
+    assert pair["baseline"]["region_code"] is None
+    assert pair["candidate"]["observer_id"] == "observer-aysen"
+    assert pair["candidate"]["region_code"] == "CL-Aysen"
+    assert pair["comparable"] is False
+    assert "n/a" not in output
