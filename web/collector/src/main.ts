@@ -1,8 +1,12 @@
 import './style.css'
 
 import {
-  renderCollectorPage,
-} from './collector-page'
+  renderAppView,
+} from './app-view'
+
+import {
+  resolveAppRoute,
+} from './navigation'
 
 import {
   fetchBridgeAssignment,
@@ -441,11 +445,18 @@ function renderCurrentProbe(): string {
 }
 
 function render(): void {
-  app.innerHTML = renderCollectorPage(
+  const route = resolveAppRoute(
+    window.location.hash,
+  )
+
+  app.innerHTML = renderAppView(
+    route,
     renderCurrentProbe(),
   )
 
-  bindEvents()
+  if (route === 'consumer-probe') {
+    bindEvents()
+  }
 }
 
 function downloadCompletedRecord(): void {
@@ -770,5 +781,11 @@ function bindEvents(): void {
       render()
     })
 }
+
+
+window.addEventListener(
+  'hashchange',
+  render,
+)
 
 render()
