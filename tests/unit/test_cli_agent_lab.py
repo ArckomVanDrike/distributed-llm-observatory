@@ -5609,3 +5609,129 @@ def test_agent_observatory_summary_returns_two_on_invalid_artifact(
     assert captured.err == (
         "Error: Invalid Agent Lab run artifact\n"
     )
+
+
+def test_parser_exposes_agent_lab_bridge_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-lab-bridge",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--history-root",
+            "data/test-agent-runs",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9877",
+        ]
+    )
+
+    assert args.command == "agent-lab-bridge"
+    assert args.observer_id == "observer-test"
+    assert args.region_code == "CL-Los-Lagos"
+    assert args.history_root == Path(
+        "data/test-agent-runs"
+    )
+    assert args.host == "127.0.0.1"
+    assert args.port == 9877
+
+
+def test_agent_lab_bridge_invokes_server(
+    tmp_path: Path,
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_serve_agent_lab_bridge(
+        config,
+        *,
+        host,
+        port,
+    ):
+        captured["config"] = config
+        captured["host"] = host
+        captured["port"] = port
+
+    monkeypatch.setattr(
+        cli_module,
+        "serve_agent_lab_bridge",
+        fake_serve_agent_lab_bridge,
+        raising=False,
+    )
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-lab-bridge",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--history-root",
+            str(tmp_path / "agent-runs"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9877",
+        ]
+    )
+
+    result = cli_module.agent_lab_bridge(args)
+
+    assert result == 0
+
+    config = captured["config"]
+
+    assert config.observer_id == "observer-test"
+    assert config.region_code == "CL-Los-Lagos"
+    assert config.history_root == (
+        tmp_path / "agent-runs"
+    )
+
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 9877
+
+
+def test_main_dispatches_agent_lab_bridge(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_agent_lab_bridge(args):
+        captured["command"] = args.command
+        captured["history_root"] = args.history_root
+        return 17
+
+    monkeypatch.setattr(
+        cli_module,
+        "agent_lab_bridge",
+        fake_agent_lab_bridge,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dllo",
+            "agent-lab-bridge",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--history-root",
+            "data/agent-runs",
+        ],
+    )
+
+    result = cli_module.main()
+
+    assert result == 17
+    assert captured["command"] == "agent-lab-bridge"
+    assert captured["history_root"] == Path(
+        "data/agent-runs"
+    )

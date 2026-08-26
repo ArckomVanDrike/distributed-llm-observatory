@@ -14,7 +14,6 @@ from observer.agent_lab_bridge import (
     make_handler,
     serve,
 )
-
 from observer.core.agent_lab_artifact_io import (
     load_agent_lab_run_artifact,
 )
