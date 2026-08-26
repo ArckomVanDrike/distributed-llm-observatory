@@ -751,6 +751,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional target ID filter",
     )
 
+    agent_history_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
+    )
+
     # -----------------------------------------------------
     # Agent Lab temporal pair discovery
     # -----------------------------------------------------
@@ -773,6 +780,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--target",
         default=None,
         help="Optional target ID filter",
+    )
+
+    agent_pairs_temporal_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
     )
 
     # -----------------------------------------------------
@@ -807,6 +821,13 @@ def build_parser() -> argparse.ArgumentParser:
             "Maximum allowed observation time skew "
             "in seconds"
         ),
+    )
+
+    agent_pairs_geographic_parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Emit machine-readable JSON output",
     )
 
     # -----------------------------------------------------
@@ -2416,6 +2437,61 @@ def agent_pairs_geographic(
             )
         )
 
+        if getattr(args, "json_output", False):
+            pair_payloads = []
+
+            for pair in pairs:
+                pair_payloads.append(
+                    {
+                        "baseline": {
+                            "session_id": str(
+                                pair.baseline_session_id
+                            ),
+                            "started_at_utc": (
+                                pair.baseline_started_at_utc.isoformat()
+                            ),
+                            "observer_id": (
+                                pair.baseline_observer_id
+                            ),
+                            "region_code": (
+                                pair.baseline_region_code
+                            ),
+                        },
+                        "candidate": {
+                            "session_id": str(
+                                pair.candidate_session_id
+                            ),
+                            "started_at_utc": (
+                                pair.candidate_started_at_utc.isoformat()
+                            ),
+                            "observer_id": (
+                                pair.candidate_observer_id
+                            ),
+                            "region_code": (
+                                pair.candidate_region_code
+                            ),
+                        },
+                        "comparable": pair.comparable,
+                        "reasons": list(
+                            pair.reasons
+                        ),
+                    }
+                )
+
+            print(
+                json.dumps(
+                    {
+                        "count": len(pair_payloads),
+                        "target_filter": args.target,
+                        "max_observation_skew_seconds": (
+                            args.max_observation_skew_seconds
+                        ),
+                        "pairs": pair_payloads,
+                    }
+                )
+            )
+            return 0
+
         print("=== DLLO AGENT GEOGRAPHIC PAIRS ===")
         print(
             f"Runs:               "
@@ -2527,6 +2603,58 @@ def agent_pairs_temporal(
             )
         )
 
+        if getattr(args, "json_output", False):
+            pair_payloads = []
+
+            for pair in pairs:
+                pair_payloads.append(
+                    {
+                        "baseline": {
+                            "session_id": str(
+                                pair.baseline_session_id
+                            ),
+                            "started_at_utc": (
+                                pair.baseline_started_at_utc.isoformat()
+                            ),
+                            "observer_id": (
+                                pair.baseline_observer_id
+                            ),
+                            "region_code": (
+                                pair.baseline_region_code
+                            ),
+                        },
+                        "candidate": {
+                            "session_id": str(
+                                pair.candidate_session_id
+                            ),
+                            "started_at_utc": (
+                                pair.candidate_started_at_utc.isoformat()
+                            ),
+                            "observer_id": (
+                                pair.candidate_observer_id
+                            ),
+                            "region_code": (
+                                pair.candidate_region_code
+                            ),
+                        },
+                        "comparable": pair.comparable,
+                        "reasons": list(
+                            pair.reasons
+                        ),
+                    }
+                )
+
+            print(
+                json.dumps(
+                    {
+                        "count": len(pair_payloads),
+                        "target_filter": args.target,
+                        "pairs": pair_payloads,
+                    }
+                )
+            )
+            return 0
+
         print("=== DLLO AGENT TEMPORAL PAIRS ===")
         print(
             f"Runs:               "
@@ -2624,6 +2752,69 @@ def agent_history(
             artifacts = history.for_target(
                 args.target
             )
+
+        if getattr(args, "json_output", False):
+            runs = []
+
+            for artifact in artifacts:
+                session = artifact.session
+                report = artifact.technical_report
+                qualification = qualify_agent_observation(
+                    artifact
+                )
+
+                runs.append(
+                    {
+                        "started_at_utc": (
+                            session.started_at_utc.isoformat()
+                        ),
+                        "session_id": str(
+                            session.session_id
+                        ),
+                        "target_id": (
+                            session.target.target_id
+                        ),
+                        "suite_id": session.suite_id,
+                        "suite_version": (
+                            session.suite_version
+                        ),
+                        "observer_id": (
+                            session.observer_id
+                        ),
+                        "region_code": (
+                            session.region_code
+                        ),
+                        "observatory": {
+                            "provenance_complete": (
+                                qualification.provenance_complete
+                            ),
+                            "temporal_eligible": (
+                                qualification.temporal_eligible
+                            ),
+                            "geographic_eligible": (
+                                qualification.geographic_eligible
+                            ),
+                            "reasons": list(
+                                qualification.reasons
+                            ),
+                        },
+                        "total_tasks": (
+                            report.total_tasks
+                        ),
+                        "pass_rate": report.pass_rate,
+                    }
+                )
+
+            print(
+                json.dumps(
+                    {
+                        "count": len(runs),
+                        "target_filter": args.target,
+                        "runs": runs,
+                    }
+                )
+            )
+            return 0
 
         print("=== DLLO AGENT RUN HISTORY ===")
         print(
