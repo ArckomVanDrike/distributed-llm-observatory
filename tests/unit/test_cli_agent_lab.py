@@ -1896,6 +1896,12 @@ def test_agent_pairs_temporal_reports_discovered_pairs(
     assert "Observed from candidate: CL-Los-Lagos" in output
 
     assert "Comparable:         yes" in output
+    assert (
+        "Compare command:    "
+        "dllo agent-compare-temporal-history "
+        "runs session-a session-b"
+        in output
+    )
 
     assert "Candidate session:  session-c" in output
     assert "Comparable:         no" in output
@@ -1904,6 +1910,7 @@ def test_agent_pairs_temporal_reports_discovered_pairs(
         "the same region_code."
         in output
     )
+    assert output.count("Compare command:") == 1
 
 
 def test_parser_exposes_agent_pairs_geographic_command():
@@ -2117,9 +2124,17 @@ def test_agent_pairs_geographic_reports_discovered_pairs(
     assert "Observed from candidate: CL-Aysen" in output
 
     assert "Comparable:         yes" in output
+    assert (
+        "Compare command:    "
+        "dllo agent-compare-geographic-history "
+        "runs session-a session-b "
+        "--max-observation-skew-seconds 600.0"
+        in output
+    )
 
     assert "Candidate session:  session-c" in output
     assert "Comparable:         no" in output
+    assert output.count("Compare command:") == 1
     assert (
         "Reason:             Geographic comparison "
         "observation skew exceeds max_observation_skew."
@@ -3004,4 +3019,157 @@ def test_agent_compare_geographic_history_returns_two_on_unknown_session(
         "Error: Agent Lab run history does not contain "
         f"session_id: {candidate_session_id}"
         in captured.err
+    )
+
+
+def test_agent_pairs_temporal_quotes_history_root_in_compare_command(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [SimpleNamespace()]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("run history")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(received_artifacts):
+        assert received_artifacts is artifacts
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-b",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    24,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-test",
+                candidate_observer_id="observer-test",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Los-Lagos",
+                comparable=True,
+                reasons=(),
+            )
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_temporal_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("run history"),
+        target=None,
+    )
+
+    result = cli_module.agent_pairs_temporal(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "dllo agent-compare-temporal-history "
+        "'run history' session-a session-b"
+        in output
+    )
+
+
+def test_agent_pairs_geographic_quotes_history_root_in_compare_command(
+    monkeypatch,
+    capsys,
+):
+    artifacts = [SimpleNamespace()]
+
+    class FakeHistory:
+        def __init__(self, root):
+            assert root == Path("run history")
+
+        def load_all(self):
+            return artifacts
+
+    def fake_discover(
+        received_artifacts,
+        *,
+        max_observation_skew,
+    ):
+        assert received_artifacts is artifacts
+        assert max_observation_skew == timedelta(
+            seconds=600.0,
+        )
+
+        return [
+            SimpleNamespace(
+                baseline_session_id="session-a",
+                candidate_session_id="session-b",
+                baseline_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+                candidate_started_at_utc=datetime(
+                    2026,
+                    8,
+                    25,
+                    20,
+                    5,
+                    tzinfo=timezone.utc,
+                ),
+                baseline_observer_id="observer-los-lagos",
+                candidate_observer_id="observer-aysen",
+                baseline_region_code="CL-Los-Lagos",
+                candidate_region_code="CL-Aysen",
+                comparable=True,
+                reasons=(),
+            )
+        ]
+
+    monkeypatch.setattr(
+        cli_module,
+        "AgentLabRunHistory",
+        FakeHistory,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_geographic_agent_observation_pairs",
+        fake_discover,
+    )
+
+    args = SimpleNamespace(
+        history_root=Path("run history"),
+        target=None,
+        max_observation_skew_seconds=600.0,
+    )
+
+    result = cli_module.agent_pairs_geographic(args)
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert (
+        "dllo agent-compare-geographic-history "
+        "'run history' session-a session-b "
+        "--max-observation-skew-seconds 600.0"
+        in output
     )

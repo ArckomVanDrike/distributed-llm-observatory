@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -2610,6 +2611,17 @@ def agent_pairs_geographic(
                 f"{'yes' if pair.comparable else 'no'}"
             )
 
+            if pair.comparable:
+                print(
+                    f"Compare command:    "
+                    f"dllo agent-compare-geographic-history "
+                    f"{shlex.quote(str(args.history_root))} "
+                    f"{pair.baseline_session_id} "
+                    f"{pair.candidate_session_id} "
+                    f"--max-observation-skew-seconds "
+                    f"{args.max_observation_skew_seconds}"
+                )
+
             for reason in pair.reasons:
                 print(
                     f"Reason:             "
@@ -2704,6 +2716,15 @@ def agent_pairs_temporal(
                 f"Comparable:         "
                 f"{'yes' if pair.comparable else 'no'}"
             )
+
+            if pair.comparable:
+                print(
+                    f"Compare command:    "
+                    f"dllo agent-compare-temporal-history "
+                    f"{shlex.quote(str(args.history_root))} "
+                    f"{pair.baseline_session_id} "
+                    f"{pair.candidate_session_id}"
+                )
 
             for reason in pair.reasons:
                 print(
