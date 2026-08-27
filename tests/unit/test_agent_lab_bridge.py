@@ -1468,3 +1468,144 @@ def test_agent_lab_bridge_rejects_negative_geographic_max_skew(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+def test_agent_lab_bridge_lists_temporal_observation_pairs(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    baseline_time = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+    candidate_time = datetime(
+        2026,
+        8,
+        26,
+        19,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000301"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000302"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                    "started_at_utc": baseline_time,
+                    "completed_at_utc": baseline_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                        "generated_at_utc": baseline_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                    "started_at_utc": candidate_time,
+                    "completed_at_utc": candidate_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                        "generated_at_utc": candidate_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # Deliberately reverse filesystem/name order.
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "a-candidate.json",
+    )
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "z-baseline.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-observation-pairs/temporal"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["pair_type"] == "temporal"
+
+        assert payload["pairs"] == [
+            {
+                "baseline_session_id": str(
+                    baseline_id
+                ),
+                "candidate_session_id": str(
+                    candidate_id
+                ),
+                "baseline_started_at_utc": (
+                    baseline_time.isoformat()
+                ),
+                "candidate_started_at_utc": (
+                    candidate_time.isoformat()
+                ),
+                "baseline_observer_id": (
+                    "observer-test"
+                ),
+                "candidate_observer_id": (
+                    "observer-test"
+                ),
+                "baseline_region_code": "CL-LL",
+                "candidate_region_code": "CL-LL",
+                "comparable": True,
+                "reasons": [],
+            }
+        ]
+
+        assert "latest" not in payload
+        assert "baseline" not in payload
+        assert "candidate" not in payload
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

@@ -18,6 +18,9 @@ from observer.core.agent_lab_artifact_io import (
 from observer.core.agent_lab_geographic_comparison import (
     compare_geographic_agent_observations,
 )
+from observer.core.agent_lab_observation_pairs import (
+    discover_temporal_agent_observation_pairs,
+)
 from observer.core.agent_lab_observation_qualification import (
     qualify_agent_observation,
 )
@@ -82,6 +85,13 @@ def make_handler(
 
             if parsed.path == "/v1/agent-tests":
                 self._handle_agent_test_history()
+                return
+
+            if (
+                parsed.path
+                == "/v1/agent-observation-pairs/temporal"
+            ):
+                self._handle_temporal_observation_pairs()
                 return
 
             self._send_json(
@@ -257,6 +267,70 @@ def make_handler(
                 {
                     "schema_version": "0.1",
                     "runs": runs,
+                },
+            )
+
+        def _handle_temporal_observation_pairs(
+            self,
+        ) -> None:
+            history = AgentLabRunHistory(
+                config.history_root
+            )
+
+            artifacts = history.load_all()
+
+            discovered = (
+                discover_temporal_agent_observation_pairs(
+                    artifacts
+                )
+            )
+
+            pairs = []
+
+            for pair in discovered:
+                pairs.append(
+                    {
+                        "baseline_session_id": str(
+                            pair.baseline_session_id
+                        ),
+                        "candidate_session_id": str(
+                            pair.candidate_session_id
+                        ),
+                        "baseline_started_at_utc": (
+                            pair
+                            .baseline_started_at_utc
+                            .isoformat()
+                        ),
+                        "candidate_started_at_utc": (
+                            pair
+                            .candidate_started_at_utc
+                            .isoformat()
+                        ),
+                        "baseline_observer_id": (
+                            pair.baseline_observer_id
+                        ),
+                        "candidate_observer_id": (
+                            pair.candidate_observer_id
+                        ),
+                        "baseline_region_code": (
+                            pair.baseline_region_code
+                        ),
+                        "candidate_region_code": (
+                            pair.candidate_region_code
+                        ),
+                        "comparable": pair.comparable,
+                        "reasons": list(
+                            pair.reasons
+                        ),
+                    }
+                )
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "pair_type": "temporal",
+                    "pairs": pairs,
                 },
             )
 
