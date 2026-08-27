@@ -7,6 +7,7 @@ import type {
 } from './agent-test-history'
 
 import {
+  fetchGeographicObservationPairs,
   fetchTemporalObservationPairs,
 } from './observatory-pairs'
 
@@ -39,4 +40,50 @@ export async function loadObservatoryDashboard(
     history,
     temporalPairs,
   }
+}
+
+
+export function parseGeographicMaxSkewInput(
+  value: string,
+): number | null {
+  const normalized = value.trim()
+
+  if (normalized === '') {
+    return null
+  }
+
+  const parsed = Number(normalized)
+
+  if (
+    !Number.isFinite(parsed)
+    || parsed < 0
+  ) {
+    return null
+  }
+
+  return parsed
+}
+
+
+export async function discoverObservatoryGeographicPairs(
+  fetchImpl: AgentTestFetch,
+  maxSkewInput: string,
+) {
+  const maxObservationSkewSeconds =
+    parseGeographicMaxSkewInput(
+      maxSkewInput,
+    )
+
+  if (maxObservationSkewSeconds === null) {
+    throw new Error(
+      'Maximum observation skew is required.',
+    )
+  }
+
+  return fetchGeographicObservationPairs(
+    fetchImpl,
+    {
+      maxObservationSkewSeconds,
+    },
+  )
 }

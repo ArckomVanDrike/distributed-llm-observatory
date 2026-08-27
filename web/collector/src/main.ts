@@ -13,6 +13,17 @@ import {
 } from './agent-test-history'
 
 import {
+  discoverObservatoryGeographicPairs,
+  loadObservatoryDashboard,
+} from './observatory-dashboard'
+
+import type {
+  GeographicObservationPairsResponse,
+  TemporalObservationPairsResponse,
+} from './observatory-pairs'
+
+
+import {
   selectAgentComparisonRole,
 } from './agent-test-selection'
 
@@ -107,6 +118,22 @@ let agentTestError: string | null = null
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
+
+let observatoryState:
+  'loading' | 'ready' | 'error' = 'loading'
+
+let observatoryHistory:
+  AgentTestHistoryResponse | null = null
+
+let observatoryTemporalPairs:
+  TemporalObservationPairsResponse | null = null
+
+let observatoryGeographicPairs:
+  GeographicObservationPairsResponse | null = null
+
+let observatoryGeographicMaxSkewInput = ''
+
+let observatoryError: string | null = null
 
 let baselineSessionId: string | null = null
 let candidateSessionId: string | null = null
@@ -517,6 +544,15 @@ function render(): void {
     route,
     renderCurrentProbe(),
     {
+      observatory: {
+        state: observatoryState,
+        history: observatoryHistory,
+        temporalPairs: observatoryTemporalPairs,
+        geographicPairs: observatoryGeographicPairs,
+        geographicMaxSkewInput:
+          observatoryGeographicMaxSkewInput,
+        error: observatoryError,
+      },
       agentTest: {
         state: agentTestState,
         baseUrl: agentBaseUrl,
@@ -539,6 +575,10 @@ function render(): void {
 
   if (route === 'agent-lab-test') {
     bindAgentTestEvents()
+  }
+
+  if (route === 'observatory') {
+    bindObservatoryEvents()
   }
 }
 
@@ -579,6 +619,103 @@ function downloadCompletedRecord(): void {
 
   URL.revokeObjectURL(url)
 }
+
+async function refreshObservatoryDashboard(): Promise<void> {
+  observatoryState = 'loading'
+  observatoryError = null
+  observatoryHistory = null
+  observatoryTemporalPairs = null
+  observatoryGeographicPairs = null
+
+  render()
+
+  try {
+    const dashboard =
+      await loadObservatoryDashboard(
+        (
+          request,
+          init,
+        ) => fetch(request, init),
+      )
+
+    observatoryHistory = dashboard.history
+    observatoryTemporalPairs =
+      dashboard.temporalPairs
+    observatoryState = 'ready'
+  } catch (error) {
+    observatoryHistory = null
+    observatoryTemporalPairs = null
+    observatoryGeographicPairs = null
+    observatoryState = 'error'
+    observatoryError =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load Observatory data.'
+  }
+
+  render()
+}
+
+
+function bindObservatoryEvents(): void {
+  document
+    .querySelector<HTMLInputElement>(
+      '#observatory-geographic-max-skew',
+    )
+    ?.addEventListener(
+      'input',
+      (event) => {
+        const input = event.currentTarget
+
+        if (!(input instanceof HTMLInputElement)) {
+          return
+        }
+
+        observatoryGeographicMaxSkewInput =
+          input.value
+
+        observatoryGeographicPairs = null
+        observatoryError = null
+      },
+    )
+
+  document
+    .querySelector<HTMLButtonElement>(
+      '#discover-geographic-pairs',
+    )
+    ?.addEventListener(
+      'click',
+      async () => {
+        observatoryGeographicPairs = null
+        observatoryError = null
+
+        try {
+          observatoryGeographicPairs =
+            await discoverObservatoryGeographicPairs(
+              (
+                request,
+                init,
+              ) => fetch(request, init),
+              observatoryGeographicMaxSkewInput,
+            )
+
+          observatoryError = null
+        } catch (error) {
+          observatoryGeographicPairs = null
+          observatoryError =
+            error instanceof Error
+              ? error.message
+              : (
+                  'Unable to discover '
+                  + 'geographic observation pairs.'
+                )
+        }
+
+        render()
+      },
+    )
+}
+
 
 async function refreshAgentTestHistory(): Promise<void> {
   try {
@@ -1144,11 +1281,16 @@ function bindEvents(): void {
 function handleRouteChange(): void {
   render()
 
-  if (
-    resolveAppRoute(window.location.hash)
-    === 'agent-lab-test'
-  ) {
+  const route = resolveAppRoute(
+    window.location.hash,
+  )
+
+  if (route === 'agent-lab-test') {
     void refreshAgentTestHistory()
+  }
+
+  if (route === 'observatory') {
+    void refreshObservatoryDashboard()
   }
 }
 
