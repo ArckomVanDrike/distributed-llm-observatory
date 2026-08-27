@@ -6,6 +6,10 @@ import type {
   AgentTestHistoryResponse,
 } from './agent-test-history'
 
+import type {
+  AgentTemporalComparisonResponse,
+} from './agent-test-comparison'
+
 
 export type AgentTestPageState =
   | 'disconnected'
@@ -19,6 +23,10 @@ export interface AgentTestPageOptions {
   result?: AgentTestBridgeResponse | null
   error?: string | null
   history?: AgentTestHistoryResponse | null
+  baselineSessionId?: string | null
+  candidateSessionId?: string | null
+  comparison?: AgentTemporalComparisonResponse | null
+  comparisonError?: string | null
 }
 
 const stateVisuals: Record<
@@ -128,6 +136,8 @@ function renderFailureMessage(
 
 function renderAgentTestHistory(
   history: AgentTestHistoryResponse,
+  baselineSessionId: string | null,
+  candidateSessionId: string | null,
 ): string {
   if (history.runs.length === 0) {
     return `
@@ -160,6 +170,31 @@ function renderAgentTestHistory(
 
   const runs = history.runs
     .map((run) => {
+      const role =
+        run.session_id === baselineSessionId
+          ? 'baseline'
+          : run.session_id === candidateSessionId
+            ? 'candidate'
+            : null
+
+      const roleAttribute =
+        role === null
+          ? ''
+          : `data-observation-role="${role}"`
+
+      const roleLabel =
+        role === null
+          ? ''
+          : `
+              <span class="agent-history-role">
+                ${
+                  role === 'baseline'
+                    ? 'Baseline'
+                    : 'Candidate'
+                }
+              </span>
+            `
+
       const passRate =
         run.pass_rate === null
           ? 'n/a'
@@ -184,6 +219,7 @@ function renderAgentTestHistory(
           data-session-id="${escapeHtml(
             run.session_id,
           )}"
+          ${roleAttribute}
         >
           <div class="agent-history-run-heading">
             <div>
@@ -196,9 +232,13 @@ function renderAgentTestHistory(
               </h3>
             </div>
 
-            <code>
-              ${escapeHtml(run.session_id)}
-            </code>
+            <div class="agent-history-run-identity">
+              ${roleLabel}
+
+              <code>
+                ${escapeHtml(run.session_id)}
+              </code>
+            </div>
           </div>
 
           <div class="agent-history-run-metrics">
@@ -226,6 +266,26 @@ function renderAgentTestHistory(
                 ${escapeHtml(run.suite_version)}
               </strong>
             </div>
+          </div>
+
+          <div class="agent-history-run-actions">
+            <button
+              type="button"
+              data-set-baseline="${escapeHtml(
+                run.session_id,
+              )}"
+            >
+              Set as baseline
+            </button>
+
+            <button
+              type="button"
+              data-set-candidate="${escapeHtml(
+                run.session_id,
+              )}"
+            >
+              Set as candidate
+            </button>
           </div>
 
           <div class="agent-history-run-provenance">
@@ -294,6 +354,22 @@ function renderAgentTestHistory(
       <div class="agent-history-runs">
         ${runs}
       </div>
+
+      ${
+        baselineSessionId !== null
+        && candidateSessionId !== null
+          ? `
+              <div class="agent-history-compare-actions">
+                <button
+                  type="button"
+                  id="compare-agent-runs"
+                >
+                  Compare selected runs
+                </button>
+              </div>
+            `
+          : ''
+      }
     </section>
   `
 }
@@ -422,6 +498,245 @@ function renderTechnicalSummary(
           <ul>${recommendations}</ul>
         </div>
       </div>
+    </section>
+  `
+}
+
+
+function formatSignedDelta(
+  value: number,
+  suffix = '',
+): string {
+  const rounded =
+    Math.round(value * 100) / 100
+
+  const prefix =
+    rounded > 0
+      ? '+'
+      : ''
+
+  return `${prefix}${rounded}${suffix}`
+}
+
+function renderAgentComparisonError(
+  error: string | null,
+): string {
+  if (error === null) {
+    return ''
+  }
+
+  return `
+    <section
+      class="agent-test-comparison agent-test-comparison-rejected"
+      data-agent-comparison="rejected"
+    >
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">
+            Comparison status
+          </p>
+
+          <h2>Comparison rejected</h2>
+        </div>
+
+        <span class="badge">
+          Temporal comparison
+        </span>
+      </div>
+
+      <p class="agent-comparison-guidance">
+        The selected observations do not satisfy the
+        requirements for this comparison.
+      </p>
+
+      <div class="agent-comparison-reason">
+        <span>Reason</span>
+
+        <strong>
+          ${escapeHtml(error)}
+        </strong>
+      </div>
+    </section>
+  `
+}
+
+
+function renderAgentTemporalComparison(
+  comparison:
+    AgentTemporalComparisonResponse | null,
+): string {
+  if (comparison === null) {
+    return ''
+  }
+
+  const changes = comparison.changes
+
+  const passRateDelta =
+    changes.pass_rate_delta === null
+      ? 'n/a'
+      : formatSignedDelta(
+          changes.pass_rate_delta * 100,
+          ' pp',
+        )
+
+  const latencyDelta =
+    changes.median_latency_ms_delta === null
+      ? 'n/a'
+      : formatSignedDelta(
+          changes.median_latency_ms_delta,
+          ' ms',
+        )
+
+  const retryDelta =
+    formatSignedDelta(
+      changes.retry_delta,
+    )
+
+  const humanInterventionDelta =
+    formatSignedDelta(
+      changes.human_intervention_delta,
+    )
+
+  const taskChanges = changes.task_changes
+    .filter((change) => (
+      change.transition === 'fail-to-pass'
+      || change.transition === 'pass-to-fail'
+    ))
+    .map((change) => {
+      const label =
+        change.transition === 'fail-to-pass'
+          ? 'Fail → Pass'
+          : 'Pass → Fail'
+
+      return `
+        <div class="agent-comparison-task-change">
+          <code>
+            ${escapeHtml(change.task_id)}
+          </code>
+
+          <strong>
+            ${label}
+          </strong>
+        </div>
+      `
+    })
+    .join('')
+
+  return `
+    <section
+      class="agent-test-comparison"
+      data-agent-comparison="temporal"
+    >
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">
+            Observed changes
+          </p>
+
+          <h2>Observed Changes</h2>
+        </div>
+
+        <span class="badge">
+          Temporal comparison
+        </span>
+      </div>
+
+      <p class="agent-comparison-guidance">
+        Descriptive comparison of two explicitly
+        selected observations. No cause or global
+        quality judgment is inferred.
+      </p>
+
+      <div class="agent-comparison-context">
+        <div>
+          <span>Baseline</span>
+          <code>
+            ${escapeHtml(
+              comparison.baseline_session_id,
+            )}
+          </code>
+        </div>
+
+        <div>
+          <span>Candidate</span>
+          <code>
+            ${escapeHtml(
+              comparison.candidate_session_id,
+            )}
+          </code>
+        </div>
+
+        <div>
+          <span>Observer</span>
+          <strong>
+            ${escapeHtml(comparison.observer_id)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Observation region</span>
+          <strong>
+            Observed from ${escapeHtml(
+              comparison.region_code,
+            )}
+          </strong>
+        </div>
+      </div>
+
+      <div class="agent-comparison-metrics">
+        <div>
+          <span>Tasks</span>
+          <strong>${changes.total_tasks}</strong>
+        </div>
+
+        <div>
+          <span>Regressions</span>
+          <strong>${changes.regressions}</strong>
+        </div>
+
+        <div>
+          <span>Improvements</span>
+          <strong>${changes.improvements}</strong>
+        </div>
+
+        <div>
+          <span>Unchanged</span>
+          <strong>${changes.unchanged}</strong>
+        </div>
+
+        <div>
+          <span>Pass rate Δ</span>
+          <strong>${passRateDelta}</strong>
+        </div>
+
+        <div>
+          <span>Median latency Δ</span>
+          <strong>${latencyDelta}</strong>
+        </div>
+
+        <div>
+          <span>Retries Δ</span>
+          <strong>${retryDelta}</strong>
+        </div>
+
+        <div>
+          <span>Human intervention Δ</span>
+          <strong>
+            ${humanInterventionDelta}
+          </strong>
+        </div>
+      </div>
+
+      ${
+        taskChanges === ''
+          ? ''
+          : `
+              <div class="agent-comparison-task-changes">
+                <h3>Task outcome transitions</h3>
+                ${taskChanges}
+              </div>
+            `
+      }
     </section>
   `
 }
@@ -583,8 +898,19 @@ export function renderAgentTestPage(
           ? ''
           : renderAgentTestHistory(
               options.history,
+              options.baselineSessionId ?? null,
+              options.candidateSessionId ?? null,
             )
       }
+
+      ${renderAgentTemporalComparison(
+        options.comparison ?? null,
+      )}
+
+      ${renderAgentComparisonError(
+        options.comparisonError ?? null,
+      )}
+
     </main>
   `
 }

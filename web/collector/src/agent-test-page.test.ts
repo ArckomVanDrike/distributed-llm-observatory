@@ -271,3 +271,218 @@ it('renders saved Agent Lab runs without choosing comparison roles', () => {
     'data-observation-role="candidate"',
   )
 })
+
+
+it('renders explicitly selected baseline and candidate runs', () => {
+  const history = {
+    schema_version: '0.1' as const,
+    runs: [
+      {
+        session_id: 'baseline-session',
+        started_at_utc:
+          '2026-08-26T18:00:00+00:00',
+        target_id: 'example-agent',
+        suite_id: 'agent-protocol-core',
+        suite_version: '1.0',
+        observer_id: 'observer-test',
+        region_code: 'CL-Los-Lagos',
+        observatory: {
+          provenance_complete: true,
+          temporal_eligible: true,
+          geographic_eligible: true,
+          reasons: [],
+        },
+        total_tasks: 11,
+        passed_tasks: 10,
+        failed_tasks: 1,
+        pass_rate: 10 / 11,
+        median_latency_ms: 4.2,
+      },
+      {
+        session_id: 'candidate-session',
+        started_at_utc:
+          '2026-08-26T19:00:00+00:00',
+        target_id: 'example-agent',
+        suite_id: 'agent-protocol-core',
+        suite_version: '1.0',
+        observer_id: 'observer-test',
+        region_code: 'CL-Los-Lagos',
+        observatory: {
+          provenance_complete: true,
+          temporal_eligible: true,
+          geographic_eligible: true,
+          reasons: [],
+        },
+        total_tasks: 11,
+        passed_tasks: 11,
+        failed_tasks: 0,
+        pass_rate: 1,
+        median_latency_ms: 3.1,
+      },
+    ],
+  }
+
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    history,
+    baselineSessionId: 'baseline-session',
+    candidateSessionId: 'candidate-session',
+  })
+
+  expect(html).toContain(
+    'data-observation-role="baseline"',
+  )
+  expect(html).toContain(
+    'data-observation-role="candidate"',
+  )
+
+  expect(html).toContain('Baseline')
+  expect(html).toContain('Candidate')
+
+  expect(html).toContain(
+    'id="compare-agent-runs"',
+  )
+  expect(html).toContain(
+    'Compare selected runs',
+  )
+})
+
+
+it('renders observed changes for an explicit temporal comparison', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    comparison: {
+      schema_version: '0.1',
+      comparison_type: 'temporal',
+      baseline_session_id: 'baseline-session',
+      candidate_session_id: 'candidate-session',
+      observer_id: 'observer-test',
+      region_code: 'CL-Los-Lagos',
+      baseline_started_at_utc:
+        '2026-08-26T18:00:00+00:00',
+      candidate_started_at_utc:
+        '2026-08-26T19:00:00+00:00',
+      changes: {
+        total_tasks: 11,
+        regressions: 1,
+        improvements: 2,
+        unchanged: 8,
+        pass_rate_delta: 0.09,
+        median_latency_ms_delta: -1.25,
+        retry_delta: -1,
+        human_intervention_delta: 0,
+        task_changes: [
+          {
+            task_id: 'task-improved',
+            baseline_passed: false,
+            candidate_passed: true,
+            transition: 'fail-to-pass',
+          },
+          {
+            task_id: 'task-regressed',
+            baseline_passed: true,
+            candidate_passed: false,
+            transition: 'pass-to-fail',
+          },
+        ],
+      },
+    },
+  })
+
+  expect(html).toContain(
+    'data-agent-comparison="temporal"',
+  )
+  expect(html).toContain('Observed Changes')
+  expect(html).toContain('Temporal comparison')
+
+  expect(html).toContain('baseline-session')
+  expect(html).toContain('candidate-session')
+
+  expect(html).toContain(
+    'Observed from CL-Los-Lagos',
+  )
+
+  expect(html).toContain('Regressions')
+  expect(html).toContain('Improvements')
+  expect(html).toContain('Unchanged')
+
+  expect(html).toContain('+9')
+  expect(html).toContain('-1.25 ms')
+  expect(html).toContain('task-improved')
+  expect(html).toContain('task-regressed')
+  expect(html).toContain('Fail → Pass')
+  expect(html).toContain('Pass → Fail')
+
+  expect(html).not.toContain(
+    'better than baseline',
+  )
+  expect(html).not.toContain(
+    'worse than baseline',
+  )
+})
+
+
+it('preserves unavailable comparison deltas as n/a', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    comparison: {
+      schema_version: '0.1',
+      comparison_type: 'temporal',
+      baseline_session_id: 'baseline-session',
+      candidate_session_id: 'candidate-session',
+      observer_id: 'observer-test',
+      region_code: 'CL-Los-Lagos',
+      baseline_started_at_utc:
+        '2026-08-26T18:00:00+00:00',
+      candidate_started_at_utc:
+        '2026-08-26T19:00:00+00:00',
+      changes: {
+        total_tasks: 0,
+        regressions: 0,
+        improvements: 0,
+        unchanged: 0,
+        pass_rate_delta: null,
+        median_latency_ms_delta: null,
+        retry_delta: 0,
+        human_intervention_delta: 0,
+        task_changes: [],
+      },
+    },
+  })
+
+  expect(html).toContain('Pass rate Δ')
+  expect(html).toContain('Median latency Δ')
+
+  expect(
+    html.match(/<strong>n\/a<\/strong>/g),
+  ).toHaveLength(2)
+
+  expect(html).not.toContain('0 pp')
+})
+
+
+it('renders a rejected temporal comparison without hiding the reason', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    comparisonError:
+      'Temporal comparison requires the candidate observation to occur after the baseline.',
+  })
+
+  expect(html).toContain(
+    'data-agent-comparison="rejected"',
+  )
+  expect(html).toContain(
+    'Comparison rejected',
+  )
+  expect(html).toContain(
+    'Temporal comparison requires the candidate observation to occur after the baseline.',
+  )
+
+  expect(html).not.toContain(
+    'Observed Changes',
+  )
+})

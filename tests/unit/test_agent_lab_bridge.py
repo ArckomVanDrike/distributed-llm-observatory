@@ -707,3 +707,274 @@ def test_agent_lab_bridge_lists_tests_in_canonical_history_order(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_compares_selected_temporal_runs(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    baseline_time = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+    candidate_time = datetime(
+        2026,
+        8,
+        26,
+        19,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000201"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000202"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                    "started_at_utc": baseline_time,
+                    "completed_at_utc": baseline_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                        "generated_at_utc": baseline_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                    "started_at_utc": candidate_time,
+                    "completed_at_utc": candidate_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                        "generated_at_utc": candidate_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "baseline.json",
+    )
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "candidate.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-comparisons/temporal"
+            ),
+            data=json.dumps(
+                {
+                    "baseline_session_id": str(
+                        baseline_id
+                    ),
+                    "candidate_session_id": str(
+                        candidate_id
+                    ),
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["comparison_type"] == "temporal"
+
+        assert payload["baseline_session_id"] == str(
+            baseline_id
+        )
+        assert payload["candidate_session_id"] == str(
+            candidate_id
+        )
+
+        assert payload["observer_id"] == "observer-test"
+        assert payload["region_code"] == "CL-LL"
+
+        assert payload["baseline_started_at_utc"] == (
+            baseline_time.isoformat()
+        )
+        assert payload["candidate_started_at_utc"] == (
+            candidate_time.isoformat()
+        )
+
+        assert payload["changes"] == {
+            "total_tasks": 0,
+            "regressions": 0,
+            "improvements": 0,
+            "unchanged": 0,
+            "pass_rate_delta": None,
+            "median_latency_ms_delta": None,
+            "retry_delta": 0,
+            "human_intervention_delta": 0,
+            "task_changes": [],
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_keeps_explicit_temporal_roles_when_rejected(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000211"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000212"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "baseline.json",
+    )
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "candidate.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-comparisons/temporal"
+            ),
+            data=json.dumps(
+                {
+                    "baseline_session_id": str(
+                        baseline_id
+                    ),
+                    "candidate_session_id": str(
+                        candidate_id
+                    ),
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert error.value.code == 422
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "comparison_rejected",
+            "message": (
+                "Temporal comparison requires the "
+                "candidate observation to occur after "
+                "the baseline."
+            ),
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

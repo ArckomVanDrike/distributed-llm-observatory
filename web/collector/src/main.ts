@@ -12,6 +12,18 @@ import {
   fetchAgentTestHistory,
 } from './agent-test-history'
 
+import {
+  selectAgentComparisonRole,
+} from './agent-test-selection'
+
+import {
+  compareTemporalAgentRuns,
+} from './agent-test-comparison'
+
+import type {
+  AgentTemporalComparisonResponse,
+} from './agent-test-comparison'
+
 import type {
   AgentTestHistoryResponse,
 } from './agent-test-history'
@@ -92,6 +104,14 @@ let agentTestError: string | null = null
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
+
+let baselineSessionId: string | null = null
+let candidateSessionId: string | null = null
+
+let agentComparison:
+  AgentTemporalComparisonResponse | null = null
+
+let agentComparisonError: string | null = null
 
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
@@ -494,6 +514,10 @@ function render(): void {
         result: agentTestResult,
         error: agentTestError,
         history: agentTestHistory,
+        baselineSessionId,
+        candidateSessionId,
+        comparison: agentComparison,
+        comparisonError: agentComparisonError,
       },
     },
   )
@@ -562,6 +586,127 @@ async function refreshAgentTestHistory(): Promise<void> {
 
 
 function bindAgentTestEvents(): void {
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-set-baseline]',
+    )
+    .forEach((roleButton) => {
+      roleButton.addEventListener(
+        'click',
+        () => {
+          const sessionId =
+            roleButton.dataset.setBaseline
+
+          if (sessionId === undefined) {
+            return
+          }
+
+          const selection =
+            selectAgentComparisonRole(
+              {
+                baselineSessionId,
+                candidateSessionId,
+              },
+              'baseline',
+              sessionId,
+            )
+
+          baselineSessionId =
+            selection.baselineSessionId
+          candidateSessionId =
+            selection.candidateSessionId
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-set-candidate]',
+    )
+    .forEach((roleButton) => {
+      roleButton.addEventListener(
+        'click',
+        () => {
+          const sessionId =
+            roleButton.dataset.setCandidate
+
+          if (sessionId === undefined) {
+            return
+          }
+
+          const selection =
+            selectAgentComparisonRole(
+              {
+                baselineSessionId,
+                candidateSessionId,
+              },
+              'candidate',
+              sessionId,
+            )
+
+          baselineSessionId =
+            selection.baselineSessionId
+          candidateSessionId =
+            selection.candidateSessionId
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelector<HTMLButtonElement>(
+      '#compare-agent-runs',
+    )
+    ?.addEventListener(
+      'click',
+      async () => {
+        if (
+          baselineSessionId === null
+          || candidateSessionId === null
+        ) {
+          return
+        }
+
+        agentComparison = null
+        agentComparisonError = null
+        render()
+
+        try {
+          agentComparison =
+            await compareTemporalAgentRuns(
+              (
+                request,
+                init,
+              ) => fetch(request, init),
+              {
+                baselineSessionId,
+                candidateSessionId,
+              },
+            )
+
+          agentComparisonError = null
+          render()
+        } catch (error) {
+          agentComparison = null
+          agentComparisonError =
+            error instanceof Error
+              ? error.message
+              : 'Agent comparison failed.'
+
+          render()
+        }
+      },
+    )
+
   const button =
     document.querySelector<HTMLButtonElement>(
       '#run-agent-test',
