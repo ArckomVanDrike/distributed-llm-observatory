@@ -1468,3 +1468,574 @@ def test_agent_lab_bridge_rejects_negative_geographic_max_skew(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+def test_agent_lab_bridge_lists_temporal_observation_pairs(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    baseline_time = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+    candidate_time = datetime(
+        2026,
+        8,
+        26,
+        19,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000301"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000302"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                    "started_at_utc": baseline_time,
+                    "completed_at_utc": baseline_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                        "generated_at_utc": baseline_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                    "started_at_utc": candidate_time,
+                    "completed_at_utc": candidate_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                        "generated_at_utc": candidate_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # Deliberately reverse filesystem/name order.
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "a-candidate.json",
+    )
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "z-baseline.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-observation-pairs/temporal"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["pair_type"] == "temporal"
+
+        assert payload["pairs"] == [
+            {
+                "baseline_session_id": str(
+                    baseline_id
+                ),
+                "candidate_session_id": str(
+                    candidate_id
+                ),
+                "baseline_started_at_utc": (
+                    baseline_time.isoformat()
+                ),
+                "candidate_started_at_utc": (
+                    candidate_time.isoformat()
+                ),
+                "baseline_observer_id": (
+                    "observer-test"
+                ),
+                "candidate_observer_id": (
+                    "observer-test"
+                ),
+                "baseline_region_code": "CL-LL",
+                "candidate_region_code": "CL-LL",
+                "comparable": True,
+                "reasons": [],
+            }
+        ]
+
+        assert "latest" not in payload
+        assert "baseline" not in payload
+        assert "candidate" not in payload
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+def test_agent_lab_bridge_lists_geographic_observation_pairs(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    baseline_time = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+    candidate_time = datetime(
+        2026,
+        8,
+        26,
+        18,
+        5,
+        tzinfo=timezone.utc,
+    )
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000401"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000402"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                    "observer_id": "observer-los-lagos",
+                    "region_code": "CL-Los-Lagos",
+                    "started_at_utc": baseline_time,
+                    "completed_at_utc": baseline_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                        "generated_at_utc": baseline_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                    "observer_id": "observer-aysen",
+                    "region_code": "CL-Aysen",
+                    "started_at_utc": candidate_time,
+                    "completed_at_utc": candidate_time,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                        "generated_at_utc": candidate_time,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "a-candidate.json",
+    )
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "z-baseline.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-observation-pairs/geographic"
+                "?max_observation_skew_seconds=600"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["pair_type"] == "geographic"
+        assert payload[
+            "max_observation_skew_seconds"
+        ] == 600
+
+        assert payload["pairs"] == [
+            {
+                "baseline_session_id": str(
+                    baseline_id
+                ),
+                "candidate_session_id": str(
+                    candidate_id
+                ),
+                "baseline_started_at_utc": (
+                    baseline_time.isoformat()
+                ),
+                "candidate_started_at_utc": (
+                    candidate_time.isoformat()
+                ),
+                "baseline_observer_id": (
+                    "observer-los-lagos"
+                ),
+                "candidate_observer_id": (
+                    "observer-aysen"
+                ),
+                "baseline_region_code": (
+                    "CL-Los-Lagos"
+                ),
+                "candidate_region_code": (
+                    "CL-Aysen"
+                ),
+                "comparable": True,
+                "reasons": [],
+            }
+        ]
+
+        assert "latest" not in payload
+        assert "baseline" not in payload
+        assert "candidate" not in payload
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+
+def test_agent_lab_bridge_requires_geographic_pair_max_skew(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                (
+                    f"http://{host}:{port}"
+                    "/v1/agent-observation-pairs/geographic"
+                ),
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "bad_request",
+            "message": (
+                "max_observation_skew_seconds "
+                "is required."
+            ),
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_rejects_empty_geographic_pair_max_skew(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                (
+                    f"http://{host}:{port}"
+                    "/v1/agent-observation-pairs/geographic"
+                    "?max_observation_skew_seconds="
+                ),
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "bad_request",
+            "message": (
+                "max_observation_skew_seconds "
+                "is required."
+            ),
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_rejects_invalid_geographic_pair_max_skew(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                (
+                    f"http://{host}:{port}"
+                    "/v1/agent-observation-pairs/geographic"
+                    "?max_observation_skew_seconds=banana"
+                ),
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "bad_request",
+            "message": (
+                "max_observation_skew_seconds "
+                "must be a number."
+            ),
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_rejects_negative_geographic_pair_max_skew(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                (
+                    f"http://{host}:{port}"
+                    "/v1/agent-observation-pairs/geographic"
+                    "?max_observation_skew_seconds=-1"
+                ),
+                timeout=2,
+            )
+
+        assert error.value.code == 422
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload == {
+            "error": "comparison_rejected",
+            "message": (
+                "max_observation_skew cannot be negative."
+            ),
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_accepts_zero_geographic_pair_max_skew(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    observed_at = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    baseline_id = UUID(
+        "00000000-0000-0000-0000-000000000411"
+    )
+    candidate_id = UUID(
+        "00000000-0000-0000-0000-000000000412"
+    )
+
+    baseline = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": baseline_id,
+                    "observer_id": "observer-los-lagos",
+                    "region_code": "CL-Los-Lagos",
+                    "started_at_utc": observed_at,
+                    "completed_at_utc": observed_at,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": baseline_id,
+                        "generated_at_utc": observed_at,
+                    },
+                )
+            ),
+        },
+    )
+
+    candidate = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": candidate_id,
+                    "observer_id": "observer-aysen",
+                    "region_code": "CL-Aysen",
+                    "started_at_utc": observed_at,
+                    "completed_at_utc": observed_at,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": candidate_id,
+                        "generated_at_utc": observed_at,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    write_agent_lab_run_artifact(
+        baseline,
+        config.history_root / "baseline.json",
+    )
+    write_agent_lab_run_artifact(
+        candidate,
+        config.history_root / "candidate.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-observation-pairs/geographic"
+                "?max_observation_skew_seconds=0"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["pair_type"] == "geographic"
+        assert payload[
+            "max_observation_skew_seconds"
+        ] == 0
+
+        assert len(payload["pairs"]) == 1
+
+        pair = payload["pairs"][0]
+
+        assert pair["baseline_session_id"] == str(
+            baseline_id
+        )
+        assert pair["candidate_session_id"] == str(
+            candidate_id
+        )
+        assert pair["comparable"] is True
+        assert pair["reasons"] == []
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

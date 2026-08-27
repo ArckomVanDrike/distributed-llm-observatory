@@ -18,32 +18,21 @@ import {
   renderCollectorPage,
 } from './collector-page'
 
+import {
+  renderObservatoryPage,
+} from './observatory-page'
+
+import type {
+  ObservatoryPageOptions,
+} from './observatory-page'
+
 import type {
   AppRoute,
 } from './navigation'
 
 export interface AppViewOptions {
   agentTest?: AgentTestPageOptions
-}
-
-function renderObservatoryPage(): string {
-  return `
-    <main class="observatory-page">
-      <section class="hero">
-        <p class="hero-label">
-          Distributed LLM Observatory
-        </p>
-
-        <h1>Observatory</h1>
-
-        <p class="hero-copy">
-          Explore reproducible observations of models,
-          agents, and AI systems across time and
-          observed regions.
-        </p>
-      </section>
-    </main>
-  `
+  observatory?: ObservatoryPageOptions
 }
 
 function renderAgentStarterPage(): string {
@@ -107,6 +96,15 @@ export function renderAppView(
 
   return renderAppShell(
     route,
-    renderObservatoryPage(),
+    renderObservatoryPage(
+      options.observatory ?? {
+        state: 'loading',
+        history: null,
+        temporalPairs: null,
+        geographicPairs: null,
+        geographicMaxSkewInput: '',
+        error: null,
+      },
+    ),
   )
 }

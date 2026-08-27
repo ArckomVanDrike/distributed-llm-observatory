@@ -24,6 +24,9 @@ export default defineConfig({
       '/v1/agent-comparisons': {
         target: 'http://127.0.0.1:8766',
       },
+      '/v1/agent-observation-pairs': {
+        target: 'http://127.0.0.1:8766',
+      },
     },
   },
 })
