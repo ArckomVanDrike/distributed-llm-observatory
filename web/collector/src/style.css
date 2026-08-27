@@ -1554,6 +1554,291 @@ footer {
   max-width: 760px;
 }
 
+
+/* Observatory -------------------------------------------------------------- */
+
+.observatory-page .hero {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.observatory-page .hero::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--accent),
+      rgba(144, 224, 192, 0.15),
+      transparent
+    );
+  content: "";
+}
+
+.observatory-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.observatory-summary > div {
+  min-width: 0;
+  padding: clamp(1.2rem, 3vw, 1.7rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(144, 224, 192, 0.07),
+      transparent 55%
+    ),
+    var(--panel);
+}
+
+.observatory-summary strong,
+.observatory-summary span {
+  display: block;
+}
+
+.observatory-summary strong {
+  margin-bottom: 0.4rem;
+  color: var(--text);
+  font-size: clamp(2rem, 5vw, 3.1rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.observatory-summary span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.observatory-comparability {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.observatory-comparability > article {
+  min-width: 0;
+  padding: clamp(1.35rem, 3vw, 1.8rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(144, 224, 192, 0.045),
+      transparent 48%
+    ),
+    var(--panel);
+}
+
+.observatory-comparability h2 {
+  margin: 0.25rem 0 1.2rem;
+  color: var(--text);
+  font-size: clamp(1.4rem, 3vw, 1.85rem);
+  letter-spacing: -0.025em;
+}
+
+.observatory-comparability
+  > article
+  > p:not(.section-label) {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.observatory-pair-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.observatory-pair-summary p {
+  min-width: 0;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  color: var(--muted);
+  background: var(--panel-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.observatory-pair-summary strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.observatory-comparability label {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) minmax(110px, 150px) auto;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1.1rem 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.observatory-comparability input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  color: var(--text);
+  background: var(--panel-soft);
+}
+
+.observatory-comparability input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--accent-soft);
+}
+
+.observatory-comparability button {
+  margin-top: 0.2rem;
+}
+
+.observatory-recent {
+  margin-top: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.observatory-recent > h2 {
+  margin: 0.25rem 0 1.25rem;
+  color: var(--text);
+  font-size: clamp(1.65rem, 4vw, 2.35rem);
+  letter-spacing: -0.035em;
+}
+
+.observatory-observation-list {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(min(100%, 320px), 1fr)
+    );
+  gap: 0.9rem;
+}
+
+.observatory-observation-card {
+  min-width: 0;
+  padding: clamp(1.2rem, 3vw, 1.5rem);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(144, 224, 192, 0.035),
+      transparent 52%
+    ),
+    var(--panel);
+}
+
+.observatory-observation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.observatory-observation-heading h3 {
+  margin: 0.2rem 0 0;
+  color: var(--text);
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.observatory-observed-from {
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.observatory-observation-details {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 1rem 0 0;
+}
+
+.observatory-observation-details > div {
+  min-width: 0;
+}
+
+.observatory-observation-details dt {
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.observatory-observation-details dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .observatory-summary,
+  .observatory-comparability {
+    grid-template-columns: 1fr;
+  }
+
+  .observatory-comparability label {
+    grid-template-columns: 1fr;
+  }
+
+  .observatory-comparability button {
+    width: 100%;
+  }
+
+  .observatory-observation-heading {
+    flex-direction: column;
+  }
+
+  .observatory-observed-from {
+    flex: initial;
+  }
+
+  .observatory-observation-details {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Responsive                                                                 */
 /* -------------------------------------------------------------------------- */

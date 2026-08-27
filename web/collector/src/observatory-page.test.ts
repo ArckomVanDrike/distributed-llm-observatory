@@ -152,6 +152,38 @@ it('renders Observatory counts from observed runs and temporal pairs', () => {
     'Maximum observation skew required',
   )
 
+  expect(html).toContain(
+    'Recent observations',
+  )
+
+  expect(html).toContain(
+    'agent-a',
+  )
+
+  expect(html).toContain(
+    'Observed from CL-Los-Lagos',
+  )
+
+  expect(html).toContain(
+    'Observed from CL-Aysen',
+  )
+
+  expect(html).not.toContain(
+    'Serving from',
+  )
+
+  expect(
+    html.indexOf('2026-08-26T20:00:00+00:00'),
+  ).toBeLessThan(
+    html.indexOf('2026-08-26T19:00:00+00:00'),
+  )
+
+  expect(
+    html.indexOf('2026-08-26T19:00:00+00:00'),
+  ).toBeLessThan(
+    html.indexOf('2026-08-26T18:00:00+00:00'),
+  )
+
   expect(html).not.toContain(
     'globally better',
   )

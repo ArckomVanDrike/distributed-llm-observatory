@@ -145,6 +145,98 @@ function renderGeographicSummary(
   `
 }
 
+function renderRecentObservations(
+  history: AgentTestHistoryResponse | null,
+): string {
+  if (
+    history === null
+    || history.runs.length === 0
+  ) {
+    return `
+      <section class="observatory-recent">
+        <p class="section-label">
+          Observation history
+        </p>
+
+        <h2>Recent observations</h2>
+
+        <p>
+          No observations recorded yet.
+        </p>
+      </section>
+    `
+  }
+
+  const runs = [...history.runs].sort(
+    (left, right) =>
+      right.started_at_utc.localeCompare(
+        left.started_at_utc,
+      ),
+  )
+
+  const cards = runs
+    .map(
+      (run) => `
+        <article class="observatory-observation-card">
+          <div class="observatory-observation-heading">
+            <div>
+              <p class="section-label">
+                Target
+              </p>
+
+              <h3>${run.target_id}</h3>
+            </div>
+
+            <p class="observatory-observed-from">
+              ${
+                run.region_code === null
+                  ? 'Observation region unavailable'
+                  : `Observed from ${run.region_code}`
+              }
+            </p>
+          </div>
+
+          <dl class="observatory-observation-details">
+            <div>
+              <dt>Observed at</dt>
+              <dd>${run.started_at_utc}</dd>
+            </div>
+
+            <div>
+              <dt>Tasks passed</dt>
+              <dd>
+                ${run.passed_tasks} / ${run.total_tasks}
+              </dd>
+            </div>
+
+            <div>
+              <dt>Median latency</dt>
+              <dd>
+                ${run.median_latency_ms} ms
+              </dd>
+            </div>
+          </dl>
+        </article>
+      `,
+    )
+    .join('')
+
+  return `
+    <section class="observatory-recent">
+      <p class="section-label">
+        Observation history
+      </p>
+
+      <h2>Recent observations</h2>
+
+      <div class="observatory-observation-list">
+        ${cards}
+      </div>
+    </section>
+  `
+}
+
+
 export function renderObservatoryPage(
   options: ObservatoryPageOptions,
 ): string {
@@ -233,6 +325,10 @@ export function renderObservatoryPage(
           ${renderGeographicSummary(options)}
         </article>
       </section>
+
+      ${renderRecentObservations(
+        options.history,
+      )}
     </main>
   `
 }
