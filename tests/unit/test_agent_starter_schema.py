@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from schemas.agent_starter import (
+    AgentStarterConstraintConflict,
     AgentStarterEvidence,
     AgentStarterGoal,
     AgentStarterRequirement,
@@ -424,4 +425,142 @@ def test_candidate_requires_supporting_evidence():
                 "The architecture remains a possible option.",
             ],
             supporting_evidence=[],
+        )
+
+
+def test_constraint_conflict_records_hard_requirements_and_options():
+    local_only_evidence = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    offline_evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    local_only = AgentStarterRequirement(
+        key="source_code_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[local_only_evidence],
+    )
+    offline = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[offline_evidence],
+    )
+
+    conflict = AgentStarterConstraintConflict(
+        conflicting_requirements=[local_only, offline],
+        summary=(
+            "No evaluated architecture satisfies all hard requirements."
+        ),
+        resolution_options=[
+            "Reduce the required capability.",
+            "Upgrade the local hardware.",
+            "Allow selected remote processing.",
+        ],
+    )
+
+    assert conflict.schema_version == "0.1"
+    assert conflict.conflicting_requirements == [
+        local_only,
+        offline,
+    ]
+    assert len(conflict.resolution_options) == 3
+
+
+def test_constraint_conflict_accepts_single_hard_requirement():
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+    conflict = AgentStarterConstraintConflict(
+        conflicting_requirements=[requirement],
+        summary=(
+            "The required capability cannot be satisfied "
+            "under the offline boundary."
+        ),
+        resolution_options=[
+            "Change the offline requirement.",
+        ],
+    )
+
+    assert conflict.conflicting_requirements == [requirement]
+
+
+def test_constraint_conflict_rejects_soft_requirement():
+    evidence = AgentStarterEvidence(
+        key="prefer_local_execution",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    preference = AgentStarterRequirement(
+        key="prefer_local_execution",
+        value=True,
+        strength=ConstraintStrength.SOFT,
+        evidence=[evidence],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Constraint conflict may contain only hard requirements",
+    ):
+        AgentStarterConstraintConflict(
+            conflicting_requirements=[preference],
+            summary="No candidate satisfies the preference.",
+            resolution_options=[
+                "Use another architecture.",
+            ],
+        )
+
+
+def test_constraint_conflict_requires_requirement():
+    with pytest.raises(
+        ValidationError,
+        match="Constraint conflict must identify a hard requirement",
+    ):
+        AgentStarterConstraintConflict(
+            conflicting_requirements=[],
+            summary="No evaluated architecture is suitable.",
+            resolution_options=[
+                "Change the requirements.",
+            ],
+        )
+
+
+def test_constraint_conflict_requires_resolution_option():
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Constraint conflict must expose a resolution option",
+    ):
+        AgentStarterConstraintConflict(
+            conflicting_requirements=[requirement],
+            summary=(
+                "No evaluated architecture satisfies the requirement."
+            ),
+            resolution_options=[],
         )

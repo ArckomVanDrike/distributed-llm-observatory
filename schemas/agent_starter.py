@@ -168,3 +168,39 @@ class CandidateArchitectureAssessment(BaseModel):
             )
 
         return self
+
+
+class AgentStarterConstraintConflict(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    conflicting_requirements: list[AgentStarterRequirement] = Field(
+        default_factory=list,
+    )
+    summary: str = Field(min_length=1)
+    resolution_options: list[str] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_constraint_conflict(
+        self,
+    ) -> AgentStarterConstraintConflict:
+        if not self.conflicting_requirements:
+            raise ValueError(
+                "Constraint conflict must identify a hard requirement."
+            )
+
+        if any(
+            requirement.strength is not ConstraintStrength.HARD
+            for requirement in self.conflicting_requirements
+        ):
+            raise ValueError(
+                "Constraint conflict may contain only hard requirements."
+            )
+
+        if not self.resolution_options:
+            raise ValueError(
+                "Constraint conflict must expose a resolution option."
+            )
+
+        return self
