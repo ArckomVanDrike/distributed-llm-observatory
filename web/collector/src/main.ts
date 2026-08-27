@@ -8,6 +8,14 @@ import {
   executeAgentTest,
 } from './agent-test-flow'
 
+import {
+  fetchAgentTestHistory,
+} from './agent-test-history'
+
+import type {
+  AgentTestHistoryResponse,
+} from './agent-test-history'
+
 import type {
   AgentTestBridgeResponse,
 } from './agent-test-bridge'
@@ -81,6 +89,9 @@ let agentTestResult:
   AgentTestBridgeResponse | null = null
 
 let agentTestError: string | null = null
+
+let agentTestHistory:
+  AgentTestHistoryResponse | null = null
 
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
@@ -482,6 +493,7 @@ function render(): void {
         baseUrl: agentBaseUrl,
         result: agentTestResult,
         error: agentTestError,
+        history: agentTestHistory,
       },
     },
   )
@@ -533,6 +545,22 @@ function downloadCompletedRecord(): void {
   URL.revokeObjectURL(url)
 }
 
+async function refreshAgentTestHistory(): Promise<void> {
+  try {
+    agentTestHistory = await fetchAgentTestHistory(
+      (
+        request,
+        init,
+      ) => fetch(request, init),
+    )
+  } catch {
+    agentTestHistory = null
+  }
+
+  render()
+}
+
+
 function bindAgentTestEvents(): void {
   const button =
     document.querySelector<HTMLButtonElement>(
@@ -577,6 +605,8 @@ function bindAgentTestEvents(): void {
 
         agentTestResult = result
         render()
+
+        await refreshAgentTestHistory()
       } catch (error) {
         agentTestError =
           error instanceof Error
@@ -876,9 +906,20 @@ function bindEvents(): void {
 }
 
 
+function handleRouteChange(): void {
+  render()
+
+  if (
+    resolveAppRoute(window.location.hash)
+    === 'agent-lab-test'
+  ) {
+    void refreshAgentTestHistory()
+  }
+}
+
 window.addEventListener(
   'hashchange',
-  render,
+  handleRouteChange,
 )
 
-render()
+handleRouteChange()

@@ -6,6 +6,7 @@ from pathlib import Path
 from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from uuid import UUID
 
 import pytest
 
@@ -16,6 +17,7 @@ from observer.agent_lab_bridge import (
 )
 from observer.core.agent_lab_artifact_io import (
     load_agent_lab_run_artifact,
+    write_agent_lab_run_artifact,
 )
 from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRun,
@@ -475,6 +477,231 @@ def test_agent_lab_bridge_reports_runner_failure(
         }
 
         assert not config.history_root.exists()
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_lists_persisted_tests(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    protocol_run = build_protocol_run()
+    artifact = protocol_run.to_artifact()
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    write_agent_lab_run_artifact(
+        artifact,
+        config.history_root
+        / f"{artifact.session.session_id}.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/v1/agent-tests",
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+
+        assert len(payload["runs"]) == 1
+
+        run = payload["runs"][0]
+
+        assert run["session_id"] == str(
+            artifact.session.session_id
+        )
+        assert run["started_at_utc"] == (
+            artifact.session.started_at_utc.isoformat()
+        )
+        assert run["target_id"] == "bridge-agent"
+        assert run["suite_id"] == "agent-protocol-core"
+        assert run["suite_version"] == "1.0"
+
+        assert run["observer_id"] == "observer-test"
+        assert run["region_code"] == "CL-LL"
+
+        assert run["total_tasks"] == 0
+        assert run["passed_tasks"] == 0
+        assert run["failed_tasks"] == 0
+        assert run["pass_rate"] is None
+        assert run["median_latency_ms"] is None
+
+        assert run["observatory"] == {
+            "provenance_complete": True,
+            "temporal_eligible": True,
+            "geographic_eligible": True,
+            "reasons": [],
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_lists_empty_history(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/v1/agent-tests",
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload == {
+            "schema_version": "0.1",
+            "runs": [],
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_lists_tests_in_canonical_history_order(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    template = build_protocol_run().to_artifact()
+
+    earlier = datetime(
+        2026,
+        8,
+        26,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+    later = datetime(
+        2026,
+        8,
+        26,
+        19,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    earlier_id = UUID(
+        "00000000-0000-0000-0000-000000000101"
+    )
+    later_id = UUID(
+        "00000000-0000-0000-0000-000000000102"
+    )
+
+    earlier_artifact = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": earlier_id,
+                    "started_at_utc": earlier,
+                    "completed_at_utc": earlier,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": earlier_id,
+                        "generated_at_utc": earlier,
+                    },
+                )
+            ),
+        },
+    )
+
+    later_artifact = template.model_copy(
+        update={
+            "session": template.session.model_copy(
+                update={
+                    "session_id": later_id,
+                    "started_at_utc": later,
+                    "completed_at_utc": later,
+                },
+            ),
+            "technical_report": (
+                template.technical_report.model_copy(
+                    update={
+                        "session_id": later_id,
+                        "generated_at_utc": later,
+                    },
+                )
+            ),
+        },
+    )
+
+    config.history_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # Deliberately reverse filesystem/name order.
+    write_agent_lab_run_artifact(
+        later_artifact,
+        config.history_root / "a-later.json",
+    )
+    write_agent_lab_run_artifact(
+        earlier_artifact,
+        config.history_root / "z-earlier.json",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/v1/agent-tests",
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+
+        assert [
+            run["session_id"]
+            for run in payload["runs"]
+        ] == [
+            str(earlier_id),
+            str(later_id),
+        ]
+
+        assert [
+            run["started_at_utc"]
+            for run in payload["runs"]
+        ] == [
+            earlier.isoformat(),
+            later.isoformat(),
+        ]
+
+        assert "latest" not in payload
+        assert "baseline" not in payload
+        assert "candidate" not in payload
 
     finally:
         server.shutdown()

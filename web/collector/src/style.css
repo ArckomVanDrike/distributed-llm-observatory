@@ -1003,6 +1003,151 @@ footer {
   margin-top: 0.3rem;
 }
 
+/* Run history -------------------------------------------------------------- */
+
+.agent-test-history {
+  max-width: 920px;
+  margin: 1rem auto 0;
+  padding: clamp(1.4rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(116, 91, 255, 0.055),
+      transparent 44%
+    ),
+    var(--panel);
+}
+
+.agent-test-history .panel-heading {
+  margin-bottom: 1rem;
+}
+
+.agent-test-history-empty {
+  padding: 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  background: var(--panel-soft);
+}
+
+.agent-test-history-empty strong {
+  display: block;
+  color: var(--text);
+}
+
+.agent-test-history-empty p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.agent-history-guidance {
+  max-width: 720px;
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.agent-history-runs {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.agent-history-run {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--panel-soft);
+}
+
+.agent-history-run-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.agent-history-run-heading h3 {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+}
+
+.agent-history-run-heading code {
+  max-width: 48%;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.agent-history-run-time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.agent-history-run-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.agent-history-run-metrics > div {
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.agent-history-run-metrics span,
+.agent-history-run-metrics strong {
+  display: block;
+}
+
+.agent-history-run-metrics span {
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.agent-history-run-metrics strong {
+  font-size: 0.86rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.agent-history-run-provenance {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.agent-history-run-provenance p {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.agent-history-run-provenance strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Observatory / Agent Starter                                                */
 /* -------------------------------------------------------------------------- */

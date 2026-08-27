@@ -2,6 +2,10 @@ import type {
   AgentTestBridgeResponse,
 } from './agent-test-bridge'
 
+import type {
+  AgentTestHistoryResponse,
+} from './agent-test-history'
+
 
 export type AgentTestPageState =
   | 'disconnected'
@@ -14,6 +18,7 @@ export interface AgentTestPageOptions {
   baseUrl: string
   result?: AgentTestBridgeResponse | null
   error?: string | null
+  history?: AgentTestHistoryResponse | null
 }
 
 const stateVisuals: Record<
@@ -117,6 +122,179 @@ function renderFailureMessage(
         <code>${escapeHtml(baseUrl)}</code>
       </div>
     </div>
+  `
+}
+
+
+function renderAgentTestHistory(
+  history: AgentTestHistoryResponse,
+): string {
+  if (history.runs.length === 0) {
+    return `
+      <section
+        class="agent-test-history"
+        data-agent-test-history="empty"
+      >
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">
+              Agent observations
+            </p>
+
+            <h2>Run History</h2>
+          </div>
+        </div>
+
+        <div class="agent-test-history-empty">
+          <strong>
+            No saved agent runs yet.
+          </strong>
+
+          <p>
+            Completed Agent Lab observations will appear here after a test.
+          </p>
+        </div>
+      </section>
+    `
+  }
+
+  const runs = history.runs
+    .map((run) => {
+      const passRate =
+        run.pass_rate === null
+          ? 'n/a'
+          : `${
+              Math.round(
+                run.pass_rate * 1000,
+              ) / 10
+            }%`
+
+      const medianLatency =
+        run.median_latency_ms === null
+          ? 'n/a'
+          : `${
+              Math.round(
+                run.median_latency_ms * 100,
+              ) / 100
+            } ms`
+
+      return `
+        <article
+          class="agent-history-run"
+          data-session-id="${escapeHtml(
+            run.session_id,
+          )}"
+        >
+          <div class="agent-history-run-heading">
+            <div>
+              <span class="agent-history-run-time">
+                ${escapeHtml(run.started_at_utc)}
+              </span>
+
+              <h3>
+                ${escapeHtml(run.target_id)}
+              </h3>
+            </div>
+
+            <code>
+              ${escapeHtml(run.session_id)}
+            </code>
+          </div>
+
+          <div class="agent-history-run-metrics">
+            <div>
+              <span>Tasks</span>
+              <strong>
+                ${run.passed_tasks} / ${run.total_tasks}
+              </strong>
+            </div>
+
+            <div>
+              <span>Pass rate</span>
+              <strong>${passRate}</strong>
+            </div>
+
+            <div>
+              <span>Median latency</span>
+              <strong>${medianLatency}</strong>
+            </div>
+
+            <div>
+              <span>Protocol</span>
+              <strong>
+                ${escapeHtml(run.suite_id)}
+                ${escapeHtml(run.suite_version)}
+              </strong>
+            </div>
+          </div>
+
+          <div class="agent-history-run-provenance">
+            <p>
+              Observer
+              <strong>
+                ${escapeHtml(
+                  run.observer_id ?? 'n/a',
+                )}
+              </strong>
+            </p>
+
+            <p>
+              <strong>
+                Observed from ${escapeHtml(
+                  run.region_code ?? 'n/a',
+                )}
+              </strong>
+            </p>
+
+            <p>
+              ${
+                run.observatory.temporal_eligible
+                  ? 'Temporal eligible'
+                  : 'Temporal not eligible'
+              }
+            </p>
+
+            <p>
+              ${
+                run.observatory.geographic_eligible
+                  ? 'Geographic eligible'
+                  : 'Geographic not eligible'
+              }
+            </p>
+          </div>
+        </article>
+      `
+    })
+    .join('')
+
+  return `
+    <section
+      class="agent-test-history"
+      data-agent-test-history="ready"
+    >
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">
+            Agent observations
+          </p>
+
+          <h2>Run History</h2>
+        </div>
+
+        <span class="badge">
+          ${history.runs.length} saved
+        </span>
+      </div>
+
+      <p class="agent-history-guidance">
+        Select comparison roles explicitly when comparing observations.
+        DLLO does not choose a baseline or candidate automatically.
+      </p>
+
+      <div class="agent-history-runs">
+        ${runs}
+      </div>
+    </section>
   `
 }
 
@@ -396,6 +574,15 @@ export function renderAgentTestPage(
           ? ''
           : renderTechnicalSummary(
               options.result,
+            )
+      }
+
+      ${
+        options.history === undefined
+        || options.history === null
+          ? ''
+          : renderAgentTestHistory(
+              options.history,
             )
       }
     </main>

@@ -152,3 +152,122 @@ it('renders an actionable failure message for a failed agent test', () => {
     'Retry Agent Test',
   )
 })
+
+
+it('renders an empty Agent Lab run history state', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    history: {
+      schema_version: '0.1',
+      runs: [],
+    },
+  })
+
+  expect(html).toContain(
+    'data-agent-test-history="empty"',
+  )
+  expect(html).toContain('Run History')
+  expect(html).toContain(
+    'No saved agent runs yet.',
+  )
+  expect(html).toContain(
+    'Completed Agent Lab observations will appear here after a test.',
+  )
+})
+
+
+it('renders saved Agent Lab runs without choosing comparison roles', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    history: {
+      schema_version: '0.1',
+      runs: [
+        {
+          session_id:
+            '00000000-0000-0000-0000-000000000101',
+          started_at_utc:
+            '2026-08-26T18:00:00+00:00',
+          target_id: 'example-agent',
+          suite_id: 'agent-protocol-core',
+          suite_version: '1.0',
+          observer_id: 'observer-one',
+          region_code: 'CL-Los-Lagos',
+          observatory: {
+            provenance_complete: true,
+            temporal_eligible: true,
+            geographic_eligible: true,
+            reasons: [],
+          },
+          total_tasks: 11,
+          passed_tasks: 10,
+          failed_tasks: 1,
+          pass_rate: 10 / 11,
+          median_latency_ms: 4.25,
+        },
+        {
+          session_id:
+            '00000000-0000-0000-0000-000000000102',
+          started_at_utc:
+            '2026-08-26T19:00:00+00:00',
+          target_id: 'example-agent',
+          suite_id: 'agent-protocol-core',
+          suite_version: '1.0',
+          observer_id: 'observer-one',
+          region_code: 'CL-Los-Lagos',
+          observatory: {
+            provenance_complete: true,
+            temporal_eligible: true,
+            geographic_eligible: true,
+            reasons: [],
+          },
+          total_tasks: 11,
+          passed_tasks: 11,
+          failed_tasks: 0,
+          pass_rate: 1,
+          median_latency_ms: 3.5,
+        },
+      ],
+    },
+  })
+
+  expect(html).toContain(
+    'data-agent-test-history="ready"',
+  )
+
+  expect(html).toContain(
+    '00000000-0000-0000-0000-000000000101',
+  )
+  expect(html).toContain(
+    '00000000-0000-0000-0000-000000000102',
+  )
+
+  expect(html).toContain('example-agent')
+  expect(html).toContain(
+    'Observed from CL-Los-Lagos',
+  )
+  expect(html).toContain('10 / 11')
+  expect(html).toContain('11 / 11')
+  expect(html).toContain('90.9%')
+  expect(html).toContain('100%')
+  expect(html).toContain('4.25 ms')
+  expect(html).toContain('3.5 ms')
+
+  const earlier = html.indexOf(
+    '00000000-0000-0000-0000-000000000101',
+  )
+  const later = html.indexOf(
+    '00000000-0000-0000-0000-000000000102',
+  )
+
+  expect(earlier).toBeGreaterThan(-1)
+  expect(later).toBeGreaterThan(earlier)
+
+  expect(html).not.toContain(
+    'data-observation-role="baseline"',
+  )
+  expect(html).not.toContain(
+    'data-observation-role="candidate"',
+  )
+})

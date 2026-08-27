@@ -21,6 +21,9 @@ from observer.core.agent_lab_protocol_runner import (
     AgentLabProtocolRunner,
     AgentLabProtocolRunnerError,
 )
+from observer.core.agent_lab_run_history import (
+    AgentLabRunHistory,
+)
 
 
 @dataclass(frozen=True)
@@ -68,6 +71,10 @@ def make_handler(
                         ),
                     },
                 )
+                return
+
+            if parsed.path == "/v1/agent-tests":
+                self._handle_agent_test_history()
                 return
 
             self._send_json(
@@ -143,6 +150,94 @@ def make_handler(
                 )
 
             return payload
+
+        def _handle_agent_test_history(
+            self,
+        ) -> None:
+            history = AgentLabRunHistory(
+                config.history_root
+            )
+
+            artifacts = history.load_all()
+
+            runs = []
+
+            for artifact in artifacts:
+                session = artifact.session
+                report = artifact.technical_report
+                qualification = (
+                    qualify_agent_observation(
+                        artifact
+                    )
+                )
+
+                runs.append(
+                    {
+                        "session_id": str(
+                            session.session_id
+                        ),
+                        "started_at_utc": (
+                            session
+                            .started_at_utc
+                            .isoformat()
+                        ),
+                        "target_id": (
+                            session.target.target_id
+                        ),
+                        "suite_id": (
+                            session.suite_id
+                        ),
+                        "suite_version": (
+                            session.suite_version
+                        ),
+                        "observer_id": (
+                            session.observer_id
+                        ),
+                        "region_code": (
+                            session.region_code
+                        ),
+                        "observatory": {
+                            "provenance_complete": (
+                                qualification
+                                .provenance_complete
+                            ),
+                            "temporal_eligible": (
+                                qualification
+                                .temporal_eligible
+                            ),
+                            "geographic_eligible": (
+                                qualification
+                                .geographic_eligible
+                            ),
+                            "reasons": list(
+                                qualification.reasons
+                            ),
+                        },
+                        "total_tasks": (
+                            report.total_tasks
+                        ),
+                        "passed_tasks": (
+                            report.passed_tasks
+                        ),
+                        "failed_tasks": (
+                            report.failed_tasks
+                        ),
+                        "pass_rate": (
+                            report.pass_rate
+                        ),
+                        "median_latency_ms": (
+                            report.median_latency_ms
+                        ),
+                    }
+                )
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "runs": runs,
+                },
+            )
 
         def _handle_agent_test(
             self,
