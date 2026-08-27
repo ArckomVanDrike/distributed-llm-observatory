@@ -1,6 +1,49 @@
 import './style.css'
 
 import {
+  renderAppView,
+} from './app-view'
+
+import {
+  executeAgentTest,
+} from './agent-test-flow'
+
+import {
+  fetchAgentTestHistory,
+} from './agent-test-history'
+
+import {
+  selectAgentComparisonRole,
+} from './agent-test-selection'
+
+import {
+  compareGeographicAgentRuns,
+  compareTemporalAgentRuns,
+} from './agent-test-comparison'
+
+import type {
+  AgentGeographicComparisonResponse,
+  AgentTemporalComparisonResponse,
+} from './agent-test-comparison'
+
+import type {
+  AgentTestHistoryResponse,
+} from './agent-test-history'
+
+import type {
+  AgentTestBridgeResponse,
+} from './agent-test-bridge'
+
+import type {
+  AgentComparisonType,
+  AgentTestPageState,
+} from './agent-test-page'
+
+import {
+  resolveAppRoute,
+} from './navigation'
+
+import {
   fetchBridgeAssignment,
 } from './bridge'
 
@@ -50,6 +93,35 @@ type CollectorState =
   | 'completed'
 
 let state: CollectorState = 'idle'
+
+let agentTestState: AgentTestPageState =
+  'disconnected'
+
+let agentBaseUrl =
+  'http://127.0.0.1:8000'
+
+let agentTestResult:
+  AgentTestBridgeResponse | null = null
+
+let agentTestError: string | null = null
+
+let agentTestHistory:
+  AgentTestHistoryResponse | null = null
+
+let baselineSessionId: string | null = null
+let candidateSessionId: string | null = null
+
+let agentComparison:
+  | AgentTemporalComparisonResponse
+  | AgentGeographicComparisonResponse
+  | null = null
+
+let agentComparisonError: string | null = null
+
+let comparisonType: AgentComparisonType | null = null
+
+let maxObservationSkewSecondsInput = ''
+
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
 let observationHistory: ObservationHistory =
@@ -437,109 +509,37 @@ function renderCurrentProbe(): string {
 }
 
 function render(): void {
-  app.innerHTML = `
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Distributed LLM Observatory</p>
-          <h1>Collector</h1>
-        </div>
+  const route = resolveAppRoute(
+    window.location.hash,
+  )
 
-        <div class="status">
-          <span class="status-dot" aria-hidden="true"></span>
-          Local session
-        </div>
-      </header>
+  app.innerHTML = renderAppView(
+    route,
+    renderCurrentProbe(),
+    {
+      agentTest: {
+        state: agentTestState,
+        baseUrl: agentBaseUrl,
+        result: agentTestResult,
+        error: agentTestError,
+        history: agentTestHistory,
+        baselineSessionId,
+        candidateSessionId,
+        comparison: agentComparison,
+        comparisonError: agentComparisonError,
+        comparisonType,
+        maxObservationSkewSecondsInput,
+      },
+    },
+  )
 
-      <section class="hero">
-        <p class="hero-label">Consumer observation interface</p>
+  if (route === 'consumer-probe') {
+    bindEvents()
+  }
 
-        <h2>
-          Measure what you observe.
-          <span>Do not infer what you cannot see.</span>
-        </h2>
-
-        <p class="hero-copy">
-          DLLO Collector guides human-in-the-loop observations of
-          consumer LLM interfaces while keeping measurement provenance
-          explicit and avoiding response-content collection.
-        </p>
-      </section>
-
-      <section class="grid">
-        <article class="panel primary-panel">
-          ${renderCurrentProbe()}
-        </article>
-
-        <aside class="panel">
-          <p class="section-label">Measurement boundaries</p>
-          <h3>Privacy by design</h3>
-
-          <ul class="boundary-list">
-            <li>
-              <strong>No response scraping</strong>
-              <span>Generated text is not collected.</span>
-            </li>
-
-            <li>
-              <strong>No account credentials</strong>
-              <span>
-                Passwords, cookies, and session tokens are excluded.
-              </span>
-            </li>
-
-            <li>
-              <strong>Human-observed timing</strong>
-              <span>
-                Consumer first-output timing is explicitly identified
-                as a manual observation.
-              </span>
-            </li>
-
-            <li>
-              <strong>Measurement provenance</strong>
-              <span>
-                Collection methods remain identifiable in exported data.
-              </span>
-            </li>
-          </ul>
-        </aside>
-      </section>
-
-      <section class="principles">
-        <article>
-          <span>01</span>
-          <h3>Observe</h3>
-          <p>
-            Record measurable events without assigning unsupported causes.
-          </p>
-        </article>
-
-        <article>
-          <span>02</span>
-          <h3>Preserve provenance</h3>
-          <p>
-            Keep methodology, platform, benchmark, region, and time explicit.
-          </p>
-        </article>
-
-        <article>
-          <span>03</span>
-          <h3>Compare carefully</h3>
-          <p>
-            Only combine measurements whose semantics are compatible.
-          </p>
-        </article>
-      </section>
-
-      <footer>
-        <span>DLLO Collector · experimental</span>
-        <span>No data leaves this page in the current build.</span>
-      </footer>
-    </main>
-  `
-
-  bindEvents()
+  if (route === 'agent-lab-test') {
+    bindAgentTestEvents()
+  }
 }
 
 function downloadCompletedRecord(): void {
@@ -579,6 +579,281 @@ function downloadCompletedRecord(): void {
 
   URL.revokeObjectURL(url)
 }
+
+async function refreshAgentTestHistory(): Promise<void> {
+  try {
+    agentTestHistory = await fetchAgentTestHistory(
+      (
+        request,
+        init,
+      ) => fetch(request, init),
+    )
+  } catch {
+    agentTestHistory = null
+  }
+
+  render()
+}
+
+
+function bindAgentTestEvents(): void {
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-set-baseline]',
+    )
+    .forEach((roleButton) => {
+      roleButton.addEventListener(
+        'click',
+        () => {
+          const sessionId =
+            roleButton.dataset.setBaseline
+
+          if (sessionId === undefined) {
+            return
+          }
+
+          const selection =
+            selectAgentComparisonRole(
+              {
+                baselineSessionId,
+                candidateSessionId,
+              },
+              'baseline',
+              sessionId,
+            )
+
+          baselineSessionId =
+            selection.baselineSessionId
+          candidateSessionId =
+            selection.candidateSessionId
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-set-candidate]',
+    )
+    .forEach((roleButton) => {
+      roleButton.addEventListener(
+        'click',
+        () => {
+          const sessionId =
+            roleButton.dataset.setCandidate
+
+          if (sessionId === undefined) {
+            return
+          }
+
+          const selection =
+            selectAgentComparisonRole(
+              {
+                baselineSessionId,
+                candidateSessionId,
+              },
+              'candidate',
+              sessionId,
+            )
+
+          baselineSessionId =
+            selection.baselineSessionId
+          candidateSessionId =
+            selection.candidateSessionId
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-comparison-type]',
+    )
+    .forEach((typeButton) => {
+      typeButton.addEventListener(
+        'click',
+        () => {
+          const nextType =
+            typeButton.dataset.comparisonType
+
+          if (
+            nextType !== 'temporal'
+            && nextType !== 'geographic'
+          ) {
+            return
+          }
+
+          comparisonType = nextType
+
+          if (nextType === 'temporal') {
+            maxObservationSkewSecondsInput = ''
+          }
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelector<HTMLInputElement>(
+      '#max-observation-skew-seconds',
+    )
+    ?.addEventListener(
+      'input',
+      (event) => {
+        const input = event.currentTarget
+
+        if (!(input instanceof HTMLInputElement)) {
+          return
+        }
+
+        maxObservationSkewSecondsInput =
+          input.value
+
+        agentComparison = null
+        agentComparisonError = null
+
+        render()
+      },
+    )
+
+  document
+    .querySelector<HTMLButtonElement>(
+      '#compare-agent-runs',
+    )
+    ?.addEventListener(
+      'click',
+      async () => {
+        if (
+          baselineSessionId === null
+          || candidateSessionId === null
+        ) {
+          return
+        }
+
+        agentComparison = null
+        agentComparisonError = null
+        render()
+
+        try {
+          if (comparisonType === 'temporal') {
+            agentComparison =
+              await compareTemporalAgentRuns(
+                (
+                  request,
+                  init,
+                ) => fetch(request, init),
+                {
+                  baselineSessionId,
+                  candidateSessionId,
+                },
+              )
+          } else if (
+            comparisonType === 'geographic'
+          ) {
+            const maxObservationSkewSeconds =
+              Number(
+                maxObservationSkewSecondsInput,
+              )
+
+            agentComparison =
+              await compareGeographicAgentRuns(
+                (
+                  request,
+                  init,
+                ) => fetch(request, init),
+                {
+                  baselineSessionId,
+                  candidateSessionId,
+                  maxObservationSkewSeconds,
+                },
+              )
+          } else {
+            return
+          }
+
+          agentComparisonError = null
+          render()
+        } catch (error) {
+          agentComparison = null
+          agentComparisonError =
+            error instanceof Error
+              ? error.message
+              : 'Agent comparison failed.'
+
+          render()
+        }
+      },
+    )
+
+  const button =
+    document.querySelector<HTMLButtonElement>(
+      '#run-agent-test',
+    )
+
+  const input =
+    document.querySelector<HTMLInputElement>(
+      '#agent-base-url',
+    )
+
+  if (
+    button === null
+    || input === null
+  ) {
+    return
+  }
+
+  button.addEventListener(
+    'click',
+    async () => {
+      agentBaseUrl = input.value.trim()
+
+      agentTestResult = null
+      agentTestError = null
+
+      try {
+        const result = await executeAgentTest({
+          baseUrl: agentBaseUrl,
+          fetchImpl: (
+            request,
+            init,
+          ) => fetch(request, init),
+          onStateChange(nextState) {
+            agentTestState = nextState
+
+            if (nextState === 'running') {
+              render()
+            }
+          },
+        })
+
+        agentTestResult = result
+        render()
+
+        await refreshAgentTestHistory()
+      } catch (error) {
+        agentTestError =
+          error instanceof Error
+            ? error.message
+            : 'Agent test failed.'
+
+        render()
+      }
+    },
+  )
+}
+
 
 function bindEvents(): void {
   document
@@ -865,4 +1140,21 @@ function bindEvents(): void {
     })
 }
 
-render()
+
+function handleRouteChange(): void {
+  render()
+
+  if (
+    resolveAppRoute(window.location.hash)
+    === 'agent-lab-test'
+  ) {
+    void refreshAgentTestHistory()
+  }
+}
+
+window.addEventListener(
+  'hashchange',
+  handleRouteChange,
+)
+
+handleRouteChange()

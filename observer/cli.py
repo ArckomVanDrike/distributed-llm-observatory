@@ -34,6 +34,12 @@ from consumer_probe.telemetry_analytics import (
     summarize_local_telemetry_by_collector,
     summarize_local_telemetry_records,
 )
+from observer.agent_lab_bridge import (
+    AgentLabBridgeConfig,
+)
+from observer.agent_lab_bridge import (
+    serve as serve_agent_lab_bridge,
+)
 from observer.core.agent_lab_artifact_io import (
     AgentLabArtifactIOError,
     load_agent_lab_run_artifact,
@@ -522,6 +528,51 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional local Collector build directory "
             "to serve from the bridge"
         ),
+    )
+
+    # -----------------------------------------------------
+    # Agent Lab localhost bridge
+    # -----------------------------------------------------
+
+    agent_lab_bridge_parser = subparsers.add_parser(
+        "agent-lab-bridge",
+        help="Run the localhost Agent Lab HTTP bridge",
+    )
+
+    agent_lab_bridge_parser.add_argument(
+        "--observer-id",
+        help=(
+            "Observer identifier. Defaults to "
+            "OBSERVATORY_ID when omitted."
+        ),
+    )
+
+    agent_lab_bridge_parser.add_argument(
+        "--region-code",
+        help=(
+            "Observer region. Defaults to "
+            "OBSERVATORY_REGION when omitted."
+        ),
+    )
+
+    agent_lab_bridge_parser.add_argument(
+        "--history-root",
+        type=Path,
+        required=True,
+        help="Agent Lab run history directory",
+    )
+
+    agent_lab_bridge_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Agent Lab bridge bind host; localhost only",
+    )
+
+    agent_lab_bridge_parser.add_argument(
+        "--port",
+        type=int,
+        default=8766,
+        help="Agent Lab bridge TCP port",
     )
 
     # -----------------------------------------------------
@@ -1930,6 +1981,41 @@ def consumer_bridge(
         )
         return 2
 
+
+
+
+def agent_lab_bridge(
+    args: argparse.Namespace,
+) -> int:
+    try:
+        observer_id, region_code = (
+            resolve_observer_identity(args)
+        )
+
+        bridge_config = AgentLabBridgeConfig(
+            observer_id=observer_id,
+            region_code=region_code,
+            history_root=args.history_root,
+        )
+
+        serve_agent_lab_bridge(
+            bridge_config,
+            host=args.host,
+            port=args.port,
+        )
+
+        return 0
+
+    except (
+        ObserverConfigError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(
+            f"Error: {exc}",
+            file=sys.stderr,
+        )
+        return 2
 
 
 def agent_test(
@@ -3407,6 +3493,9 @@ def main() -> int:
 
     if args.command == "consumer-bridge":
         return consumer_bridge(args)
+
+    if args.command == "agent-lab-bridge":
+        return agent_lab_bridge(args)
 
     if args.command == "agent-test":
         return agent_test(args)
