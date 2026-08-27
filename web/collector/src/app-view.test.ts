@@ -94,3 +94,58 @@ it('renders Test Your Agent from external state', () => {
   )
   expect(html).toContain('Running test...')
 })
+
+
+it('renders Observatory from external dashboard state', () => {
+  const html = renderAppView(
+    'observatory',
+    '',
+    {
+      observatory: {
+        state: 'ready',
+        history: {
+          schema_version: '0.1',
+          runs: [
+            {
+              session_id: 'run-1',
+              started_at_utc:
+                '2026-08-26T18:00:00+00:00',
+              target_id: 'agent-a',
+              suite_id: 'agent-protocol-core',
+              suite_version: '1.0',
+              observer_id: 'observer-one',
+              region_code: 'CL-Los-Lagos',
+              observatory: {
+                provenance_complete: true,
+                temporal_eligible: true,
+                geographic_eligible: true,
+                reasons: [],
+              },
+              total_tasks: 11,
+              passed_tasks: 11,
+              failed_tasks: 0,
+              pass_rate: 1,
+              median_latency_ms: 3.2,
+            },
+          ],
+        },
+        temporalPairs: {
+          schema_version: '0.1',
+          pair_type: 'temporal',
+          pairs: [],
+        },
+        geographicPairs: null,
+        geographicMaxSkewInput: '',
+        error: null,
+      },
+    },
+  )
+
+  expect(html).toMatch(
+    /<strong>1<\/strong>\s*<span>observations<\/span>/,
+  )
+
+  expect(html).toContain(
+    'Maximum observation skew required',
+  )
+})
