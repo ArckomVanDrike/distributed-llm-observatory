@@ -461,7 +461,7 @@ footer {
     minmax(0, 0.9fr)
     minmax(420px, 1.1fr);
   align-items: center;
-  gap: clamp(2rem, 5vw, 5rem);
+  gap: clamp(0.8rem, 2.2vw, 2.4rem);
   min-height: 520px;
 }
 
@@ -1963,5 +1963,1216 @@ footer {
   .agent-report-observatory,
   .agent-report-notes {
     grid-template-columns: 1fr;
+  }
+}
+
+
+/* Observatory visual semantics --------------------------------------------- */
+
+.observatory-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(1rem, 3vw, 2rem);
+  overflow: hidden;
+}
+
+.observatory-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  opacity: 0.94;
+  filter:
+    drop-shadow(
+      0 0 1.1rem rgba(144, 224, 192, 0.12)
+    );
+  pointer-events: none;
+  user-select: none;
+}
+
+.observatory-summary
+  .observatory-icon {
+  width: clamp(4.2rem, 7vw, 5.6rem);
+  height: clamp(4.2rem, 7vw, 5.6rem);
+  margin-right: -0.15rem;
+}
+
+.observatory-panel-heading,
+.observatory-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.observatory-panel-heading {
+  margin-bottom: 1.2rem;
+}
+
+.observatory-panel-heading h2,
+.observatory-section-heading h2 {
+  margin-bottom: 0;
+}
+
+.observatory-panel-heading
+  .observatory-icon {
+  width: clamp(4.6rem, 7vw, 6rem);
+  height: clamp(4.6rem, 7vw, 6rem);
+  margin-top: -1.25rem;
+  margin-right: -0.35rem;
+}
+
+.observatory-section-heading {
+  margin-bottom: 1.25rem;
+}
+
+.observatory-section-heading
+  .observatory-icon {
+  width: clamp(4.4rem, 6vw, 5.4rem);
+  height: clamp(4.4rem, 6vw, 5.4rem);
+  margin-right: 0.25rem;
+}
+
+@media (max-width: 520px) {
+  .observatory-summary
+    .observatory-icon {
+    width: 3.8rem;
+    height: 3.8rem;
+  }
+
+  .observatory-panel-heading
+    .observatory-icon,
+  .observatory-section-heading
+    .observatory-icon {
+    width: 4rem;
+    height: 4rem;
+  }
+}
+
+
+/* Observatory hero --------------------------------------------------------- */
+
+.observatory-page .observatory-hero {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 0.92fr)
+    minmax(420px, 1.08fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 5rem);
+  max-width: none;
+  min-height: 500px;
+  padding: 3.5rem 0 4rem;
+}
+
+.observatory-hero-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.observatory-hero-visual {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  isolation: isolate;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--bg) 0%,
+      rgba(11, 15, 20, 0.58) 8%,
+      rgba(11, 15, 20, 0.08) 28%,
+      transparent 46%
+    ),
+    url(
+      "/observatory/dllo-observatory-hero.webp"
+    )
+    72% center / cover no-repeat;
+}
+
+/* Nebula glow */
+.observatory-hero-visual::before {
+  position: absolute;
+  inset: 5% -4% 8% 12%;
+  z-index: 1;
+  background:
+    radial-gradient(
+      circle at 66% 30%,
+      rgba(144, 224, 192, 0.24),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 47% 48%,
+      rgba(60, 180, 210, 0.18),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 72% 61%,
+      rgba(110, 235, 200, 0.12),
+      transparent 31%
+    );
+  filter: blur(24px);
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  transform: scale(1);
+  content: "";
+  pointer-events: none;
+  animation:
+    observatory-nebula-breathe
+    7s
+    ease-in-out
+    infinite;
+}
+
+/* Small stellar glints */
+.observatory-hero-visual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    radial-gradient(
+      circle at 64% 22%,
+      rgba(255, 255, 255, 0.9) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 82% 34%,
+      rgba(144, 224, 192, 0.95) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 54% 58%,
+      rgba(210, 255, 245, 0.9) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 90% 67%,
+      rgba(144, 224, 192, 0.85) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 43% 37%,
+      rgba(180, 230, 255, 0.85) 0 1px,
+      transparent 2px
+    );
+  opacity: 0.5;
+  filter:
+    brightness(1.2)
+    drop-shadow(
+      0 0 5px rgba(190, 255, 240, 0.45)
+    );
+  content: "";
+  pointer-events: none;
+  animation:
+    observatory-stars-pulse
+    4.6s
+    ease-in-out
+    infinite;
+}
+
+@keyframes observatory-nebula-breathe {
+  0%,
+  100% {
+    opacity: 0.46;
+    transform: scale(0.985);
+  }
+
+  50% {
+    opacity: 0.78;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes observatory-stars-pulse {
+  0%,
+  100% {
+    opacity: 0.22;
+    filter:
+      brightness(0.9)
+      drop-shadow(
+        0 0 2px rgba(190, 255, 240, 0.22)
+      );
+  }
+
+  38% {
+    opacity: 1;
+    filter:
+      brightness(1.75)
+      drop-shadow(
+        0 0 8px rgba(190, 255, 240, 0.72)
+      );
+  }
+
+  62% {
+    opacity: 0.58;
+    filter:
+      brightness(1.2)
+      drop-shadow(
+        0 0 4px rgba(190, 255, 240, 0.42)
+      );
+  }
+
+  78% {
+    opacity: 0.88;
+    filter:
+      brightness(1.5)
+      drop-shadow(
+        0 0 6px rgba(190, 255, 240, 0.6)
+      );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .observatory-hero-visual::before,
+  .observatory-hero-visual::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .observatory-page .observatory-hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .observatory-hero-visual {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 560px) {
+  .observatory-hero-visual {
+    min-height: 280px;
+    background-position: 68% center;
+  }
+}
+
+
+@media (min-width: 901px) {
+  .observatory-hero-visual {
+    margin-left: -0.8rem;
+  }
+}
+
+
+/* Observatory hero composition tuning -------------------------------------- */
+
+.observatory-page {
+  padding-top: 0.6rem;
+}
+
+.observatory-page .observatory-hero {
+  grid-template-columns:
+    minmax(0, 0.82fr)
+    minmax(0, 1.18fr);
+  gap: 0;
+  min-height: 410px;
+  padding: 1rem 0 2.4rem;
+}
+
+.observatory-page .observatory-hero h1 {
+  margin-bottom: 1.35rem;
+  font-size: clamp(4rem, 7.2vw, 6.7rem);
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+}
+
+.observatory-hero-copy {
+  z-index: 3;
+}
+
+.observatory-hero-copy .hero-copy {
+  max-width: 620px;
+  font-size: 1.05rem;
+}
+
+.observatory-hero-visual {
+  z-index: 1;
+  width: calc(100% + 4.8rem);
+  min-height: 420px;
+  margin-left: -4.8rem;
+  background-position: 88% center;
+}
+
+/* Stronger living nebula */
+.observatory-hero-visual::before {
+  inset: 0 -4% 3% 2%;
+  opacity: 0.68;
+  filter: blur(22px);
+  animation:
+    observatory-nebula-breathe
+    6.2s
+    ease-in-out
+    infinite;
+}
+
+/* Visible white stellar pulse */
+.observatory-hero-visual::after {
+  inset: 0;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(
+      circle at 69% 16%,
+      #fff 0 1.5px,
+      rgba(255, 255, 255, 0.9) 2px,
+      rgba(195, 255, 245, 0.42) 4px,
+      transparent 9px
+    ),
+    radial-gradient(
+      circle at 82% 27%,
+      #fff 0 1.25px,
+      rgba(255, 255, 255, 0.92) 2px,
+      rgba(180, 255, 240, 0.38) 4px,
+      transparent 8px
+    ),
+    radial-gradient(
+      circle at 62% 35%,
+      #fff 0 1.4px,
+      rgba(255, 255, 255, 0.9) 2px,
+      rgba(190, 255, 245, 0.42) 4px,
+      transparent 9px
+    ),
+    radial-gradient(
+      circle at 76% 47%,
+      #fff 0 1.6px,
+      rgba(255, 255, 255, 0.94) 2.2px,
+      rgba(185, 255, 240, 0.42) 4.5px,
+      transparent 10px
+    ),
+    radial-gradient(
+      circle at 91% 38%,
+      #fff 0 1.3px,
+      rgba(255, 255, 255, 0.9) 2px,
+      rgba(190, 255, 245, 0.38) 4px,
+      transparent 8px
+    ),
+    radial-gradient(
+      circle at 55% 25%,
+      #fff 0 1px,
+      rgba(255, 255, 255, 0.85) 1.8px,
+      rgba(180, 235, 255, 0.35) 3.8px,
+      transparent 8px
+    );
+
+  opacity: 0.2;
+
+  animation:
+    observatory-stars-pulse-v2
+    4.2s
+    ease-in-out
+    infinite;
+}
+
+@keyframes observatory-stars-pulse-v2 {
+  0%,
+  100% {
+    opacity: 0.16;
+    filter:
+      brightness(0.75)
+      drop-shadow(
+        0 0 1px rgba(255, 255, 255, 0.1)
+      );
+    transform: scale(0.995);
+  }
+
+  38% {
+    opacity: 1;
+    filter:
+      brightness(2.6)
+      drop-shadow(
+        0 0 9px rgba(220, 255, 250, 0.9)
+      );
+    transform: scale(1.012);
+  }
+
+  57% {
+    opacity: 0.42;
+    filter:
+      brightness(1.15)
+      drop-shadow(
+        0 0 3px rgba(220, 255, 250, 0.32)
+      );
+  }
+
+  76% {
+    opacity: 0.9;
+    filter:
+      brightness(2.1)
+      drop-shadow(
+        0 0 7px rgba(220, 255, 250, 0.7)
+      );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .observatory-hero-visual::before,
+  .observatory-hero-visual::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .observatory-page .observatory-hero {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-top: 1.5rem;
+  }
+
+  .observatory-hero-visual {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .observatory-page .observatory-hero h1 {
+    font-size: clamp(3.5rem, 12vw, 5.5rem);
+  }
+}
+
+
+/* Observatory deep-space atmosphere ---------------------------------------- */
+
+body:has(.observatory-page) {
+  background:
+    radial-gradient(
+      circle at 72% 17%,
+      rgba(55, 145, 145, 0.035),
+      transparent 30rem
+    ),
+    #010609;
+}
+
+.dllo-app-shell:has(.observatory-page),
+.dllo-page:has(.observatory-page),
+.observatory-page {
+  background: transparent;
+}
+
+/*
+ * Dissolve the artwork into the same near-black environment instead
+ * of presenting it as a rectangular image card.
+ */
+.observatory-hero-visual {
+  border-radius: 0;
+  box-shadow: none;
+
+  -webkit-mask-image:
+    radial-gradient(
+      ellipse 100% 96% at 61% 49%,
+      #000 60%,
+      rgba(0, 0, 0, 0.94) 72%,
+      rgba(0, 0, 0, 0.5) 88%,
+      transparent 100%
+    );
+
+  mask-image:
+    radial-gradient(
+      ellipse 100% 96% at 61% 49%,
+      #000 60%,
+      rgba(0, 0, 0, 0.94) 72%,
+      rgba(0, 0, 0, 0.5) 88%,
+      transparent 100%
+    );
+}
+
+
+/* Stable pseudo-random observation lights on the globe */
+
+.observatory-globe-points {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.observatory-globe-points span {
+  position: absolute;
+
+  left: var(--point-x);
+  top: var(--point-y);
+
+  width: 4px;
+  height: 4px;
+
+  border-radius: 50%;
+
+  background: #fff;
+
+  box-shadow:
+    0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 7px rgba(210, 255, 246, 0.82),
+    0 0 14px rgba(144, 224, 192, 0.52);
+
+  opacity: 0.18;
+
+  transform:
+    translate(-50%, -50%)
+    scale(var(--point-scale));
+
+  animation:
+    observatory-globe-point-pulse
+    var(--point-duration)
+    ease-in-out
+    var(--point-delay)
+    infinite;
+}
+
+
+@keyframes observatory-globe-point-pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+
+    transform:
+      translate(-50%, -50%)
+      scale(
+        calc(
+          var(--point-scale) * 0.65
+        )
+      );
+
+    filter: brightness(0.75);
+  }
+
+  24% {
+    opacity: 0.42;
+  }
+
+  48% {
+    opacity: 1;
+
+    transform:
+      translate(-50%, -50%)
+      scale(
+        calc(
+          var(--point-scale) * 1.35
+        )
+      );
+
+    filter: brightness(2.5);
+
+    box-shadow:
+      0 0 4px #fff,
+      0 0 10px rgba(230, 255, 250, 0.95),
+      0 0 22px rgba(144, 224, 192, 0.72);
+  }
+
+  67% {
+    opacity: 0.3;
+  }
+
+  82% {
+    opacity: 0.7;
+  }
+}
+
+
+/*
+ * Nebula: teal atmosphere periodically blooms toward white,
+ * independently from the globe points.
+ */
+
+.observatory-hero-visual::before {
+  inset: -4% -3% 0 -2%;
+
+  background:
+    radial-gradient(
+      ellipse at 48% 31%,
+      rgba(255, 255, 255, 0.22),
+      transparent 18%
+    ),
+    radial-gradient(
+      ellipse at 61% 21%,
+      rgba(225, 255, 250, 0.16),
+      transparent 21%
+    ),
+    radial-gradient(
+      ellipse at 42% 49%,
+      rgba(255, 255, 255, 0.12),
+      transparent 18%
+    ),
+    radial-gradient(
+      ellipse at 68% 46%,
+      rgba(180, 255, 242, 0.16),
+      transparent 25%
+    ),
+    radial-gradient(
+      ellipse at 40% 46%,
+      rgba(48, 178, 205, 0.19),
+      transparent 37%
+    );
+
+  mix-blend-mode: screen;
+
+  animation:
+    observatory-nebula-white-bloom
+    8.4s
+    ease-in-out
+    infinite;
+}
+
+
+@keyframes observatory-nebula-white-bloom {
+  0%,
+  100% {
+    opacity: 0.34;
+
+    filter:
+      blur(27px)
+      brightness(0.82);
+
+    transform:
+      translate3d(-1%, 1%, 0)
+      scale(0.98);
+  }
+
+  29% {
+    opacity: 0.58;
+
+    filter:
+      blur(25px)
+      brightness(1.2);
+  }
+
+  48% {
+    opacity: 0.92;
+
+    filter:
+      blur(22px)
+      brightness(1.85);
+
+    transform:
+      translate3d(1.5%, -1%, 0)
+      scale(1.035);
+  }
+
+  63% {
+    opacity: 0.45;
+
+    filter:
+      blur(29px)
+      brightness(1);
+  }
+
+  78% {
+    opacity: 0.78;
+
+    filter:
+      blur(24px)
+      brightness(1.55);
+
+    transform:
+      translate3d(-0.5%, 0.5%, 0)
+      scale(1.015);
+  }
+}
+
+
+/* Sparse white flashes distributed through the surrounding nebula */
+
+.observatory-hero-visual::after {
+  z-index: 3;
+
+  background:
+    radial-gradient(
+      circle at 43% 24%,
+      #fff 0 1.2px,
+      rgba(255, 255, 255, 0.72) 2px,
+      transparent 7px
+    ),
+    radial-gradient(
+      circle at 51% 36%,
+      #fff 0 1px,
+      rgba(220, 255, 250, 0.68) 2px,
+      transparent 8px
+    ),
+    radial-gradient(
+      circle at 37% 43%,
+      #fff 0 1.4px,
+      rgba(255, 255, 255, 0.72) 2.2px,
+      transparent 9px
+    ),
+    radial-gradient(
+      circle at 55% 57%,
+      #fff 0 1px,
+      rgba(215, 255, 247, 0.62) 2px,
+      transparent 7px
+    ),
+    radial-gradient(
+      circle at 47% 67%,
+      #fff 0 1.3px,
+      rgba(255, 255, 255, 0.66) 2px,
+      transparent 8px
+    );
+
+  mix-blend-mode: screen;
+
+  animation:
+    observatory-nebula-stars
+    6.1s
+    ease-in-out
+    infinite;
+}
+
+
+@keyframes observatory-nebula-stars {
+  0%,
+  100% {
+    opacity: 0.12;
+    filter: brightness(0.7);
+  }
+
+  31% {
+    opacity: 0.48;
+    filter: brightness(1.25);
+  }
+
+  49% {
+    opacity: 1;
+
+    filter:
+      brightness(2.8)
+      drop-shadow(
+        0 0 7px rgba(255, 255, 255, 0.86)
+      );
+  }
+
+  65% {
+    opacity: 0.28;
+    filter: brightness(0.9);
+  }
+
+  83% {
+    opacity: 0.76;
+
+    filter:
+      brightness(2)
+      drop-shadow(
+        0 0 5px rgba(220, 255, 250, 0.7)
+      );
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .observatory-globe-points span,
+  .observatory-hero-visual::before,
+  .observatory-hero-visual::after {
+    animation: none;
+  }
+}
+
+
+/* Observatory atmosphere final tuning -------------------------------------- */
+
+/*
+ * Fill the visual frame more aggressively.
+ * The artwork is slightly zoomed so its own dark margins disappear.
+ */
+.observatory-hero-visual {
+  background-size: 122% auto;
+  background-position: 76% 50%;
+
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+
+/*
+ * No synthetic star field.
+ * Only the original stars in the artwork remain visible.
+ */
+.observatory-hero-visual::after {
+  display: none;
+  content: none;
+  animation: none;
+}
+
+
+/*
+ * One slow atmospheric bloom across the nebula:
+ * dark → softly white/teal → dark.
+ */
+.observatory-hero-visual::before {
+  inset: -8% -6% -4% -8%;
+  z-index: 2;
+
+  background:
+    radial-gradient(
+      ellipse 60% 48% at 48% 39%,
+      rgba(255, 255, 255, 0.20),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 72% 58% at 58% 43%,
+      rgba(205, 255, 248, 0.17),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 75% 65% at 47% 48%,
+      rgba(71, 191, 205, 0.15),
+      transparent 74%
+    );
+
+  mix-blend-mode: screen;
+
+  opacity: 0.12;
+
+  filter:
+    blur(28px)
+    brightness(0.8);
+
+  transform: scale(0.98);
+
+  animation:
+    observatory-nebula-reveal
+    9.5s
+    ease-in-out
+    infinite;
+}
+
+
+@keyframes observatory-nebula-reveal {
+  0%,
+  100% {
+    opacity: 0.08;
+
+    filter:
+      blur(30px)
+      brightness(0.72);
+
+    transform: scale(0.985);
+  }
+
+  45% {
+    opacity: 0.56;
+
+    filter:
+      blur(24px)
+      brightness(1.45);
+
+    transform: scale(1.018);
+  }
+
+  62% {
+    opacity: 0.72;
+
+    filter:
+      blur(22px)
+      brightness(1.8);
+
+    transform: scale(1.025);
+  }
+
+  82% {
+    opacity: 0.32;
+
+    filter:
+      blur(27px)
+      brightness(1.05);
+
+    transform: scale(1);
+  }
+}
+
+
+/*
+ * Sparse observation pings.
+ * No constant constellation effect.
+ */
+.observatory-globe-points span {
+  width: 3px;
+  height: 3px;
+
+  opacity: 0;
+
+  background: #fff;
+
+  box-shadow:
+    0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 9px rgba(185, 255, 242, 0.65);
+
+  animation:
+    observatory-test-ping
+    var(--point-duration)
+    ease-out
+    var(--point-delay)
+    infinite;
+}
+
+
+@keyframes observatory-test-ping {
+  0%,
+  68%,
+  100% {
+    opacity: 0;
+
+    transform:
+      translate(-50%, -50%)
+      scale(0.45);
+  }
+
+  73% {
+    opacity: 1;
+
+    transform:
+      translate(-50%, -50%)
+      scale(var(--point-scale));
+
+    box-shadow:
+      0 0 3px #fff,
+      0 0 9px rgba(210, 255, 247, 0.9),
+      0 0 18px rgba(144, 224, 192, 0.48);
+  }
+
+  79% {
+    opacity: 0.42;
+
+    transform:
+      translate(-50%, -50%)
+      scale(
+        calc(
+          var(--point-scale) * 1.8
+        )
+      );
+  }
+
+  84% {
+    opacity: 0;
+
+    transform:
+      translate(-50%, -50%)
+      scale(
+        calc(
+          var(--point-scale) * 2.4
+        )
+      );
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .observatory-hero-visual::before,
+  .observatory-globe-points span {
+    animation: none;
+  }
+}
+
+
+/* Observatory hero full-height artwork ------------------------------------- */
+
+.observatory-page .observatory-hero {
+  align-items: stretch;
+  min-height: 440px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.observatory-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2.2rem 0;
+}
+
+.observatory-hero-visual {
+  align-self: stretch;
+  min-height: 100%;
+  height: auto;
+
+  margin-top: 0;
+  margin-bottom: 0;
+
+  background-size: cover;
+  background-position: 72% center;
+}
+
+/*
+ * Keep the artwork entering toward the copy,
+ * while filling the complete vertical hero area.
+ */
+@media (min-width: 901px) {
+  .observatory-hero-visual {
+    width: calc(100% + 5rem);
+    margin-left: -5rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .observatory-page .observatory-hero {
+    min-height: auto;
+  }
+
+  .observatory-hero-copy {
+    padding: 2rem 0 1rem;
+  }
+
+  .observatory-hero-visual {
+    min-height: 340px;
+    width: 100%;
+    margin-left: 0;
+    background-position: 70% center;
+  }
+}
+
+
+/* Observatory hero final alignment + seamless blend ------------------------ */
+
+/* Move the artwork content slightly upward. */
+.observatory-hero-visual {
+  background-color: #010609;
+  background-position: 72% 43%;
+}
+
+
+/*
+ * Dissolve the artwork edges into Observatory's deep-space black.
+ * This removes the visible image/background rectangle without
+ * shrinking the artwork.
+ */
+.observatory-hero-visual::after {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+
+  background:
+    linear-gradient(
+      90deg,
+      #010609 0%,
+      rgba(1, 6, 9, 0.94) 4%,
+      rgba(1, 6, 9, 0.62) 9%,
+      rgba(1, 6, 9, 0.18) 16%,
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(1, 6, 9, 0.38) 0%,
+      rgba(1, 6, 9, 0.10) 8%,
+      transparent 16%,
+      transparent 84%,
+      rgba(1, 6, 9, 0.12) 93%,
+      rgba(1, 6, 9, 0.42) 100%
+    ),
+    linear-gradient(
+      270deg,
+      rgba(1, 6, 9, 0.16) 0%,
+      transparent 9%
+    );
+
+  content: "";
+  opacity: 1;
+  filter: none;
+  mix-blend-mode: normal;
+  animation: none;
+  pointer-events: none;
+}
+
+
+/*
+ * The cyan Observatory divider belongs to the interface,
+ * so it must visually sit above the artwork.
+ */
+.observatory-page .observatory-hero::after {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+
+  height: 1px;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--accent) 0%,
+      rgba(144, 224, 192, 0.78) 42%,
+      rgba(144, 224, 192, 0.30) 75%,
+      transparent 100%
+    );
+
+  box-shadow:
+    0 0 8px rgba(144, 224, 192, 0.16);
+
+  pointer-events: none;
+}
+
+
+/* Observatory human-readable observation metadata -------------------------- */
+
+.observatory-observation-details time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.observatory-observation-details time span {
+  display: block;
+}
+
+
+/* Observatory compact mobile hero ------------------------------------------ */
+
+@media (max-width: 900px) {
+  .observatory-page .observatory-hero {
+    gap: 0;
+    padding: 0 0 1.25rem;
+  }
+
+  .observatory-hero-copy {
+    position: relative;
+    z-index: 5;
+    padding: 1.5rem 0 0;
+  }
+
+  .observatory-hero-copy .hero-copy {
+    max-width: 34rem;
+    margin-bottom: 0;
+  }
+
+  .observatory-hero-visual {
+    position: relative;
+    z-index: 1;
+
+    min-height: 330px;
+
+    margin-top: -1.35rem;
+
+    background-position:
+      69% 44%;
+  }
+}
+
+@media (max-width: 560px) {
+  .observatory-page .observatory-hero {
+    padding-bottom: 0.75rem;
+  }
+
+  .observatory-hero-copy {
+    padding-top: 1rem;
+  }
+
+  .observatory-page
+    .observatory-hero h1 {
+    margin-bottom: 0.8rem;
+  }
+
+  .observatory-hero-copy .hero-copy {
+    position: relative;
+    z-index: 5;
+    max-width: 94%;
+  }
+
+  .observatory-hero-visual {
+    min-height: 300px;
+
+    /*
+     * Slight overlap with the copy creates one continuous
+     * hero instead of two vertically separated blocks.
+     */
+    margin-top: -1.8rem;
+
+    background-position:
+      68% 43%;
   }
 }

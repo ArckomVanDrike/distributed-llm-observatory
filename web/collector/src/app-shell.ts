@@ -16,6 +16,17 @@ function routeAttributes(
   return `data-route="${route}"`
 }
 
+function isAgentLabRoute(
+  route: AppRoute,
+): boolean {
+  return (
+    route === 'agent-lab'
+    || route === 'agent-lab-test'
+    || route === 'agent-lab-starter'
+  )
+}
+
+
 export function renderAppShell(
   activeRoute: AppRoute,
   content: string,
@@ -67,30 +78,36 @@ export function renderAppShell(
         </nav>
       </header>
 
-      <nav
-        class="dllo-agent-nav"
-        aria-label="Agent Lab navigation"
-      >
-        <a
-          href="#/agent-lab/test"
-          ${routeAttributes(
-            'agent-lab-test',
-            activeRoute,
-          )}
-        >
-          Test Your Agent
-        </a>
+      ${
+        isAgentLabRoute(activeRoute)
+          ? `
+            <nav
+              class="dllo-agent-nav"
+              aria-label="Agent Lab navigation"
+            >
+              <a
+                href="#/agent-lab/test"
+                ${routeAttributes(
+                  'agent-lab-test',
+                  activeRoute,
+                )}
+              >
+                Test Your Agent
+              </a>
 
-        <a
-          href="#/agent-lab/starter"
-          ${routeAttributes(
-            'agent-lab-starter',
-            activeRoute,
-          )}
-        >
-          Agent Starter
-        </a>
-      </nav>
+              <a
+                href="#/agent-lab/starter"
+                ${routeAttributes(
+                  'agent-lab-starter',
+                  activeRoute,
+                )}
+              >
+                Agent Starter
+              </a>
+            </nav>
+          `
+          : ''
+      }
 
       <div class="dllo-page">
         ${content}

@@ -54,3 +54,43 @@ describe('renderAppShell', () => {
     )
   })
 })
+
+
+it('hides Agent Lab secondary navigation outside Agent Lab routes', () => {
+  const html = renderAppShell(
+    'observatory',
+    '<main>Observatory</main>',
+  )
+
+  expect(html).not.toContain(
+    'aria-label="Agent Lab navigation"',
+  )
+
+  expect(html).not.toContain(
+    'href="#/agent-lab/test"',
+  )
+
+  expect(html).not.toContain(
+    'href="#/agent-lab/starter"',
+  )
+})
+
+
+it('keeps Agent Lab secondary navigation on Agent Lab routes', () => {
+  const html = renderAppShell(
+    'agent-lab-starter',
+    '<main>Agent Starter</main>',
+  )
+
+  expect(html).toContain(
+    'aria-label="Agent Lab navigation"',
+  )
+
+  expect(html).toContain(
+    'href="#/agent-lab/test"',
+  )
+
+  expect(html).toContain(
+    'href="#/agent-lab/starter"',
+  )
+})

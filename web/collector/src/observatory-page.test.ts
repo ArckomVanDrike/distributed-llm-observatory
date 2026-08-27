@@ -123,6 +123,14 @@ it('renders Observatory counts from observed runs and temporal pairs', () => {
     'Distributed LLM Observatory',
   )
 
+  expect(html).toContain(
+    'data-observatory-hero-visual',
+  )
+
+  expect(html).toContain(
+    'data-observatory-globe-points',
+  )
+
   expect(html).toMatch(
     /<strong>3<\/strong>\s*<span>observations<\/span>/,
   )
@@ -157,6 +165,30 @@ it('renders Observatory counts from observed runs and temporal pairs', () => {
   )
 
   expect(html).toContain(
+    'data-observatory-icon="observations"',
+  )
+
+  expect(html).toContain(
+    'data-observatory-icon="targets"',
+  )
+
+  expect(html).toContain(
+    'data-observatory-icon="regions"',
+  )
+
+  expect(html).toContain(
+    'data-observatory-icon="temporal"',
+  )
+
+  expect(html).toContain(
+    'data-observatory-icon="geographic"',
+  )
+
+  expect(html).toContain(
+    'data-observatory-icon="history"',
+  )
+
+  expect(html).toContain(
     'agent-a',
   )
 
@@ -166,6 +198,22 @@ it('renders Observatory counts from observed runs and temporal pairs', () => {
 
   expect(html).toContain(
     'Observed from CL-Aysen',
+  )
+
+  expect(html).toContain(
+    '26 Aug 2026',
+  )
+
+  expect(html).toContain(
+    '20:00:00 UTC',
+  )
+
+  expect(html).toContain(
+    '2.90 ms',
+  )
+
+  expect(html).not.toContain(
+    '2026-08-26T20:00:00+00:00</dd>',
   )
 
   expect(html).not.toContain(
