@@ -5,6 +5,7 @@ from schemas.agent_starter import (
     AgentStarterEvidence,
     AgentStarterGoal,
     AgentStarterRequirement,
+    CandidateArchitectureAssessment,
     ConstraintStrength,
     EvidenceSource,
     RecommendationConfidence,
@@ -287,4 +288,140 @@ def test_requirement_requires_value():
             value=None,
             strength=ConstraintStrength.HARD,
             evidence=[evidence],
+        )
+
+
+def test_candidate_can_be_feasible_but_not_recommended():
+    evidence = AgentStarterEvidence(
+        key="local_cpu_execution",
+        source=EvidenceSource.OBSERVED,
+        value=True,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local_cpu_coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=(
+            RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+        ),
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[
+            "The workload can execute on the observed device.",
+        ],
+        recommendation_reasons=[
+            (
+                "Expected performance does not fit the requested "
+                "autonomous coding workload."
+            ),
+        ],
+        supporting_evidence=[evidence],
+    )
+
+    assert assessment.schema_version == "0.1"
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert (
+        assessment.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+
+
+def test_candidate_recommendation_can_reflect_hard_requirement():
+    evidence = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="cloud_coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "Remote inference is technically available.",
+        ],
+        recommendation_reasons=[
+            "The architecture violates the local-only code boundary.",
+        ],
+        supporting_evidence=[evidence],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert (
+        assessment.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+
+
+def test_candidate_requires_technical_reason():
+    evidence = AgentStarterEvidence(
+        key="total_memory_bytes",
+        source=EvidenceSource.OBSERVED,
+        value=16 * 1024**3,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Candidate assessment must explain technical feasibility",
+    ):
+        CandidateArchitectureAssessment(
+            architecture_id="local_coding",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            recommendation=RecommendationVerdict.RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[],
+            recommendation_reasons=[
+                "The architecture fits the requested workload.",
+            ],
+            supporting_evidence=[evidence],
+        )
+
+
+def test_candidate_requires_recommendation_reason():
+    evidence = AgentStarterEvidence(
+        key="total_memory_bytes",
+        source=EvidenceSource.OBSERVED,
+        value=16 * 1024**3,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Candidate assessment must explain its recommendation",
+    ):
+        CandidateArchitectureAssessment(
+            architecture_id="local_coding",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            recommendation=RecommendationVerdict.RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[
+                "Observed resources satisfy the architecture.",
+            ],
+            recommendation_reasons=[],
+            supporting_evidence=[evidence],
+        )
+
+
+def test_candidate_requires_supporting_evidence():
+    with pytest.raises(
+        ValidationError,
+        match="Candidate assessment must record supporting evidence",
+    ):
+        CandidateArchitectureAssessment(
+            architecture_id="local_coding",
+            technical_feasibility=TechnicalFeasibility.UNKNOWN,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[
+                "Available hardware evidence is incomplete.",
+            ],
+            recommendation_reasons=[
+                "The architecture remains a possible option.",
+            ],
+            supporting_evidence=[],
         )

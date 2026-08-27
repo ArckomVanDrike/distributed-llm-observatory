@@ -126,3 +126,45 @@ class AgentStarterRequirement(BaseModel):
             )
 
         return self
+
+
+class CandidateArchitectureAssessment(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    architecture_id: str = Field(min_length=1)
+    technical_feasibility: TechnicalFeasibility
+    recommendation: RecommendationVerdict
+    confidence: RecommendationConfidence
+    technical_reasons: list[str] = Field(
+        default_factory=list,
+    )
+    recommendation_reasons: list[str] = Field(
+        default_factory=list,
+    )
+    supporting_evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_assessment(
+        self,
+    ) -> CandidateArchitectureAssessment:
+        if not self.technical_reasons:
+            raise ValueError(
+                "Candidate assessment must explain "
+                "technical feasibility."
+            )
+
+        if not self.recommendation_reasons:
+            raise ValueError(
+                "Candidate assessment must explain "
+                "its recommendation."
+            )
+
+        if not self.supporting_evidence:
+            raise ValueError(
+                "Candidate assessment must record "
+                "supporting evidence."
+            )
+
+        return self
