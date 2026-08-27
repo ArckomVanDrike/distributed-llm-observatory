@@ -17,10 +17,12 @@ import {
 } from './agent-test-selection'
 
 import {
+  compareGeographicAgentRuns,
   compareTemporalAgentRuns,
 } from './agent-test-comparison'
 
 import type {
+  AgentGeographicComparisonResponse,
   AgentTemporalComparisonResponse,
 } from './agent-test-comparison'
 
@@ -33,6 +35,7 @@ import type {
 } from './agent-test-bridge'
 
 import type {
+  AgentComparisonType,
   AgentTestPageState,
 } from './agent-test-page'
 
@@ -109,9 +112,15 @@ let baselineSessionId: string | null = null
 let candidateSessionId: string | null = null
 
 let agentComparison:
-  AgentTemporalComparisonResponse | null = null
+  | AgentTemporalComparisonResponse
+  | AgentGeographicComparisonResponse
+  | null = null
 
 let agentComparisonError: string | null = null
+
+let comparisonType: AgentComparisonType | null = null
+
+let maxObservationSkewSecondsInput = ''
 
 let currentProbe: CollectorProbe | null = null
 let observationSession: ObservationSession | null = null
@@ -518,6 +527,8 @@ function render(): void {
         candidateSessionId,
         comparison: agentComparison,
         comparisonError: agentComparisonError,
+        comparisonType,
+        maxObservationSkewSecondsInput,
       },
     },
   )
@@ -663,6 +674,61 @@ function bindAgentTestEvents(): void {
     })
 
   document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-comparison-type]',
+    )
+    .forEach((typeButton) => {
+      typeButton.addEventListener(
+        'click',
+        () => {
+          const nextType =
+            typeButton.dataset.comparisonType
+
+          if (
+            nextType !== 'temporal'
+            && nextType !== 'geographic'
+          ) {
+            return
+          }
+
+          comparisonType = nextType
+
+          if (nextType === 'temporal') {
+            maxObservationSkewSecondsInput = ''
+          }
+
+          agentComparison = null
+          agentComparisonError = null
+
+          render()
+        },
+      )
+    })
+
+  document
+    .querySelector<HTMLInputElement>(
+      '#max-observation-skew-seconds',
+    )
+    ?.addEventListener(
+      'input',
+      (event) => {
+        const input = event.currentTarget
+
+        if (!(input instanceof HTMLInputElement)) {
+          return
+        }
+
+        maxObservationSkewSecondsInput =
+          input.value
+
+        agentComparison = null
+        agentComparisonError = null
+
+        render()
+      },
+    )
+
+  document
     .querySelector<HTMLButtonElement>(
       '#compare-agent-runs',
     )
@@ -681,17 +747,41 @@ function bindAgentTestEvents(): void {
         render()
 
         try {
-          agentComparison =
-            await compareTemporalAgentRuns(
-              (
-                request,
-                init,
-              ) => fetch(request, init),
-              {
-                baselineSessionId,
-                candidateSessionId,
-              },
-            )
+          if (comparisonType === 'temporal') {
+            agentComparison =
+              await compareTemporalAgentRuns(
+                (
+                  request,
+                  init,
+                ) => fetch(request, init),
+                {
+                  baselineSessionId,
+                  candidateSessionId,
+                },
+              )
+          } else if (
+            comparisonType === 'geographic'
+          ) {
+            const maxObservationSkewSeconds =
+              Number(
+                maxObservationSkewSecondsInput,
+              )
+
+            agentComparison =
+              await compareGeographicAgentRuns(
+                (
+                  request,
+                  init,
+                ) => fetch(request, init),
+                {
+                  baselineSessionId,
+                  candidateSessionId,
+                  maxObservationSkewSeconds,
+                },
+              )
+          } else {
+            return
+          }
 
           agentComparisonError = null
           render()

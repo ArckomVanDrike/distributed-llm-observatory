@@ -328,6 +328,7 @@ it('renders explicitly selected baseline and candidate runs', () => {
     history,
     baselineSessionId: 'baseline-session',
     candidateSessionId: 'candidate-session',
+    comparisonType: 'temporal',
   })
 
   expect(html).toContain(
@@ -484,5 +485,200 @@ it('renders a rejected temporal comparison without hiding the reason', () => {
 
   expect(html).not.toContain(
     'Observed Changes',
+  )
+})
+
+
+it('requires an explicit comparison type before offering comparison', () => {
+  const history = {
+    schema_version: '0.1' as const,
+    runs: [
+      {
+        session_id: 'baseline-session',
+        started_at_utc:
+          '2026-08-26T18:00:00+00:00',
+        target_id: 'example-agent',
+        suite_id: 'agent-protocol-core',
+        suite_version: '1.0',
+        observer_id: 'observer-one',
+        region_code: 'CL-Los-Lagos',
+        observatory: {
+          provenance_complete: true,
+          temporal_eligible: true,
+          geographic_eligible: true,
+          reasons: [],
+        },
+        total_tasks: 11,
+        passed_tasks: 11,
+        failed_tasks: 0,
+        pass_rate: 1,
+        median_latency_ms: 3,
+      },
+      {
+        session_id: 'candidate-session',
+        started_at_utc:
+          '2026-08-26T18:05:00+00:00',
+        target_id: 'example-agent',
+        suite_id: 'agent-protocol-core',
+        suite_version: '1.0',
+        observer_id: 'observer-two',
+        region_code: 'CL-Aysen',
+        observatory: {
+          provenance_complete: true,
+          temporal_eligible: true,
+          geographic_eligible: true,
+          reasons: [],
+        },
+        total_tasks: 11,
+        passed_tasks: 11,
+        failed_tasks: 0,
+        pass_rate: 1,
+        median_latency_ms: 3,
+      },
+    ],
+  }
+
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    history,
+    baselineSessionId: 'baseline-session',
+    candidateSessionId: 'candidate-session',
+    comparisonType: null,
+  })
+
+  expect(html).toContain(
+    'data-comparison-type="temporal"',
+  )
+  expect(html).toContain(
+    'data-comparison-type="geographic"',
+  )
+
+  expect(html).toContain('Temporal')
+  expect(html).toContain('Geographic')
+
+  expect(html).not.toContain(
+    'id="max-observation-skew-seconds"',
+  )
+
+  expect(html).not.toContain(
+    'id="compare-agent-runs"',
+  )
+})
+
+
+it('shows geographic max skew only after explicit geographic selection', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    history: {
+      schema_version: '0.1',
+      runs: [],
+    },
+    baselineSessionId: 'baseline-session',
+    candidateSessionId: 'candidate-session',
+    comparisonType: 'geographic',
+    maxObservationSkewSecondsInput: '0',
+  })
+
+  expect(html).toContain(
+    'data-comparison-type-selected="geographic"',
+  )
+
+  expect(html).toContain(
+    'id="max-observation-skew-seconds"',
+  )
+
+  expect(html).toContain('value="0"')
+
+  expect(html).toContain(
+    'Max observation skew',
+  )
+})
+
+
+it('renders observed changes for an explicit geographic comparison', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    comparison: {
+      schema_version: '0.1',
+      comparison_type: 'geographic',
+      baseline_session_id: 'baseline-session',
+      candidate_session_id: 'candidate-session',
+      baseline_observer_id: 'observer-los-lagos',
+      candidate_observer_id: 'observer-aysen',
+      baseline_region_code: 'CL-Los-Lagos',
+      candidate_region_code: 'CL-Aysen',
+      baseline_started_at_utc:
+        '2026-08-26T18:00:00+00:00',
+      candidate_started_at_utc:
+        '2026-08-26T18:05:00+00:00',
+      observation_skew_seconds: 300,
+      max_observation_skew_seconds: 600,
+      changes: {
+        total_tasks: 11,
+        regressions: 1,
+        improvements: 1,
+        unchanged: 9,
+        pass_rate_delta: 0,
+        median_latency_ms_delta: 1.5,
+        retry_delta: 0,
+        human_intervention_delta: 0,
+        task_changes: [],
+      },
+    },
+  })
+
+  expect(html).toContain(
+    'data-agent-comparison="geographic"',
+  )
+  expect(html).toContain('Observed Changes')
+  expect(html).toContain('Geographic comparison')
+
+  expect(html).toContain('baseline-session')
+  expect(html).toContain('candidate-session')
+
+  expect(html).toContain('observer-los-lagos')
+  expect(html).toContain('observer-aysen')
+
+  expect(html).toContain(
+    'Observed from CL-Los-Lagos',
+  )
+  expect(html).toContain(
+    'Observed from CL-Aysen',
+  )
+
+  expect(html).toContain('Observation skew')
+  expect(html).toContain('300 s')
+
+  expect(html).toContain('Maximum allowed skew')
+  expect(html).toContain('600 s')
+
+  expect(html).not.toContain(
+    'better than baseline',
+  )
+  expect(html).not.toContain(
+    'worse than baseline',
+  )
+})
+
+
+it('labels a rejected geographic comparison correctly', () => {
+  const html = renderAgentTestPage({
+    state: 'disconnected',
+    baseUrl: 'http://127.0.0.1:8000',
+    comparisonType: 'geographic',
+    comparisonError:
+      'Geographic comparison requires different region_code values.',
+  })
+
+  expect(html).toContain('Comparison rejected')
+  expect(html).toContain('Geographic comparison')
+  expect(html).toContain(
+    'Geographic comparison requires different region_code values.',
+  )
+  expect(html).not.toContain(
+    '<span class="badge">\n          Temporal comparison',
   )
 })

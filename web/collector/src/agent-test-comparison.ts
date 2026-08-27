@@ -187,3 +187,107 @@ export async function compareTemporalAgentRuns(
 
   return parseTemporalComparison(payload)
 }
+
+
+export type AgentGeographicComparisonResponse = {
+  schema_version: '0.1'
+  comparison_type: 'geographic'
+  baseline_session_id: string
+  candidate_session_id: string
+  baseline_observer_id: string
+  candidate_observer_id: string
+  baseline_region_code: string
+  candidate_region_code: string
+  baseline_started_at_utc: string
+  candidate_started_at_utc: string
+  observation_skew_seconds: number
+  max_observation_skew_seconds: number
+  changes: AgentRunComparisonChanges
+}
+
+export type CompareGeographicAgentRunsInput = {
+  baselineSessionId: string
+  candidateSessionId: string
+  maxObservationSkewSeconds: number
+}
+
+function parseGeographicComparison(
+  value: unknown,
+): AgentGeographicComparisonResponse {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Lab comparison payload.',
+    )
+  }
+
+  if (
+    value.schema_version !== '0.1'
+    || value.comparison_type !== 'geographic'
+    || typeof value.baseline_session_id !== 'string'
+    || typeof value.candidate_session_id !== 'string'
+    || typeof value.baseline_observer_id !== 'string'
+    || typeof value.candidate_observer_id !== 'string'
+    || typeof value.baseline_region_code !== 'string'
+    || typeof value.candidate_region_code !== 'string'
+    || typeof value.baseline_started_at_utc !== 'string'
+    || typeof value.candidate_started_at_utc !== 'string'
+    || typeof value.observation_skew_seconds !== 'number'
+    || typeof value.max_observation_skew_seconds !== 'number'
+    || !isChanges(value.changes)
+  ) {
+    throw new Error(
+      'Invalid Agent Lab comparison payload.',
+    )
+  }
+
+  return value as AgentGeographicComparisonResponse
+}
+
+export async function compareGeographicAgentRuns(
+  fetchImpl: AgentTestFetch,
+  input: CompareGeographicAgentRunsInput,
+): Promise<AgentGeographicComparisonResponse> {
+  const response = await fetchImpl(
+    '/v1/agent-comparisons/geographic',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        baseline_session_id:
+          input.baselineSessionId,
+        candidate_session_id:
+          input.candidateSessionId,
+        max_observation_skew_seconds:
+          input.maxObservationSkewSeconds,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    let message =
+      `Agent Lab comparison request failed with HTTP ${response.status}.`
+
+    try {
+      const payload = await response.json()
+
+      if (
+        isRecord(payload)
+        && typeof payload.message === 'string'
+        && payload.message.trim() !== ''
+      ) {
+        message = payload.message
+      }
+    } catch {
+      // Keep the HTTP fallback for invalid bodies.
+    }
+
+    throw new Error(message)
+  }
+
+  const payload = await response.json()
+
+  return parseGeographicComparison(payload)
+}

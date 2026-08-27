@@ -1388,6 +1388,105 @@ footer {
 }
 
 
+/* Explicit comparison controls -------------------------------------------- */
+
+.agent-comparison-controls {
+  max-width: 920px;
+  margin: 1rem auto 0;
+  padding: clamp(1.2rem, 3vw, 1.6rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(75, 215, 180, 0.045),
+      transparent 48%
+    ),
+    var(--panel);
+}
+
+.agent-comparison-controls > .section-label {
+  margin: 0 0 0.8rem;
+}
+
+.agent-comparison-type-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.agent-comparison-type-actions button {
+  padding: 0.65rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  color: var(--muted);
+  background: var(--panel-soft);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.agent-comparison-type-actions button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.agent-geographic-options {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.agent-geographic-options > label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-geographic-skew-input {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 340px;
+}
+
+.agent-geographic-skew-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  color: var(--text);
+  background: var(--panel-soft);
+  font: inherit;
+}
+
+.agent-geographic-skew-input input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.agent-geographic-skew-input span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.agent-comparison-controls .agent-history-compare-actions {
+  margin-top: 1rem;
+}
+
+.agent-comparison-controls
+  .agent-history-compare-actions
+  button {
+  padding: 0.7rem 1rem;
+}
+
+
 /* Agent comparison responsive --------------------------------------------- */
 
 @media (max-width: 900px) {
@@ -1397,8 +1496,22 @@ footer {
 }
 
 @media (max-width: 640px) {
-  .agent-test-comparison {
+  .agent-test-comparison,
+  .agent-comparison-controls {
     padding: 1.2rem;
+  }
+
+  .agent-comparison-type-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-comparison-type-actions button {
+    width: 100%;
+  }
+
+  .agent-geographic-skew-input {
+    max-width: none;
   }
 
   .agent-comparison-context,

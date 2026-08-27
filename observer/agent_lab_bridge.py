@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import (
     BaseHTTPRequestHandler,
     ThreadingHTTPServer,
@@ -14,6 +14,9 @@ from uuid import UUID
 
 from observer.core.agent_lab_artifact_io import (
     write_agent_lab_run_artifact,
+)
+from observer.core.agent_lab_geographic_comparison import (
+    compare_geographic_agent_observations,
 )
 from observer.core.agent_lab_observation_qualification import (
     qualify_agent_observation,
@@ -100,6 +103,13 @@ def make_handler(
                 == "/v1/agent-comparisons/temporal"
             ):
                 self._handle_temporal_comparison()
+                return
+
+            if (
+                parsed.path
+                == "/v1/agent-comparisons/geographic"
+            ):
+                self._handle_geographic_comparison()
                 return
 
             self._send_json(
@@ -247,6 +257,201 @@ def make_handler(
                 {
                     "schema_version": "0.1",
                     "runs": runs,
+                },
+            )
+
+        def _handle_geographic_comparison(
+            self,
+        ) -> None:
+            try:
+                payload = self._read_json_body()
+
+                baseline_raw = payload.get(
+                    "baseline_session_id"
+                )
+                candidate_raw = payload.get(
+                    "candidate_session_id"
+                )
+                max_skew_raw = payload.get(
+                    "max_observation_skew_seconds"
+                )
+
+                if not isinstance(
+                    baseline_raw,
+                    str,
+                ):
+                    raise ValueError(
+                        "baseline_session_id is required."
+                    )
+
+                if not isinstance(
+                    candidate_raw,
+                    str,
+                ):
+                    raise ValueError(
+                        "candidate_session_id is required."
+                    )
+
+                if (
+                    isinstance(max_skew_raw, bool)
+                    or not isinstance(
+                        max_skew_raw,
+                        (int, float),
+                    )
+                ):
+                    raise ValueError(
+                        "max_observation_skew_seconds "
+                        "is required."
+                    )
+
+                baseline_id = UUID(
+                    baseline_raw
+                )
+                candidate_id = UUID(
+                    candidate_raw
+                )
+
+                max_observation_skew = timedelta(
+                    seconds=max_skew_raw
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            history = AgentLabRunHistory(
+                config.history_root
+            )
+
+            try:
+                baseline = history.get_by_session_id(
+                    baseline_id
+                )
+                candidate = history.get_by_session_id(
+                    candidate_id
+                )
+
+                comparison = (
+                    compare_geographic_agent_observations(
+                        candidate,
+                        baseline,
+                        max_observation_skew=(
+                            max_observation_skew
+                        ),
+                    )
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    422,
+                    {
+                        "error": "comparison_rejected",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            changes = comparison.run_comparison
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "comparison_type": "geographic",
+                    "baseline_session_id": str(
+                        changes.baseline_session_id
+                    ),
+                    "candidate_session_id": str(
+                        changes.candidate_session_id
+                    ),
+                    "baseline_observer_id": (
+                        comparison.baseline_observer_id
+                    ),
+                    "candidate_observer_id": (
+                        comparison.candidate_observer_id
+                    ),
+                    "baseline_region_code": (
+                        comparison.baseline_region_code
+                    ),
+                    "candidate_region_code": (
+                        comparison.candidate_region_code
+                    ),
+                    "baseline_started_at_utc": (
+                        comparison
+                        .baseline_started_at_utc
+                        .isoformat()
+                    ),
+                    "candidate_started_at_utc": (
+                        comparison
+                        .candidate_started_at_utc
+                        .isoformat()
+                    ),
+                    "observation_skew_seconds": (
+                        comparison
+                        .observation_skew
+                        .total_seconds()
+                    ),
+                    "max_observation_skew_seconds": (
+                        comparison
+                        .max_observation_skew
+                        .total_seconds()
+                    ),
+                    "changes": {
+                        "total_tasks": (
+                            changes.total_tasks
+                        ),
+                        "regressions": (
+                            changes.regressions
+                        ),
+                        "improvements": (
+                            changes.improvements
+                        ),
+                        "unchanged": (
+                            changes.unchanged
+                        ),
+                        "pass_rate_delta": (
+                            changes.pass_rate_delta
+                        ),
+                        "median_latency_ms_delta": (
+                            changes
+                            .median_latency_ms_delta
+                        ),
+                        "retry_delta": (
+                            changes.retry_delta
+                        ),
+                        "human_intervention_delta": (
+                            changes
+                            .human_intervention_delta
+                        ),
+                        "task_changes": [
+                            {
+                                "task_id": (
+                                    change.task_id
+                                ),
+                                "baseline_passed": (
+                                    change
+                                    .baseline_passed
+                                ),
+                                "candidate_passed": (
+                                    change
+                                    .candidate_passed
+                                ),
+                                "transition": (
+                                    change
+                                    .transition
+                                    .value
+                                ),
+                            }
+                            for change
+                            in changes.task_changes
+                        ],
+                    },
                 },
             )
 

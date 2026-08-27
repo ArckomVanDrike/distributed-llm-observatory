@@ -7,6 +7,7 @@ import type {
 } from './agent-test-history'
 
 import type {
+  AgentGeographicComparisonResponse,
   AgentTemporalComparisonResponse,
 } from './agent-test-comparison'
 
@@ -17,6 +18,10 @@ export type AgentTestPageState =
   | 'success'
   | 'failed'
 
+export type AgentComparisonType =
+  | 'temporal'
+  | 'geographic'
+
 export interface AgentTestPageOptions {
   state: AgentTestPageState
   baseUrl: string
@@ -25,8 +30,13 @@ export interface AgentTestPageOptions {
   history?: AgentTestHistoryResponse | null
   baselineSessionId?: string | null
   candidateSessionId?: string | null
-  comparison?: AgentTemporalComparisonResponse | null
+  comparison?:
+    | AgentTemporalComparisonResponse
+    | AgentGeographicComparisonResponse
+    | null
   comparisonError?: string | null
+  comparisonType?: AgentComparisonType | null
+  maxObservationSkewSecondsInput?: string
 }
 
 const stateVisuals: Record<
@@ -355,21 +365,6 @@ function renderAgentTestHistory(
         ${runs}
       </div>
 
-      ${
-        baselineSessionId !== null
-        && candidateSessionId !== null
-          ? `
-              <div class="agent-history-compare-actions">
-                <button
-                  type="button"
-                  id="compare-agent-runs"
-                >
-                  Compare selected runs
-                </button>
-              </div>
-            `
-          : ''
-      }
     </section>
   `
 }
@@ -518,12 +513,125 @@ function formatSignedDelta(
   return `${prefix}${rounded}${suffix}`
 }
 
+function renderAgentComparisonControls(
+  baselineSessionId: string | null,
+  candidateSessionId: string | null,
+  comparisonType: AgentComparisonType | null,
+  maxObservationSkewSecondsInput: string,
+): string {
+  if (
+    baselineSessionId === null
+    || candidateSessionId === null
+  ) {
+    return ''
+  }
+
+  const selectedAttribute =
+    comparisonType === null
+      ? ''
+      : `data-comparison-type-selected="${comparisonType}"`
+
+  const geographicOptions =
+    comparisonType === 'geographic'
+      ? `
+          <div class="agent-geographic-options">
+            <label
+              for="max-observation-skew-seconds"
+            >
+              Max observation skew
+            </label>
+
+            <div class="agent-geographic-skew-input">
+              <input
+                id="max-observation-skew-seconds"
+                type="number"
+                min="0"
+                step="any"
+                inputmode="decimal"
+                value="${escapeHtml(
+                  maxObservationSkewSecondsInput,
+                )}"
+              />
+
+              <span>seconds</span>
+            </div>
+          </div>
+        `
+      : ''
+
+  const canCompare =
+    comparisonType === 'temporal'
+    || (
+      comparisonType === 'geographic'
+      && maxObservationSkewSecondsInput.trim() !== ''
+    )
+
+  return `
+    <section
+      class="agent-comparison-controls"
+      ${selectedAttribute}
+    >
+      <p class="section-label">
+        Comparison type
+      </p>
+
+      <div class="agent-comparison-type-actions">
+        <button
+          type="button"
+          data-comparison-type="temporal"
+          aria-pressed="${
+            comparisonType === 'temporal'
+          }"
+        >
+          Temporal
+        </button>
+
+        <button
+          type="button"
+          data-comparison-type="geographic"
+          aria-pressed="${
+            comparisonType === 'geographic'
+          }"
+        >
+          Geographic
+        </button>
+      </div>
+
+      ${geographicOptions}
+
+      ${
+        canCompare
+          ? `
+              <div class="agent-history-compare-actions">
+                <button
+                  type="button"
+                  id="compare-agent-runs"
+                >
+                  Compare selected runs
+                </button>
+              </div>
+            `
+          : ''
+      }
+    </section>
+  `
+}
+
+
 function renderAgentComparisonError(
   error: string | null,
+  comparisonType: AgentComparisonType | null,
 ): string {
   if (error === null) {
     return ''
   }
+
+  const comparisonLabel =
+    comparisonType === 'temporal'
+      ? 'Temporal comparison'
+      : comparisonType === 'geographic'
+        ? 'Geographic comparison'
+        : 'Comparison'
 
   return `
     <section
@@ -540,7 +648,7 @@ function renderAgentComparisonError(
         </div>
 
         <span class="badge">
-          Temporal comparison
+          ${comparisonLabel}
         </span>
       </div>
 
@@ -742,6 +850,244 @@ function renderAgentTemporalComparison(
 }
 
 
+function renderAgentGeographicComparison(
+  comparison:
+    AgentGeographicComparisonResponse | null,
+): string {
+  if (comparison === null) {
+    return ''
+  }
+
+  const changes = comparison.changes
+
+  const passRateDelta =
+    changes.pass_rate_delta === null
+      ? 'n/a'
+      : formatSignedDelta(
+          changes.pass_rate_delta * 100,
+          ' pp',
+        )
+
+  const latencyDelta =
+    changes.median_latency_ms_delta === null
+      ? 'n/a'
+      : formatSignedDelta(
+          changes.median_latency_ms_delta,
+          ' ms',
+        )
+
+  const retryDelta =
+    formatSignedDelta(
+      changes.retry_delta,
+    )
+
+  const humanInterventionDelta =
+    formatSignedDelta(
+      changes.human_intervention_delta,
+    )
+
+  const taskChanges = changes.task_changes
+    .filter((change) => (
+      change.transition === 'fail-to-pass'
+      || change.transition === 'pass-to-fail'
+    ))
+    .map((change) => {
+      const label =
+        change.transition === 'fail-to-pass'
+          ? 'Fail → Pass'
+          : 'Pass → Fail'
+
+      return `
+        <div class="agent-comparison-task-change">
+          <code>
+            ${escapeHtml(change.task_id)}
+          </code>
+
+          <strong>
+            ${label}
+          </strong>
+        </div>
+      `
+    })
+    .join('')
+
+  return `
+    <section
+      class="agent-test-comparison"
+      data-agent-comparison="geographic"
+    >
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">
+            Observed changes
+          </p>
+
+          <h2>Observed Changes</h2>
+        </div>
+
+        <span class="badge">
+          Geographic comparison
+        </span>
+      </div>
+
+      <p class="agent-comparison-guidance">
+        Descriptive comparison of two explicitly
+        selected observations from different regions.
+        No serving location, cause, or global quality
+        judgment is inferred.
+      </p>
+
+      <div class="agent-comparison-context">
+        <div>
+          <span>Baseline</span>
+          <code>
+            ${escapeHtml(
+              comparison.baseline_session_id,
+            )}
+          </code>
+        </div>
+
+        <div>
+          <span>Candidate</span>
+          <code>
+            ${escapeHtml(
+              comparison.candidate_session_id,
+            )}
+          </code>
+        </div>
+
+        <div>
+          <span>Baseline observer</span>
+          <strong>
+            ${escapeHtml(
+              comparison.baseline_observer_id,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Candidate observer</span>
+          <strong>
+            ${escapeHtml(
+              comparison.candidate_observer_id,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Baseline observation</span>
+          <strong>
+            Observed from ${escapeHtml(
+              comparison.baseline_region_code,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Candidate observation</span>
+          <strong>
+            Observed from ${escapeHtml(
+              comparison.candidate_region_code,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Observation skew</span>
+          <strong>
+            ${comparison.observation_skew_seconds} s
+          </strong>
+        </div>
+
+        <div>
+          <span>Maximum allowed skew</span>
+          <strong>
+            ${comparison.max_observation_skew_seconds} s
+          </strong>
+        </div>
+      </div>
+
+      <div class="agent-comparison-metrics">
+        <div>
+          <span>Tasks</span>
+          <strong>${changes.total_tasks}</strong>
+        </div>
+
+        <div>
+          <span>Regressions</span>
+          <strong>${changes.regressions}</strong>
+        </div>
+
+        <div>
+          <span>Improvements</span>
+          <strong>${changes.improvements}</strong>
+        </div>
+
+        <div>
+          <span>Unchanged</span>
+          <strong>${changes.unchanged}</strong>
+        </div>
+
+        <div>
+          <span>Pass rate Δ</span>
+          <strong>${passRateDelta}</strong>
+        </div>
+
+        <div>
+          <span>Median latency Δ</span>
+          <strong>${latencyDelta}</strong>
+        </div>
+
+        <div>
+          <span>Retries Δ</span>
+          <strong>${retryDelta}</strong>
+        </div>
+
+        <div>
+          <span>Human intervention Δ</span>
+          <strong>
+            ${humanInterventionDelta}
+          </strong>
+        </div>
+      </div>
+
+      ${
+        taskChanges === ''
+          ? ''
+          : `
+              <div class="agent-comparison-task-changes">
+                <h3>Task outcome transitions</h3>
+                ${taskChanges}
+              </div>
+            `
+      }
+    </section>
+  `
+}
+
+
+function renderAgentComparison(
+  comparison:
+    | AgentTemporalComparisonResponse
+    | AgentGeographicComparisonResponse
+    | null,
+): string {
+  if (comparison === null) {
+    return ''
+  }
+
+  if (comparison.comparison_type === 'geographic') {
+    return renderAgentGeographicComparison(
+      comparison,
+    )
+  }
+
+  return renderAgentTemporalComparison(
+    comparison,
+  )
+}
+
+
 export function renderAgentTestPage(
   options: AgentTestPageOptions,
 ): string {
@@ -903,12 +1249,20 @@ export function renderAgentTestPage(
             )
       }
 
-      ${renderAgentTemporalComparison(
+      ${renderAgentComparisonControls(
+        options.baselineSessionId ?? null,
+        options.candidateSessionId ?? null,
+        options.comparisonType ?? null,
+        options.maxObservationSkewSecondsInput ?? '',
+      )}
+
+      ${renderAgentComparison(
         options.comparison ?? null,
       )}
 
       ${renderAgentComparisonError(
         options.comparisonError ?? null,
+        options.comparisonType ?? null,
       )}
 
     </main>
