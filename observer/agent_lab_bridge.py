@@ -9,7 +9,7 @@ from http.server import (
     ThreadingHTTPServer,
 )
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from observer.core.agent_lab_artifact_io import (
@@ -19,6 +19,7 @@ from observer.core.agent_lab_geographic_comparison import (
     compare_geographic_agent_observations,
 )
 from observer.core.agent_lab_observation_pairs import (
+    discover_geographic_agent_observation_pairs,
     discover_temporal_agent_observation_pairs,
 )
 from observer.core.agent_lab_observation_qualification import (
@@ -92,6 +93,15 @@ def make_handler(
                 == "/v1/agent-observation-pairs/temporal"
             ):
                 self._handle_temporal_observation_pairs()
+                return
+
+            if (
+                parsed.path
+                == "/v1/agent-observation-pairs/geographic"
+            ):
+                self._handle_geographic_observation_pairs(
+                    parsed.query
+                )
                 return
 
             self._send_json(
@@ -330,6 +340,127 @@ def make_handler(
                 {
                     "schema_version": "0.1",
                     "pair_type": "temporal",
+                    "pairs": pairs,
+                },
+            )
+
+        def _handle_geographic_observation_pairs(
+            self,
+            raw_query: str,
+        ) -> None:
+            query = parse_qs(
+                raw_query,
+                keep_blank_values=True,
+            )
+
+            max_skew_raw = query.get(
+                "max_observation_skew_seconds",
+                [None],
+            )[0]
+
+            if max_skew_raw in (None, ""):
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": (
+                            "max_observation_skew_seconds "
+                            "is required."
+                        ),
+                    },
+                )
+                return
+
+            try:
+                max_skew_seconds = float(
+                    max_skew_raw
+                )
+            except ValueError:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": (
+                            "max_observation_skew_seconds "
+                            "must be a number."
+                        ),
+                    },
+                )
+                return
+
+            history = AgentLabRunHistory(
+                config.history_root
+            )
+
+            artifacts = history.load_all()
+
+            try:
+                discovered = (
+                    discover_geographic_agent_observation_pairs(
+                        artifacts,
+                        max_observation_skew=timedelta(
+                            seconds=max_skew_seconds
+                        ),
+                    )
+                )
+            except ValueError as exc:
+                self._send_json(
+                    422,
+                    {
+                        "error": "comparison_rejected",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            pairs = []
+
+            for pair in discovered:
+                pairs.append(
+                    {
+                        "baseline_session_id": str(
+                            pair.baseline_session_id
+                        ),
+                        "candidate_session_id": str(
+                            pair.candidate_session_id
+                        ),
+                        "baseline_started_at_utc": (
+                            pair
+                            .baseline_started_at_utc
+                            .isoformat()
+                        ),
+                        "candidate_started_at_utc": (
+                            pair
+                            .candidate_started_at_utc
+                            .isoformat()
+                        ),
+                        "baseline_observer_id": (
+                            pair.baseline_observer_id
+                        ),
+                        "candidate_observer_id": (
+                            pair.candidate_observer_id
+                        ),
+                        "baseline_region_code": (
+                            pair.baseline_region_code
+                        ),
+                        "candidate_region_code": (
+                            pair.candidate_region_code
+                        ),
+                        "comparable": pair.comparable,
+                        "reasons": list(
+                            pair.reasons
+                        ),
+                    }
+                )
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "pair_type": "geographic",
+                    "max_observation_skew_seconds": (
+                        max_skew_seconds
+                    ),
                     "pairs": pairs,
                 },
             )
