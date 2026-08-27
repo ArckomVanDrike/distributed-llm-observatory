@@ -204,3 +204,46 @@ class AgentStarterConstraintConflict(BaseModel):
             )
 
         return self
+
+
+class AgentStarterPlan(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    goal: AgentStarterGoal
+    requirements: list[AgentStarterRequirement] = Field(
+        default_factory=list,
+    )
+    candidate_assessments: list[
+        CandidateArchitectureAssessment
+    ] = Field(
+        default_factory=list,
+    )
+    constraint_conflict: AgentStarterConstraintConflict | None = None
+
+    @model_validator(mode="after")
+    def validate_plan(
+        self,
+    ) -> AgentStarterPlan:
+        if (
+            not self.candidate_assessments
+            and self.constraint_conflict is None
+        ):
+            raise ValueError(
+                "Agent Starter plan must record candidate assessments "
+                "or a constraint conflict."
+            )
+
+        if (
+            self.constraint_conflict is not None
+            and any(
+                candidate.recommendation
+                is RecommendationVerdict.RECOMMENDED
+                for candidate in self.candidate_assessments
+            )
+        ):
+            raise ValueError(
+                "Constraint conflict cannot coexist with "
+                "a recommended candidate."
+            )
+
+        return self

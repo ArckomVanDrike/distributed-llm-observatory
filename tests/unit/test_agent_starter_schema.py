@@ -5,6 +5,7 @@ from schemas.agent_starter import (
     AgentStarterConstraintConflict,
     AgentStarterEvidence,
     AgentStarterGoal,
+    AgentStarterPlan,
     AgentStarterRequirement,
     CandidateArchitectureAssessment,
     ConstraintStrength,
@@ -563,4 +564,156 @@ def test_constraint_conflict_requires_resolution_option():
                 "No evaluated architecture satisfies the requirement."
             ),
             resolution_options=[],
+        )
+
+
+def test_agent_starter_plan_records_goal_requirements_and_candidates():
+    evidence = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="source_code_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+    candidate = CandidateArchitectureAssessment(
+        architecture_id="local_first_coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The observed environment supports local execution.",
+        ],
+        recommendation_reasons=[
+            "The architecture respects the local-only code boundary.",
+        ],
+        supporting_evidence=[evidence],
+    )
+
+    plan = AgentStarterPlan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[requirement],
+        candidate_assessments=[candidate],
+    )
+
+    assert plan.schema_version == "0.1"
+    assert plan.goal is AgentStarterGoal.CODING
+    assert plan.requirements == [requirement]
+    assert plan.candidate_assessments == [candidate]
+    assert plan.constraint_conflict is None
+
+
+def test_agent_starter_plan_can_record_constraint_conflict():
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+    candidate = CandidateArchitectureAssessment(
+        architecture_id="cloud_voice",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "Remote voice processing is technically available.",
+        ],
+        recommendation_reasons=[
+            "The architecture violates the offline requirement.",
+        ],
+        supporting_evidence=[evidence],
+    )
+    conflict = AgentStarterConstraintConflict(
+        conflicting_requirements=[requirement],
+        summary=(
+            "The requested capability cannot be satisfied "
+            "under the offline boundary."
+        ),
+        resolution_options=[
+            "Allow selected remote processing.",
+            "Reduce the required capability.",
+        ],
+    )
+
+    plan = AgentStarterPlan(
+        goal=AgentStarterGoal.VOICE,
+        requirements=[requirement],
+        candidate_assessments=[candidate],
+        constraint_conflict=conflict,
+    )
+
+    assert plan.constraint_conflict == conflict
+    assert plan.candidate_assessments == [candidate]
+
+
+def test_agent_starter_plan_requires_decision_state():
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Agent Starter plan must record candidate assessments "
+            "or a constraint conflict"
+        ),
+    ):
+        AgentStarterPlan(
+            goal=AgentStarterGoal.PERSONAL,
+            requirements=[],
+            candidate_assessments=[],
+        )
+
+
+def test_agent_starter_plan_conflict_rejects_recommended_candidate():
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+    candidate = CandidateArchitectureAssessment(
+        architecture_id="local_voice",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The architecture can execute locally.",
+        ],
+        recommendation_reasons=[
+            "The architecture satisfies the requested workflow.",
+        ],
+        supporting_evidence=[evidence],
+    )
+    conflict = AgentStarterConstraintConflict(
+        conflicting_requirements=[requirement],
+        summary=(
+            "No architecture satisfies the hard requirement."
+        ),
+        resolution_options=[
+            "Change the hard requirement.",
+        ],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Constraint conflict cannot coexist with "
+            "a recommended candidate"
+        ),
+    ):
+        AgentStarterPlan(
+            goal=AgentStarterGoal.VOICE,
+            requirements=[requirement],
+            candidate_assessments=[candidate],
+            constraint_conflict=conflict,
         )
