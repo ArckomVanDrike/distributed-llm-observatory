@@ -90,3 +90,39 @@ class AgentStarterEvidence(BaseModel):
             )
 
         return self
+
+
+class AgentStarterRequirement(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    key: str = Field(min_length=1)
+    value: Any | None
+    strength: ConstraintStrength
+    evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_requirement(
+        self,
+    ) -> AgentStarterRequirement:
+        if self.value is None:
+            raise ValueError(
+                "Requirement must record a value."
+            )
+
+        if not self.evidence:
+            raise ValueError(
+                "Requirement must record supporting evidence."
+            )
+
+        if all(
+            item.source is EvidenceSource.UNKNOWN
+            for item in self.evidence
+        ):
+            raise ValueError(
+                "Requirement cannot be supported only "
+                "by unknown evidence."
+            )
+
+        return self

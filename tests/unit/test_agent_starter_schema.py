@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from schemas.agent_starter import (
     AgentStarterEvidence,
     AgentStarterGoal,
+    AgentStarterRequirement,
     ConstraintStrength,
     EvidenceSource,
     RecommendationConfidence,
@@ -171,3 +172,119 @@ def test_known_agent_starter_evidence_requires_value(
         match="Known evidence must record a value",
     ):
         AgentStarterEvidence(**kwargs)
+
+
+def test_hard_requirement_records_declared_evidence():
+    evidence = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    requirement = AgentStarterRequirement(
+        key="source_code_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+    assert requirement.schema_version == "0.1"
+    assert requirement.key == "source_code_must_stay_local"
+    assert requirement.value is True
+    assert requirement.strength is ConstraintStrength.HARD
+    assert requirement.evidence == [evidence]
+
+
+def test_soft_requirement_records_declared_preference():
+    evidence = AgentStarterEvidence(
+        key="prefer_local_execution",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    requirement = AgentStarterRequirement(
+        key="prefer_local_execution",
+        value=True,
+        strength=ConstraintStrength.SOFT,
+        evidence=[evidence],
+    )
+
+    assert requirement.strength is ConstraintStrength.SOFT
+
+
+def test_requirement_accepts_derived_evidence():
+    evidence = AgentStarterEvidence(
+        key="filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "User selected modify files and run tests."
+        ),
+    )
+
+    requirement = AgentStarterRequirement(
+        key="filesystem_write",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+    assert (
+        requirement.evidence[0].source
+        is EvidenceSource.DERIVED
+    )
+
+
+def test_requirement_requires_supporting_evidence():
+    with pytest.raises(
+        ValidationError,
+        match="Requirement must record supporting evidence",
+    ):
+        AgentStarterRequirement(
+            key="offline_required",
+            value=True,
+            strength=ConstraintStrength.HARD,
+            evidence=[],
+        )
+
+
+def test_requirement_rejects_unknown_only_evidence():
+    unknown = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.UNKNOWN,
+        value=None,
+        reason="Offline requirement has not been established.",
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Requirement cannot be supported only "
+            "by unknown evidence"
+        ),
+    ):
+        AgentStarterRequirement(
+            key="offline_required",
+            value=True,
+            strength=ConstraintStrength.HARD,
+            evidence=[unknown],
+        )
+
+
+def test_requirement_requires_value():
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Requirement must record a value",
+    ):
+        AgentStarterRequirement(
+            key="offline_required",
+            value=None,
+            strength=ConstraintStrength.HARD,
+            evidence=[evidence],
+        )
