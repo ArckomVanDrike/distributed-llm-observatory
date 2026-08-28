@@ -125,10 +125,10 @@ def test_unmapped_derived_capability_is_not_silently_inferred():
         goal=AgentStarterGoal.CODING,
         evidence=[
             AgentStarterEvidence(
-                key="test_execution",
+                key="container_isolation",
                 source=EvidenceSource.DERIVED,
                 value=True,
-                reason="Running tests requires test execution.",
+                reason="Autonomous execution may require isolation.",
             ),
         ],
     )
@@ -406,7 +406,7 @@ def test_maps_shell_execution_capability_to_candidate_evidence():
     assert assessments[0].supporting_evidence == [support]
 
 
-def test_real_run_tests_intent_assesses_shell_but_not_unmapped_test_execution():
+def test_real_run_tests_intent_assesses_shell_and_test_execution():
     from observer.core.agent_starter_candidate_generator import (
         generate_agent_starter_candidates,
     )
@@ -455,9 +455,56 @@ def test_real_run_tests_intent_assesses_shell_but_not_unmapped_test_execution():
         for assessment in assessments
     ] == [
         "shell_execution",
+        "test_execution",
     ]
 
+    assert all(
+        assessment.status
+        is TechnicalRequirementStatus.SATISFIED
+        for assessment in assessments
+    )
+
+def test_maps_test_execution_capability_to_candidate_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="test_execution",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="Running tests requires test execution.",
+            ),
+        ],
+    )
+
+    support = AgentStarterEvidence(
+        key="candidate_supports_test_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="Candidate provides test execution.",
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[support],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "test_execution"
     assert (
         assessments[0].status
         is TechnicalRequirementStatus.SATISFIED
     )
+    assert assessments[0].supporting_evidence == [support]

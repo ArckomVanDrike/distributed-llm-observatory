@@ -14,6 +14,7 @@ _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
     "filesystem_read": "candidate_supports_filesystem_read",
     "filesystem_write": "candidate_supports_filesystem_write",
     "shell_execution": "candidate_supports_shell_execution",
+    "test_execution": "candidate_supports_test_execution",
 }
 
 

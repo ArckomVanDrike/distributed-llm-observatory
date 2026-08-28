@@ -51,6 +51,7 @@ def test_coding_candidates_record_locality_evidence():
         "candidate_supports_filesystem_read",
         "candidate_supports_filesystem_write",
         "candidate_supports_shell_execution",
+        "candidate_supports_test_execution",
     ]
     assert local_candidate.evidence[0].value is False
 
@@ -62,6 +63,7 @@ def test_coding_candidates_record_locality_evidence():
         "candidate_supports_filesystem_read",
         "candidate_supports_filesystem_write",
         "candidate_supports_shell_execution",
+        "candidate_supports_test_execution",
     ]
     assert remote_candidate.evidence[0].value is True
 
@@ -685,6 +687,36 @@ def test_coding_candidates_explicitly_record_shell_execution_support():
             for evidence in candidate.evidence
             if evidence.key
             == "candidate_supports_shell_execution"
+        ]
+
+        assert len(matches) == 1
+        assert matches[0].value is True
+        assert matches[0].source is EvidenceSource.DERIVED
+        assert matches[0].reason
+
+
+def test_coding_candidates_explicitly_record_test_execution_support():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    local_candidate, remote_candidate = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    for candidate in (
+        local_candidate,
+        remote_candidate,
+    ):
+        matches = [
+            evidence
+            for evidence in candidate.evidence
+            if evidence.key
+            == "candidate_supports_test_execution"
         ]
 
         assert len(matches) == 1
