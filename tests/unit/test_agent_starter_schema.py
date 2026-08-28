@@ -781,3 +781,106 @@ def test_candidate_assessment_rejects_soft_blocking_requirement():
             supporting_evidence=[evidence],
             blocking_requirements=[preference],
         )
+
+
+def test_agent_starter_intake_records_goal_declared_evidence_and_hardware():
+    from schemas.agent_starter import AgentStarterIntake
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        os_name="Linux",
+        logical_cpu_count=8,
+        total_memory_bytes=16 * 1024**3,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="source_code_must_stay_local",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+        hardware_profile=hardware,
+    )
+
+    assert intake.goal is AgentStarterGoal.CODING
+    assert intake.evidence[0].source is EvidenceSource.DECLARED
+    assert intake.hardware_profile == hardware
+
+
+def test_agent_starter_intake_allows_observed_and_unknown_evidence():
+    from schemas.agent_starter import AgentStarterIntake
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="microphone_available",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="accelerator_details_available",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "The browser environment does not expose "
+                    "accelerator details."
+                ),
+            ),
+        ],
+    )
+
+    assert [
+        evidence.source
+        for evidence in intake.evidence
+    ] == [
+        EvidenceSource.OBSERVED,
+        EvidenceSource.UNKNOWN,
+    ]
+    assert intake.hardware_profile is None
+
+
+def test_agent_starter_intake_rejects_derived_evidence():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import AgentStarterIntake
+
+    with pytest.raises(
+        ValidationError,
+        match="Derived evidence belongs to orchestration",
+    ):
+        AgentStarterIntake(
+            goal=AgentStarterGoal.CODING,
+            evidence=[
+                AgentStarterEvidence(
+                    key="shell_execution_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "Repository modification requires shell execution."
+                    ),
+                ),
+            ],
+        )
+
+
+def test_agent_starter_intake_can_start_with_goal_only():
+    from schemas.agent_starter import AgentStarterIntake
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    assert intake.goal is AgentStarterGoal.PERSONAL
+    assert intake.evidence == []
+    assert intake.hardware_profile is None

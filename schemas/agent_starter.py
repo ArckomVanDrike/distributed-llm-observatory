@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from schemas.hardware import HardwareProfile
+
 
 class AgentStarterGoal(str, Enum):
     PERSONAL = "personal"
@@ -87,6 +89,31 @@ class AgentStarterEvidence(BaseModel):
         ):
             raise ValueError(
                 "Derived evidence must record its reason."
+            )
+
+        return self
+
+
+class AgentStarterIntake(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    goal: AgentStarterGoal
+    evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+    hardware_profile: HardwareProfile | None = None
+
+    @model_validator(mode="after")
+    def validate_intake(
+        self,
+    ) -> AgentStarterIntake:
+        if any(
+            evidence.source is EvidenceSource.DERIVED
+            for evidence in self.evidence
+        ):
+            raise ValueError(
+                "Derived evidence belongs to orchestration, "
+                "not intake."
             )
 
         return self
