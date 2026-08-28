@@ -234,3 +234,94 @@ def test_catalog_orchestrator_preserves_query_with_zero_matches():
         "coding",
     ]
     assert query_match.matched_entries == []
+
+
+def test_catalog_orchestrator_preserves_all_candidate_assessments_in_order():
+    llm = _entry(
+        identifier="automation-model",
+        capabilities=[],
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="catalog-2026-08-28",
+        generated_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+        entries=[llm],
+    )
+
+    deterministic = CandidateArchitectureAssessment(
+        architecture_id="traditional-deterministic-automation",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The deterministic architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "Deterministic automation satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="The candidate does not use an LLM.",
+            ),
+        ],
+    )
+
+    llm_automation = CandidateArchitectureAssessment(
+        architecture_id="supervised-automation-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The LLM architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The LLM architecture is a possible alternative.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses an LLM.",
+            ),
+        ],
+    )
+
+    from observer.core.agent_starter_catalog_orchestrator import (
+        match_agent_starter_candidates_to_catalog,
+    )
+
+    results = match_agent_starter_candidates_to_catalog(
+        goal=AgentStarterGoal.AUTOMATION,
+        assessments=[
+            deterministic,
+            llm_automation,
+        ],
+        snapshot=snapshot,
+    )
+
+    assert [
+        result.architecture_id
+        for result in results
+    ] == [
+        "traditional-deterministic-automation",
+        "supervised-automation-agent",
+    ]
+
+    assert results[0].query_matches == []
+
+    assert len(results[1].query_matches) == 1
+    assert [
+        entry.identifier
+        for entry in results[1].query_matches[0].matched_entries
+    ] == [
+        "automation-model",
+    ]

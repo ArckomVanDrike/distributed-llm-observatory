@@ -46,3 +46,19 @@ def match_agent_starter_architecture_to_catalog(
         catalog_snapshot_id=snapshot.snapshot_id,
         query_matches=query_matches,
     )
+
+
+def match_agent_starter_candidates_to_catalog(
+    *,
+    goal: AgentStarterGoal,
+    assessments: list[CandidateArchitectureAssessment],
+    snapshot: AgentStarterCatalogSnapshot,
+) -> list[AgentStarterCatalogArchitectureResult]:
+    return [
+        match_agent_starter_architecture_to_catalog(
+            goal=goal,
+            assessment=assessment,
+            snapshot=snapshot,
+        )
+        for assessment in assessments
+    ]
