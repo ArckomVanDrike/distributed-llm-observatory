@@ -1041,3 +1041,92 @@ def test_agent_starter_candidate_architecture_rejects_empty_identifier():
             architecture_id="",
             goal=AgentStarterGoal.PERSONAL,
         )
+
+
+def test_agent_starter_technical_feasibility_records_reason_and_evidence():
+    from schemas.agent_starter import (
+        AgentStarterTechnicalFeasibilityAssessment,
+    )
+
+    evidence = AgentStarterEvidence(
+        key="observed_total_memory_bytes",
+        source=EvidenceSource.OBSERVED,
+        value=16 * 1024**3,
+    )
+
+    assessment = AgentStarterTechnicalFeasibilityAssessment(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        reasons=[
+            "Known environment evidence supports this architecture.",
+        ],
+        supporting_evidence=[evidence],
+    )
+
+    assert assessment.architecture_id == "local-coding-agent"
+    assert assessment.goal is AgentStarterGoal.CODING
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert assessment.reasons
+    assert assessment.supporting_evidence == [evidence]
+
+
+def test_agent_starter_technical_feasibility_can_remain_unknown():
+    from schemas.agent_starter import (
+        AgentStarterTechnicalFeasibilityAssessment,
+    )
+
+    assessment = AgentStarterTechnicalFeasibilityAssessment(
+        architecture_id="device-local-voice",
+        goal=AgentStarterGoal.VOICE,
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        reasons=[
+            "Critical environment information is unavailable.",
+        ],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert assessment.supporting_evidence == []
+
+
+def test_agent_starter_technical_feasibility_requires_explanation():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import (
+        AgentStarterTechnicalFeasibilityAssessment,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Technical feasibility assessment must explain",
+    ):
+        AgentStarterTechnicalFeasibilityAssessment(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+            technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        )
+
+
+def test_agent_starter_technical_feasibility_has_no_recommendation_state():
+    from schemas.agent_starter import (
+        AgentStarterTechnicalFeasibilityAssessment,
+    )
+
+    assessment = AgentStarterTechnicalFeasibilityAssessment(
+        architecture_id="cloud-voice-pipeline",
+        goal=AgentStarterGoal.VOICE,
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        reasons=[
+            "Technical feasibility has not yet been established.",
+        ],
+    )
+
+    assert not hasattr(assessment, "recommendation")
+    assert not hasattr(assessment, "confidence")

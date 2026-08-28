@@ -178,6 +178,30 @@ class AgentStarterCandidateArchitecture(BaseModel):
     )
 
 
+class AgentStarterTechnicalFeasibilityAssessment(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    architecture_id: str = Field(min_length=1)
+    goal: AgentStarterGoal
+    technical_feasibility: TechnicalFeasibility
+    reasons: list[str] = Field(default_factory=list)
+    supporting_evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_feasibility_assessment(
+        self,
+    ) -> AgentStarterTechnicalFeasibilityAssessment:
+        if not self.reasons:
+            raise ValueError(
+                "Technical feasibility assessment must explain "
+                "its verdict."
+            )
+
+        return self
+
+
 class CandidateArchitectureAssessment(BaseModel):
     schema_version: Literal["0.1"] = "0.1"
 
