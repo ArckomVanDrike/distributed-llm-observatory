@@ -45,12 +45,14 @@ def assess_coding_candidate(
     ]
     supporting_evidence.extend(candidate_evidence)
 
-    local_only_required = any(
-        requirement.key == "source_code_must_stay_local"
+    local_only_requirements = [
+        requirement
+        for requirement in requirements
+        if requirement.key == "source_code_must_stay_local"
         and requirement.value is True
         and requirement.strength is ConstraintStrength.HARD
-        for requirement in requirements
-    )
+    ]
+    local_only_required = bool(local_only_requirements)
 
     processing_evidence = [
         evidence
@@ -103,6 +105,7 @@ def assess_coding_candidate(
                 "that source code must stay local."
             ],
             supporting_evidence=supporting_evidence,
+            blocking_requirements=local_only_requirements,
         )
 
     if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
