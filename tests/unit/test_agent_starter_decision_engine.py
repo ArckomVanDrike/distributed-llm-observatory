@@ -2552,3 +2552,137 @@ def test_missing_memory_controls_does_not_assume_selective_memory_fit():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _retention_personal_evidence(
+    *,
+    candidate_retains_all_conversations_indefinitely: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.DERIVED,
+            value=candidate_retains_all_conversations_indefinitely,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether all conversation history is retained "
+                "without a bounded retention policy."
+            ),
+        ),
+    ]
+
+
+def test_personal_assistant_without_unnecessary_indefinite_retention_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="selective_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_retention_personal_evidence(
+            candidate_retains_all_conversations_indefinitely=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_unnecessary_indefinite_conversation_retention_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="retain_everything_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_retention_personal_evidence(
+            candidate_retains_all_conversations_indefinitely=True,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "retain" in reason.lower()
+        or "retention" in reason.lower()
+        or "indefinite" in reason.lower()
+        or "conversation" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_indefinite_retention_behavior_limits_personal_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate retains all conversations indefinitely."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "retention" in reason.lower()
+            or "retain" in reason.lower()
+            or "conversation" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_indefinite_retention_behavior_does_not_assume_personal_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "retention" in reason.lower()
+            or "retain" in reason.lower()
+            or "conversation" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

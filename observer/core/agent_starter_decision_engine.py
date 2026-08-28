@@ -1395,6 +1395,71 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    indefinite_all_conversation_retention_not_required = any(
+        evidence.key == "indefinite_all_conversation_retention_required"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    candidate_retains_all_conversations_indefinitely = any(
+        evidence.key == "candidate_retains_all_conversations_indefinitely"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    indefinite_retention_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_retains_all_conversations_indefinitely"
+    ]
+
+    indefinite_retention_unknown = (
+        indefinite_all_conversation_retention_not_required
+        and (
+            not indefinite_retention_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in indefinite_retention_evidence
+            )
+        )
+    )
+
+    if (
+        indefinite_all_conversation_retention_not_required
+        and candidate_retains_all_conversations_indefinitely
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Indefinite retention of all conversations is not "
+                "required, so retaining everything without a bounded "
+                "retention policy is not recommended."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if indefinite_retention_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Conversation retention behavior is unknown or "
+                "insufficiently established where indefinite "
+                "retention is not required."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     selective_memory_required = any(
         evidence.key == "selective_memory_required"
         and evidence.value is True
