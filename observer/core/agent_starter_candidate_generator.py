@@ -52,16 +52,42 @@ def _generate_coding_candidates(
         ),
     )
 
+    local_filesystem_write = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes filesystem "
+            "write capability for code modification."
+        ),
+    )
+
+    remote_filesystem_write = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes filesystem "
+            "write capability for code modification."
+        ),
+    )
+
     return [
         AgentStarterCandidateArchitecture(
             architecture_id="local-coding-agent",
             goal=AgentStarterGoal.CODING,
-            evidence=[local_evidence],
+            evidence=[
+                local_evidence,
+                local_filesystem_write,
+            ],
         ),
         AgentStarterCandidateArchitecture(
             architecture_id="remote-coding-agent",
             goal=AgentStarterGoal.CODING,
-            evidence=[remote_evidence],
+            evidence=[
+                remote_evidence,
+                remote_filesystem_write,
+            ],
         ),
     ]
 
