@@ -127,3 +127,80 @@ def test_plan_builder_preserves_rejected_candidates_with_explicit_conflict():
         cloud_candidate,
     ]
     assert result.constraint_conflict == conflict
+
+
+def _blocked_candidate(
+    *,
+    architecture_id: str,
+    requirement: AgentStarterRequirement,
+) -> CandidateArchitectureAssessment:
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The candidate is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "A hard requirement blocks this candidate.",
+        ],
+        supporting_evidence=requirement.evidence,
+        blocking_requirements=[requirement],
+    )
+
+
+def test_plan_builder_infers_conflict_from_shared_hard_blocker():
+    requirement = _local_only_requirement()
+
+    local_candidate = _blocked_candidate(
+        architecture_id="local_coding",
+        requirement=requirement,
+    )
+    cloud_candidate = _blocked_candidate(
+        architecture_id="cloud_coding",
+        requirement=requirement,
+    )
+
+    result = build_agent_starter_plan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[requirement],
+        candidate_assessments=[
+            local_candidate,
+            cloud_candidate,
+        ],
+    )
+
+    assert result.candidate_assessments == [
+        local_candidate,
+        cloud_candidate,
+    ]
+    assert result.constraint_conflict is not None
+    assert (
+        result.constraint_conflict.conflicting_requirements
+        == [requirement]
+    )
+
+
+def test_plan_builder_does_not_infer_conflict_from_recommendation_alone():
+    requirement = _local_only_requirement()
+
+    first = _candidate(
+        architecture_id="candidate_a",
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+    )
+    second = _candidate(
+        architecture_id="candidate_b",
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+    )
+
+    result = build_agent_starter_plan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[requirement],
+        candidate_assessments=[
+            first,
+            second,
+        ],
+    )
+
+    assert result.constraint_conflict is None
