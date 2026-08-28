@@ -298,3 +298,121 @@ def test_catalog_query_records_explicit_matching_properties():
     ]
     assert query.required_runtime == "llama.cpp"
     assert query.required_pricing_class == "free"
+
+
+def test_catalog_query_match_records_query_results_and_snapshot():
+    from datetime import datetime, timezone
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry(
+        identifier="coding-model",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Example",
+        version="1.0",
+        capabilities=["coding"],
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/coding-model",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type=AgentStarterCatalogComponentType.LLM,
+        required_capabilities=["coding"],
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-2026-08-28",
+        query=query,
+        matched_entries=[entry],
+    )
+
+    assert match.architecture_id == "local-coding-agent"
+    assert match.catalog_snapshot_id == "catalog-2026-08-28"
+    assert match.query == query
+    assert match.matched_entries == [entry]
+
+
+def test_catalog_query_match_rejects_entries_of_different_component_type():
+    from datetime import datetime, timezone
+
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    runtime_entry = AgentStarterCatalogEntry(
+        identifier="example-runtime",
+        component_type=AgentStarterCatalogComponentType.RUNTIME,
+        vendor="Example Vendor",
+        family="Example Runtime",
+        version="1.0",
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/runtime",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type=AgentStarterCatalogComponentType.LLM,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Matched catalog entries must have the "
+            "component type requested by the query"
+        ),
+    ):
+        AgentStarterCatalogQueryMatch(
+            architecture_id="example-architecture",
+            catalog_snapshot_id="catalog-2026-08-28",
+            query=query,
+            matched_entries=[runtime_entry],
+        )
+
+
+def test_catalog_query_match_allows_zero_matched_entries():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type=AgentStarterCatalogComponentType.LLM,
+        required_capabilities=[
+            "coding",
+        ],
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-2026-08-28",
+        query=query,
+        matched_entries=[],
+    )
+
+    assert match.matched_entries == []

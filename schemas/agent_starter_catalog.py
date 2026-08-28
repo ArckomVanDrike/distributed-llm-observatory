@@ -116,3 +116,29 @@ class AgentStarterCatalogQuery(BaseModel):
     )
     required_runtime: str | None = None
     required_pricing_class: str | None = None
+
+
+class AgentStarterCatalogQueryMatch(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    architecture_id: str = Field(min_length=1)
+    catalog_snapshot_id: str = Field(min_length=1)
+    query: AgentStarterCatalogQuery
+    matched_entries: list[AgentStarterCatalogEntry] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_matched_component_types(
+        self,
+    ) -> AgentStarterCatalogQueryMatch:
+        if any(
+            entry.component_type is not self.query.component_type
+            for entry in self.matched_entries
+        ):
+            raise ValueError(
+                "Matched catalog entries must have the "
+                "component type requested by the query."
+            )
+
+        return self
