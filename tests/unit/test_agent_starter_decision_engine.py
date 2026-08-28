@@ -2686,3 +2686,135 @@ def test_missing_indefinite_retention_behavior_does_not_assume_personal_fit():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _proactive_personal_evidence(
+    *,
+    candidate_supports_background_scheduling: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_background_scheduling,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether scheduled or background execution is available."
+            ),
+        ),
+    ]
+
+
+def test_proactive_personal_assistant_with_background_scheduling_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="proactive_personal_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_proactive_personal_evidence(
+            candidate_supports_background_scheduling=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_proactive_personal_assistant_without_background_scheduling_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="reactive_only_personal_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_proactive_personal_evidence(
+            candidate_supports_background_scheduling=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "background" in reason.lower()
+        or "schedul" in reason.lower()
+        or "proactive" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_background_scheduling_limits_proactive_personal_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "scheduled or background execution is supported."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "background" in reason.lower()
+            or "schedul" in reason.lower()
+            or "proactive" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_background_scheduling_does_not_assume_proactive_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "background" in reason.lower()
+            or "schedul" in reason.lower()
+            or "proactive" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

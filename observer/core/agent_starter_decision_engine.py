@@ -1395,6 +1395,70 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    proactive_behavior_required = any(
+        evidence.key == "proactive_behavior_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_lacks_background_scheduling = any(
+        evidence.key == "candidate_supports_background_scheduling"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    background_scheduling_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_background_scheduling"
+    ]
+
+    background_scheduling_unknown = (
+        proactive_behavior_required
+        and (
+            not background_scheduling_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in background_scheduling_evidence
+            )
+        )
+    )
+
+    if (
+        proactive_behavior_required
+        and candidate_lacks_background_scheduling
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Proactive behavior is required, but the candidate "
+                "does not support scheduled or background execution."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if background_scheduling_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Scheduled or background execution support is "
+                "unknown or insufficiently established for the "
+                "requested proactive workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     indefinite_all_conversation_retention_not_required = any(
         evidence.key == "indefinite_all_conversation_retention_required"
         and evidence.value is False
