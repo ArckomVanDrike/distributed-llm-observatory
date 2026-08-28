@@ -243,6 +243,15 @@ def test_catalog_query_builder_maps_direct_context_rag_to_llm_query():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The knowledge-assistant architecture uses an LLM "
+                    "for generation."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_uses_retrieval_pipeline",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -286,6 +295,15 @@ def test_catalog_query_builder_maps_full_rag_to_llm_query():
             "The retrieval architecture satisfies the requirements.",
         ],
         supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The knowledge-assistant architecture uses an LLM "
+                    "for generation."
+                ),
+            ),
             AgentStarterEvidence(
                 key="candidate_uses_retrieval_pipeline",
                 source=EvidenceSource.DERIVED,
@@ -333,6 +351,15 @@ def test_catalog_query_builder_rejects_rag_without_retrieval_evidence():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The knowledge-assistant architecture uses an LLM "
+                    "for generation."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="unrelated_evidence",
                 source=EvidenceSource.DERIVED,
                 value=True,
@@ -344,8 +371,8 @@ def test_catalog_query_builder_rejects_rag_without_retrieval_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Knowledge catalog mapping requires exactly one "
-            "candidate_uses_retrieval_pipeline evidence value"
+            "Knowledge stack mapping requires exactly one "
+            "candidate_uses_retrieval_pipeline boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -370,6 +397,15 @@ def test_catalog_query_builder_rejects_conflicting_rag_retrieval_evidence():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The knowledge-assistant architecture uses an LLM "
+                    "for generation."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_uses_retrieval_pipeline",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -387,8 +423,8 @@ def test_catalog_query_builder_rejects_conflicting_rag_retrieval_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Knowledge catalog mapping requires exactly one "
-            "candidate_uses_retrieval_pipeline evidence value"
+            "Knowledge stack mapping requires exactly one "
+            "candidate_uses_retrieval_pipeline boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -784,5 +820,45 @@ def test_catalog_query_builder_routes_automation_validation_through_stack_requir
     ):
         build_agent_starter_catalog_queries(
             goal=AgentStarterGoal.AUTOMATION,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_routes_rag_validation_through_stack_requirements():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="unknown-knowledge-architecture",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Retrieval architecture is not established.",
+        ],
+        recommendation_reasons=[
+            "The stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The architecture uses an LLM "
+                    "for generation."
+                ),
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Knowledge stack mapping requires exactly one "
+            "candidate_uses_retrieval_pipeline boolean evidence value"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.KNOWLEDGE_RAG,
             assessment=assessment,
         )

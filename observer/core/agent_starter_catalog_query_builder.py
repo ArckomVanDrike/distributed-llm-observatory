@@ -48,27 +48,16 @@ def build_agent_starter_catalog_queries(
         ]
 
     if goal is AgentStarterGoal.KNOWLEDGE_RAG:
-        uses_retrieval_pipeline = [
-            evidence.value
-            for evidence in assessment.supporting_evidence
-            if evidence.key == "candidate_uses_retrieval_pipeline"
-        ]
-
-        if (
-            len(uses_retrieval_pipeline) != 1
-            or not isinstance(uses_retrieval_pipeline[0], bool)
-        ):
-            raise ValueError(
-                "Knowledge catalog mapping requires exactly one "
-                "candidate_uses_retrieval_pipeline evidence value."
-            )
+        requirements = build_agent_starter_stack_requirements(
+            goal=goal,
+            assessment=assessment,
+        )
 
         return [
-            AgentStarterCatalogQuery(
-                component_type=(
-                    AgentStarterCatalogComponentType.LLM
-                ),
+            map_agent_starter_stack_requirement_to_catalog_query(
+                requirement
             )
+            for requirement in requirements
         ]
 
     if goal is AgentStarterGoal.VOICE:
