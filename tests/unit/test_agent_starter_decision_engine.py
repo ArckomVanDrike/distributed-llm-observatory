@@ -1,4 +1,5 @@
 from observer.core.agent_starter_decision_engine import (
+    assess_automation_candidate,
     assess_coding_candidate,
     technical_feasibility_from_compatibility,
 )
@@ -329,3 +330,309 @@ def test_unknown_local_only_compliance_is_not_recorded_as_proven_blocker():
         is RecommendationVerdict.NOT_RECOMMENDED
     )
     assert result.blocking_requirements == []
+
+
+def _deterministic_automation_evidence(
+    *,
+    candidate_uses_llm: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The declared workflow consists of fixed "
+                "deterministic steps."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=candidate_uses_llm,
+            reason=(
+                "The candidate architecture explicitly "
+                "defines whether LLM inference is used."
+            ),
+        ),
+    ]
+
+
+def test_deterministic_workflow_recommends_traditional_automation():
+    result = assess_automation_candidate(
+        architecture_id="traditional_automation",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "deterministic" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_deterministic_workflow_does_not_recommend_unnecessary_llm_agent():
+    result = assess_automation_candidate(
+        architecture_id="llm_automation_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "unnecessary" in reason.lower()
+        or "not required" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_llm_usage_limits_automation_recommendation_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The declared workflow consists of fixed "
+                "deterministic steps."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "The candidate architecture does not provide "
+                "enough evidence to establish LLM usage."
+            ),
+        ),
+    ]
+
+    result = assess_automation_candidate(
+        architecture_id="automation_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_semantic_need_does_not_make_ai_unnecessary():
+    evidence = [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate architecture uses LLM inference."
+            ),
+        ),
+    ]
+
+    result = assess_automation_candidate(
+        architecture_id="llm_automation_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _high_impact_automation_evidence(
+    *,
+    human_approval_required: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses LLM inference.",
+        ),
+        AgentStarterEvidence(
+            key="destructive_or_high_impact_actions",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_executes_autonomously",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate can execute external write actions "
+                "without waiting for a user command."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="human_approval_required",
+            source=EvidenceSource.DECLARED,
+            value=human_approval_required,
+        ),
+    ]
+
+
+def test_autonomous_high_impact_automation_without_approval_is_not_recommended():
+    result = assess_automation_candidate(
+        architecture_id="autonomous_workflow_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_high_impact_automation_evidence(
+            human_approval_required=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "approval" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_high_impact_automation_with_human_approval_can_proceed():
+    result = assess_automation_candidate(
+        architecture_id="supervised_workflow_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_high_impact_automation_evidence(
+            human_approval_required=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_24_7_requirement_downgrades_non_always_available_automation():
+    evidence = _deterministic_automation_evidence(
+        candidate_uses_llm=False,
+    )
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="availability_24_7_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_always_available",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate runs on a device that is not "
+                    "expected to remain continuously available."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_automation_candidate(
+        architecture_id="personal_device_automation",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "24/7" in reason
+        or "availability" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_24_7_requirement_allows_always_available_traditional_automation():
+    evidence = _deterministic_automation_evidence(
+        candidate_uses_llm=False,
+    )
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="availability_24_7_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_always_available",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The candidate deployment is designed for "
+                    "continuous availability."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_automation_candidate(
+        architecture_id="always_on_automation",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
