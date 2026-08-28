@@ -172,6 +172,16 @@ def _generate_coding_candidates(
 
 def _generate_rag_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    rag_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The knowledge-assistant architecture uses an LLM "
+            "for generation."
+        ),
+    )
+
     direct_context_evidence = AgentStarterEvidence(
         key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
@@ -196,12 +206,18 @@ def _generate_rag_candidates(
         AgentStarterCandidateArchitecture(
             architecture_id="direct-context-knowledge-assistant",
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
-            evidence=[direct_context_evidence],
+            evidence=[
+                rag_llm_usage,
+                direct_context_evidence,
+            ],
         ),
         AgentStarterCandidateArchitecture(
             architecture_id="full-rag-pipeline",
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
-            evidence=[full_rag_evidence],
+            evidence=[
+                rag_llm_usage,
+                full_rag_evidence,
+            ],
         ),
     ]
 

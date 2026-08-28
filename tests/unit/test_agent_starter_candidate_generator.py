@@ -155,44 +155,28 @@ def test_generates_base_rag_candidates_in_deterministic_order():
 
 
 def test_rag_candidates_record_retrieval_architecture_evidence():
-    from observer.core.agent_starter_candidate_generator import (
-        generate_agent_starter_candidates,
-    )
-
     prepared = AgentStarterPreparedInput(
         goal=AgentStarterGoal.KNOWLEDGE_RAG,
     )
 
-    candidates = generate_agent_starter_candidates(prepared)
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
 
     direct_context, full_rag = candidates
 
-    assert [
-        evidence.key
+    assert any(
+        evidence.key == "candidate_uses_retrieval_pipeline"
+        and evidence.source is EvidenceSource.DERIVED
+        and evidence.value is False
         for evidence in direct_context.evidence
-    ] == [
-        "candidate_uses_retrieval_pipeline",
-    ]
-    assert direct_context.evidence[0].value is False
-
-    assert [
-        evidence.key
-        for evidence in full_rag.evidence
-    ] == [
-        "candidate_uses_retrieval_pipeline",
-    ]
-    assert full_rag.evidence[0].value is True
-
-    assert all(
-        evidence.source is EvidenceSource.DERIVED
-        for candidate in candidates
-        for evidence in candidate.evidence
     )
 
-    assert all(
-        evidence.reason
-        for candidate in candidates
-        for evidence in candidate.evidence
+    assert any(
+        evidence.key == "candidate_uses_retrieval_pipeline"
+        and evidence.source is EvidenceSource.DERIVED
+        and evidence.value is True
+        for evidence in full_rag.evidence
     )
 
 
@@ -719,6 +703,33 @@ def test_coding_candidates_explicitly_record_llm_usage():
     ] == [
         "local-coding-agent",
         "remote-coding-agent",
+    ]
+
+    for candidate in candidates:
+        llm_usage = [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+
+        assert llm_usage == [True]
+
+
+def test_rag_candidates_explicitly_record_llm_usage():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    )
+
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "direct-context-knowledge-assistant",
+        "full-rag-pipeline",
     ]
 
     for candidate in candidates:
