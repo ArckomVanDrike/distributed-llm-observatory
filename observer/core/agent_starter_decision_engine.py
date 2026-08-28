@@ -535,6 +535,39 @@ def assess_rag_candidate(
         )
     )
 
+    exact_identifier_lookup_required = any(
+        evidence.key == "exact_identifier_lookup_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_lexical_or_hybrid_retrieval = any(
+        evidence.key == "candidate_supports_lexical_or_hybrid_retrieval"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    lexical_or_hybrid_retrieval_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if (
+            evidence.key
+            == "candidate_supports_lexical_or_hybrid_retrieval"
+        )
+    ]
+
+    lexical_or_hybrid_retrieval_unknown = (
+        exact_identifier_lookup_required
+        and (
+            not lexical_or_hybrid_retrieval_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in lexical_or_hybrid_retrieval_evidence
+            )
+        )
+    )
+
     if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
         technical_reason = (
             "The candidate is not technically feasible."
@@ -690,6 +723,41 @@ def assess_rag_candidate(
                 "Incremental indexing support is unknown or "
                 "insufficiently established for the frequently "
                 "updated corpus."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        exact_identifier_lookup_required
+        and candidate_explicitly_lacks_lexical_or_hybrid_retrieval
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Exact identifier lookup is required, but the "
+                "candidate lacks lexical or hybrid retrieval, "
+                "making it a poor retrieval fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if lexical_or_hybrid_retrieval_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Lexical or hybrid retrieval support is unknown "
+                "or insufficiently established for the requested "
+                "exact identifier lookup."
             ],
             supporting_evidence=supporting_evidence,
         )

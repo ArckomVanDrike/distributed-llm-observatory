@@ -1370,3 +1370,185 @@ def test_rag_unknown_feasibility_cannot_be_recommended_from_feature_fit():
         or "unknown" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def _exact_identifier_rag_evidence(
+    *,
+    candidate_supports_lexical_or_hybrid_retrieval: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_lexical_or_hybrid_retrieval",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_lexical_or_hybrid_retrieval,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether exact-match-friendly lexical or hybrid "
+                "retrieval is available."
+            ),
+        ),
+    ]
+
+
+def test_exact_identifier_rag_with_lexical_or_hybrid_retrieval_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="hybrid_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_exact_identifier_rag_evidence(
+            candidate_supports_lexical_or_hybrid_retrieval=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_exact_identifier_rag_without_lexical_or_hybrid_retrieval_is_not_preferred():
+    result = assess_rag_candidate(
+        architecture_id="semantic_only_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_exact_identifier_rag_evidence(
+            candidate_supports_lexical_or_hybrid_retrieval=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "lexical" in reason.lower()
+        or "hybrid" in reason.lower()
+        or "exact" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_lexical_or_hybrid_support_limits_exact_identifier_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_lexical_or_hybrid_retrieval",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports lexical or hybrid retrieval."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "lexical" in reason.lower()
+            or "hybrid" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_lexical_or_hybrid_support_does_not_assume_exact_identifier_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "lexical" in reason.lower()
+            or "hybrid" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
