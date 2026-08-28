@@ -5,6 +5,7 @@ from schemas.agent_starter import (
     AgentStarterRequirement,
     CandidateArchitectureAssessment,
     ConstraintStrength,
+    EvidenceSource,
     RecommendationConfidence,
     RecommendationVerdict,
     TechnicalFeasibility,
@@ -51,10 +52,24 @@ def assess_coding_candidate(
         for requirement in requirements
     )
 
-    remote_processing = any(
-        evidence.key == "source_code_remote_processing"
-        and evidence.value is True
+    processing_evidence = [
+        evidence
         for evidence in candidate_evidence
+        if evidence.key == "source_code_remote_processing"
+    ]
+
+    remote_processing = any(
+        evidence.value is True
+        for evidence in processing_evidence
+    )
+
+    processing_boundary_unknown = (
+        not processing_evidence
+        or any(
+            evidence.source is EvidenceSource.UNKNOWN
+            or evidence.value is None
+            for evidence in processing_evidence
+        )
     )
 
     if technical_feasibility is TechnicalFeasibility.FEASIBLE:
@@ -67,7 +82,8 @@ def assess_coding_candidate(
         )
     elif technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
         technical_reason = (
-            "The candidate is not feasible under the evaluated technical constraints."
+            "The candidate is not feasible under the evaluated "
+            "technical constraints."
         )
     else:
         technical_reason = (
@@ -89,6 +105,35 @@ def assess_coding_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if local_only_required and processing_boundary_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Compliance with the hard local-only source-code "
+                "requirement cannot be verified from the available "
+                "evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     if technical_feasibility is TechnicalFeasibility.LIMITED:
         return CandidateArchitectureAssessment(
             architecture_id=architecture_id,
@@ -102,20 +147,6 @@ def assess_coding_candidate(
                 "Limited technical feasibility makes this "
                 "candidate a possible but currently "
                 "not recommended choice."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
-
-    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
-            confidence=RecommendationConfidence.HIGH,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "The candidate is not technically feasible "
-                "under the evaluated constraints."
             ],
             supporting_evidence=supporting_evidence,
         )

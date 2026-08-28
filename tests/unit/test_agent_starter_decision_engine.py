@@ -223,3 +223,59 @@ def test_not_feasible_coding_candidate_is_not_recommended():
         "not feasible" in reason.lower()
         for reason in result.technical_reasons
     )
+
+
+def test_local_only_requirement_with_unknown_processing_is_not_recommended():
+    requirement = _local_only_requirement()
+
+    unknown_processing = AgentStarterEvidence(
+        key="source_code_remote_processing",
+        source=EvidenceSource.UNKNOWN,
+        value=None,
+        reason=(
+            "It is not known whether the candidate sends "
+            "repository context to remote inference."
+        ),
+    )
+
+    result = assess_coding_candidate(
+        architecture_id="coding_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[unknown_processing],
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "cannot be verified" in reason.lower()
+        or "insufficient" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_local_only_requirement_without_processing_evidence_is_not_recommended():
+    requirement = _local_only_requirement()
+
+    result = assess_coding_candidate(
+        architecture_id="coding_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[],
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "cannot be verified" in reason.lower()
+        or "insufficient" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
