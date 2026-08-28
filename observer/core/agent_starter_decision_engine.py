@@ -475,6 +475,36 @@ def assess_rag_candidate(
         )
     )
 
+    documents_include_scans = any(
+        evidence.key == "documents_include_scans"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_ocr = any(
+        evidence.key == "candidate_supports_ocr"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    ocr_support_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_ocr"
+    ]
+
+    ocr_support_unknown = (
+        documents_include_scans
+        and (
+            not ocr_support_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in ocr_support_evidence
+            )
+        )
+    )
+
     technical_reason = (
         "The candidate is technically feasible."
     )
@@ -492,6 +522,37 @@ def assess_rag_candidate(
             recommendation_reasons=[
                 "Citations are required, but the candidate does not "
                 "retain source provenance for retrieved evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        documents_include_scans
+        and candidate_explicitly_lacks_ocr
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The document corpus includes scanned content, "
+                "but the candidate does not support OCR."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if ocr_support_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "OCR support is unknown or insufficiently "
+                "established for the scanned document corpus."
             ],
             supporting_evidence=supporting_evidence,
         )
