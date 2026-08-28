@@ -411,7 +411,18 @@ def _generate_automation_candidates(
 
 def _generate_personal_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    personal_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The personal-assistant architecture uses an LLM "
+            "for language interaction."
+        ),
+    )
+
     session_only_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,
@@ -424,6 +435,7 @@ def _generate_personal_candidates(
     ]
 
     opaque_memory_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,
@@ -445,6 +457,7 @@ def _generate_personal_candidates(
     ]
 
     controlled_memory_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,

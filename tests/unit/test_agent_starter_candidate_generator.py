@@ -485,6 +485,7 @@ def test_personal_candidates_record_memory_properties():
     assert {
         evidence.key: evidence.value
         for evidence in session_only.evidence
+            if evidence.key != "candidate_uses_llm"
     } == {
         "candidate_supports_persistent_memory": False,
     }
@@ -492,6 +493,7 @@ def test_personal_candidates_record_memory_properties():
     assert {
         evidence.key: evidence.value
         for evidence in opaque_memory.evidence
+            if evidence.key != "candidate_uses_llm"
     } == {
         "candidate_supports_persistent_memory": True,
         "candidate_supports_memory_inspect_edit_delete": False,
@@ -500,6 +502,7 @@ def test_personal_candidates_record_memory_properties():
     assert {
         evidence.key: evidence.value
         for evidence in controlled_memory.evidence
+            if evidence.key != "candidate_uses_llm"
     } == {
         "candidate_supports_persistent_memory": True,
         "candidate_supports_memory_inspect_edit_delete": True,
@@ -761,3 +764,28 @@ def test_voice_candidates_explicitly_record_speech_component_usage():
 
         assert stt_usage == [True]
         assert tts_usage == [True]
+
+
+def test_personal_candidates_explicitly_record_llm_usage():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
+
+    assert len(candidates) == 3
+    assert len({
+        candidate.architecture_id
+        for candidate in candidates
+    }) == 3
+
+    for candidate in candidates:
+        llm_usage = [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+
+        assert llm_usage == [True]
