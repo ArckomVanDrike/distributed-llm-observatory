@@ -2,6 +2,7 @@ from observer.core.agent_starter_decision_engine import (
     assess_automation_candidate,
     assess_coding_candidate,
     assess_rag_candidate,
+    assess_voice_candidate,
     technical_feasibility_from_compatibility,
 )
 from schemas.agent_starter import (
@@ -1608,5 +1609,691 @@ def test_automation_unknown_feasibility_cannot_be_recommended_from_workflow_fit(
     assert any(
         "insufficient" in reason.lower()
         or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _realtime_voice_evidence(
+    *,
+    candidate_supports_streaming: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_streaming,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether streaming voice processing is supported."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate meets the requested end-to-end "
+                "realtime latency requirement."
+            ),
+        ),
+    ]
+
+
+def test_realtime_voice_with_streaming_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="streaming_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_voice_evidence(
+            candidate_supports_streaming=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_realtime_voice_without_streaming_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="non_streaming_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_voice_evidence(
+            candidate_supports_streaming=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "streaming" in reason.lower()
+        or "realtime" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_streaming_support_limits_realtime_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports streaming voice processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "streaming" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_streaming_support_does_not_assume_realtime_voice_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "streaming" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _raw_audio_local_only_requirement() -> AgentStarterRequirement:
+    return AgentStarterRequirement(
+        key="raw_audio_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            AgentStarterEvidence(
+                key="raw_audio_local_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+
+def test_remote_raw_audio_processing_violates_local_only_voice_requirement():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate sends raw audio to a remote STT "
+                "component for transcription."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="remote_stt_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [requirement]
+    assert any(
+        "raw audio" in reason.lower()
+        or "local" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_local_raw_audio_processing_satisfies_local_only_boundary():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "Raw audio is processed locally before any "
+                "downstream remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="local_stt_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_unknown_raw_audio_processing_cannot_verify_local_only_compliance():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "raw audio is sent to remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "raw audio" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_raw_audio_processing_does_not_assume_local_only_compliance():
+    requirement = _raw_audio_local_only_requirement()
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "raw audio" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _transcript_local_only_requirement() -> AgentStarterRequirement:
+    return AgentStarterRequirement(
+        key="transcript_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            AgentStarterEvidence(
+                key="transcript_local_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+
+def test_hybrid_voice_allows_remote_transcript_when_raw_audio_stays_local():
+    raw_audio_requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="Raw audio is transcribed locally.",
+        ),
+        AgentStarterEvidence(
+            key="transcript_remote_processing_allowed",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Only the locally produced transcript is sent "
+                "to a remote downstream component."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="hybrid_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[raw_audio_requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_remote_transcript_processing_violates_local_only_transcript_requirement():
+    requirement = _transcript_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate sends the transcript to a remote "
+                "component for downstream processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="remote_transcript_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [requirement]
+    assert any(
+        "transcript" in reason.lower()
+        and "local" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_transcript_processing_cannot_verify_local_only_compliance():
+    requirement = _transcript_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the transcript is sent to remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "transcript" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_transcript_processing_does_not_assume_local_only_compliance():
+    requirement = _transcript_local_only_requirement()
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "transcript" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _interruptible_voice_evidence(
+    *,
+    candidate_supports_barge_in_turn_management: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_barge_in_turn_management",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_barge_in_turn_management,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether interruptions and conversational turn "
+                "management are supported."
+            ),
+        ),
+    ]
+
+
+def test_interruptible_voice_with_turn_management_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="interruptible_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_interruptible_voice_evidence(
+            candidate_supports_barge_in_turn_management=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_interruptible_voice_without_turn_management_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="non_interruptible_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_interruptible_voice_evidence(
+            candidate_supports_barge_in_turn_management=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "interrupt" in reason.lower()
+        or "turn" in reason.lower()
+        or "barge" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_turn_management_limits_interruptible_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_barge_in_turn_management",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports barge-in or turn management."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "interrupt" in reason.lower()
+            or "turn" in reason.lower()
+            or "barge" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_turn_management_does_not_assume_interruptible_voice_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "interrupt" in reason.lower()
+            or "turn" in reason.lower()
+            or "barge" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _realtime_latency_voice_evidence(
+    *,
+    candidate_meets_realtime_latency_requirement: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.DERIVED,
+            value=candidate_meets_realtime_latency_requirement,
+            reason=(
+                "The candidate architecture has been assessed against "
+                "the requested end-to-end realtime latency requirement."
+            ),
+        ),
+    ]
+
+
+def test_realtime_voice_with_acceptable_end_to_end_latency_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="low_latency_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_latency_voice_evidence(
+            candidate_meets_realtime_latency_requirement=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_realtime_voice_with_unacceptable_end_to_end_latency_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="slow_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_latency_voice_evidence(
+            candidate_meets_realtime_latency_requirement=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "latency" in reason.lower()
+        or "realtime" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_realtime_latency_fit_limits_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate meets the realtime latency requirement."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "latency" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_realtime_latency_fit_does_not_assume_voice_suitability():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "latency" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
         for reason in result.recommendation_reasons
     )

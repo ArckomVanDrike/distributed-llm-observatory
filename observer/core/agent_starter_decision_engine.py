@@ -886,3 +886,434 @@ def assess_rag_candidate(
         ],
         supporting_evidence=supporting_evidence,
     )
+
+
+def assess_voice_candidate(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not technically feasible."
+        )
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        technical_reason = (
+            "The candidate's technical feasibility is unknown."
+        )
+    else:
+        technical_reason = (
+            "The candidate is technically feasible."
+        )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.LIMITED:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Limited technical feasibility makes this "
+                "candidate a possible but currently "
+                "not recommended choice."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "technical feasibility for this candidate."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    raw_audio_local_only_requirements = [
+        requirement
+        for requirement in requirements
+        if (
+            requirement.key == "raw_audio_must_stay_local"
+            and requirement.value is True
+            and requirement.strength is ConstraintStrength.HARD
+        )
+    ]
+
+    candidate_raw_audio_remote_processing = any(
+        evidence.key == "candidate_raw_audio_remote_processing"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    raw_audio_processing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_raw_audio_remote_processing"
+    ]
+
+    raw_audio_processing_unknown = (
+        bool(raw_audio_local_only_requirements)
+        and (
+            not raw_audio_processing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in raw_audio_processing_evidence
+            )
+        )
+    )
+
+    if (
+        raw_audio_local_only_requirements
+        and candidate_raw_audio_remote_processing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate violates the hard requirement "
+                "that raw audio must stay local."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=raw_audio_local_only_requirements,
+        )
+
+    if raw_audio_processing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Compliance with the hard requirement that raw "
+                "audio must stay local cannot be verified from "
+                "the available evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=[],
+        )
+
+    transcript_local_only_requirements = [
+        requirement
+        for requirement in requirements
+        if (
+            requirement.key == "transcript_must_stay_local"
+            and requirement.value is True
+            and requirement.strength is ConstraintStrength.HARD
+        )
+    ]
+
+    candidate_transcript_remote_processing = any(
+        evidence.key == "candidate_transcript_remote_processing"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    transcript_processing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_transcript_remote_processing"
+    ]
+
+    transcript_processing_unknown = (
+        bool(transcript_local_only_requirements)
+        and (
+            not transcript_processing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in transcript_processing_evidence
+            )
+        )
+    )
+
+    if (
+        transcript_local_only_requirements
+        and candidate_transcript_remote_processing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate violates the hard requirement "
+                "that the transcript must stay local."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=transcript_local_only_requirements,
+        )
+
+    if transcript_processing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Compliance with the hard requirement that the "
+                "transcript must stay local cannot be verified "
+                "from the available evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=[],
+        )
+
+    interruptions_required = any(
+        evidence.key == "interruptions_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_barge_in_turn_management = any(
+        evidence.key == "candidate_supports_barge_in_turn_management"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    turn_management_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_barge_in_turn_management"
+    ]
+
+    turn_management_unknown = (
+        interruptions_required
+        and (
+            not turn_management_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in turn_management_evidence
+            )
+        )
+    )
+
+    if (
+        interruptions_required
+        and candidate_explicitly_lacks_barge_in_turn_management
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Interruptions are required, but the candidate "
+                "does not support barge-in or conversational "
+                "turn management."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if turn_management_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Barge-in or conversational turn management "
+                "support is unknown or insufficiently established "
+                "for the requested interruptions."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    realtime_voice_required = any(
+        evidence.key == "realtime_voice_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_supports_streaming = any(
+        evidence.key == "candidate_supports_streaming"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_streaming = any(
+        evidence.key == "candidate_supports_streaming"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    streaming_support_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_streaming"
+    ]
+
+    streaming_support_unknown = (
+        realtime_voice_required
+        and (
+            not streaming_support_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in streaming_support_evidence
+            )
+        )
+    )
+
+    candidate_explicitly_misses_realtime_latency_requirement = any(
+        evidence.key == "candidate_meets_realtime_latency_requirement"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    realtime_latency_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_meets_realtime_latency_requirement"
+    ]
+
+    realtime_latency_unknown = (
+        realtime_voice_required
+        and (
+            not realtime_latency_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in realtime_latency_evidence
+            )
+        )
+    )
+
+    if (
+        realtime_voice_required
+        and candidate_explicitly_lacks_streaming
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Realtime voice interaction is required, but the "
+                "candidate does not support streaming processing."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if streaming_support_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Streaming support is unknown or insufficiently "
+                "established for the requested realtime voice workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        realtime_voice_required
+        and candidate_explicitly_misses_realtime_latency_requirement
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate does not meet the requested "
+                "end-to-end realtime voice latency requirement."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if realtime_latency_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "End-to-end realtime voice latency suitability "
+                "is unknown or insufficiently established."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if realtime_voice_required and candidate_supports_streaming:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate supports streaming processing "
+                "required by the realtime voice workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "The available voice evidence does not yet justify "
+            "a stronger architecture recommendation."
+        ],
+        supporting_evidence=supporting_evidence,
+    )
