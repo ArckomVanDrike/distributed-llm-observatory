@@ -307,3 +307,184 @@ def test_voice_multiple_local_privacy_requirements_are_preserved_in_order():
         requirement.strength is ConstraintStrength.HARD
         for requirement in requirements
     )
+
+
+def test_derives_coding_capabilities_from_modify_files_and_run_tests():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "filesystem_read",
+        "filesystem_write",
+        "shell_execution",
+        "test_execution",
+    ]
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for evidence in derived
+    )
+    assert all(
+        evidence.value is True
+        for evidence in derived
+    )
+    assert all(
+        evidence.reason
+        for evidence in derived
+    )
+
+
+def test_does_not_invent_coding_capabilities_without_user_intent():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_false_coding_intent_does_not_derive_capabilities():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_modify_files_alone_derives_filesystem_capabilities():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "filesystem_read",
+        "filesystem_write",
+    ]
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for evidence in derived
+    )
+    assert all(
+        evidence.reason
+        for evidence in derived
+    )
+
+
+def test_run_tests_alone_derives_shell_and_test_capabilities():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "shell_execution",
+        "test_execution",
+    ]
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for evidence in derived
+    )
+    assert all(
+        evidence.reason
+        for evidence in derived
+    )
+
+
+def test_observed_coding_activity_does_not_derive_user_intent_capabilities():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert derived == []

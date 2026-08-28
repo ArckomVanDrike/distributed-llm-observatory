@@ -56,3 +56,70 @@ def derive_agent_starter_requirements(
         )
 
     return requirements
+
+
+def derive_agent_starter_capability_evidence(
+    intake: AgentStarterIntake,
+) -> list[AgentStarterEvidence]:
+    derived: list[AgentStarterEvidence] = []
+
+    modify_files = bool(
+        _declared_true_evidence(
+            intake,
+            key="modify_files",
+        )
+    )
+    run_tests = bool(
+        _declared_true_evidence(
+            intake,
+            key="run_tests",
+        )
+    )
+
+    if modify_files:
+        reason = (
+            "Modifying files requires repository filesystem "
+            "read and write access."
+        )
+
+        derived.extend(
+            [
+                AgentStarterEvidence(
+                    key="filesystem_read",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=reason,
+                ),
+                AgentStarterEvidence(
+                    key="filesystem_write",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=reason,
+                ),
+            ]
+        )
+
+    if run_tests:
+        reason = (
+            "Running tests requires shell execution and "
+            "test execution capabilities."
+        )
+
+        derived.extend(
+            [
+                AgentStarterEvidence(
+                    key="shell_execution",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=reason,
+                ),
+                AgentStarterEvidence(
+                    key="test_execution",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=reason,
+                ),
+            ]
+        )
+
+    return derived
