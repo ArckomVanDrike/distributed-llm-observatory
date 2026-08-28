@@ -136,7 +136,6 @@ def test_candidate_generation_returns_empty_for_unimplemented_goals():
 
     for goal in (
         AgentStarterGoal.PERSONAL,
-        AgentStarterGoal.AUTOMATION,
     ):
         prepared = AgentStarterPreparedInput(
             goal=goal,
@@ -372,4 +371,117 @@ def test_voice_candidate_generation_does_not_filter_privacy_conflicts():
         "local-voice-pipeline",
         "hybrid-voice-pipeline",
         "cloud-voice-pipeline",
+    ]
+
+
+def test_generates_base_automation_candidates_in_deterministic_order():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.AUTOMATION,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "traditional-deterministic-automation",
+        "supervised-automation-agent",
+        "autonomous-workflow-agent",
+    ]
+
+    assert all(
+        candidate.goal is AgentStarterGoal.AUTOMATION
+        for candidate in candidates
+    )
+
+
+def test_automation_candidates_record_llm_and_autonomy_properties():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.AUTOMATION,
+    )
+
+    traditional, supervised, autonomous = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in traditional.evidence
+    } == {
+        "candidate_uses_llm": False,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in supervised.evidence
+    } == {
+        "candidate_uses_llm": True,
+        "candidate_executes_autonomously": False,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in autonomous.evidence
+    } == {
+        "candidate_uses_llm": True,
+        "candidate_executes_autonomously": True,
+    }
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for candidate in (traditional, supervised, autonomous)
+        for evidence in candidate.evidence
+    )
+
+    assert all(
+        evidence.reason
+        for candidate in (traditional, supervised, autonomous)
+        for evidence in candidate.evidence
+    )
+
+
+def test_automation_generation_does_not_filter_deterministic_workflows():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from schemas.agent_starter import AgentStarterEvidence
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[
+            AgentStarterEvidence(
+                key="workflow_deterministic",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="semantic_interpretation_required",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The declared workflow is deterministic and "
+                    "does not require semantic interpretation."
+                ),
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "traditional-deterministic-automation",
+        "supervised-automation-agent",
+        "autonomous-workflow-agent",
     ]

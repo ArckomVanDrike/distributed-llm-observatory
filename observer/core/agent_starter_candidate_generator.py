@@ -21,6 +21,9 @@ def generate_agent_starter_candidates(
     if prepared.goal is AgentStarterGoal.VOICE:
         return _generate_voice_candidates()
 
+    if prepared.goal is AgentStarterGoal.AUTOMATION:
+        return _generate_automation_candidates()
+
     return []
 
 
@@ -176,5 +179,81 @@ def _generate_voice_candidates(
             architecture_id="cloud-voice-pipeline",
             goal=AgentStarterGoal.VOICE,
             evidence=cloud_evidence,
+        ),
+    ]
+
+
+
+def _generate_automation_candidates(
+) -> list[AgentStarterCandidateArchitecture]:
+    traditional_evidence = [
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The traditional automation architecture executes "
+                "the workflow without an LLM."
+            ),
+        ),
+    ]
+
+    supervised_evidence = [
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The supervised automation architecture uses an LLM "
+                "for agent behavior."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_executes_autonomously",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The supervised automation architecture keeps "
+                "execution under user supervision."
+            ),
+        ),
+    ]
+
+    autonomous_evidence = [
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The autonomous workflow architecture uses an LLM "
+                "for agent behavior."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_executes_autonomously",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The autonomous workflow architecture can execute "
+                "without per-action user supervision."
+            ),
+        ),
+    ]
+
+    return [
+        AgentStarterCandidateArchitecture(
+            architecture_id="traditional-deterministic-automation",
+            goal=AgentStarterGoal.AUTOMATION,
+            evidence=traditional_evidence,
+        ),
+        AgentStarterCandidateArchitecture(
+            architecture_id="supervised-automation-agent",
+            goal=AgentStarterGoal.AUTOMATION,
+            evidence=supervised_evidence,
+        ),
+        AgentStarterCandidateArchitecture(
+            architecture_id="autonomous-workflow-agent",
+            goal=AgentStarterGoal.AUTOMATION,
+            evidence=autonomous_evidence,
         ),
     ]
