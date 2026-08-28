@@ -168,6 +168,16 @@ class AgentStarterPreparedInput(BaseModel):
     hardware_profile: HardwareProfile | None = None
 
 
+class AgentStarterCandidateArchitecture(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    architecture_id: str = Field(min_length=1)
+    goal: AgentStarterGoal
+    evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
+
 class CandidateArchitectureAssessment(BaseModel):
     schema_version: Literal["0.1"] = "0.1"
 
