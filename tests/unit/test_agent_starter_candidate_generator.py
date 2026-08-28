@@ -137,7 +137,6 @@ def test_candidate_generation_returns_empty_for_unimplemented_goals():
     for goal in (
         AgentStarterGoal.PERSONAL,
         AgentStarterGoal.AUTOMATION,
-        AgentStarterGoal.VOICE,
     ):
         prepared = AgentStarterPreparedInput(
             goal=goal,
@@ -242,4 +241,135 @@ def test_rag_candidate_generation_does_not_filter_unneeded_retrieval():
     ] == [
         "direct-context-knowledge-assistant",
         "full-rag-pipeline",
+    ]
+
+
+def test_generates_base_voice_candidates_in_deterministic_order():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "local-voice-pipeline",
+        "hybrid-voice-pipeline",
+        "cloud-voice-pipeline",
+    ]
+
+    assert all(
+        candidate.goal is AgentStarterGoal.VOICE
+        for candidate in candidates
+    )
+
+
+def test_voice_candidates_record_audio_and_transcript_locality():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    local_voice, hybrid_voice, cloud_voice = candidates
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in local_voice.evidence
+    } == {
+        "candidate_raw_audio_remote_processing": False,
+        "candidate_transcript_remote_processing": False,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in hybrid_voice.evidence
+    } == {
+        "candidate_raw_audio_remote_processing": False,
+        "candidate_transcript_remote_processing": True,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in cloud_voice.evidence
+    } == {
+        "candidate_raw_audio_remote_processing": True,
+        "candidate_transcript_remote_processing": True,
+    }
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for candidate in candidates
+        for evidence in candidate.evidence
+    )
+
+    assert all(
+        evidence.reason
+        for candidate in candidates
+        for evidence in candidate.evidence
+    )
+
+
+def test_voice_candidate_generation_does_not_filter_privacy_conflicts():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    raw_audio_local = AgentStarterEvidence(
+        key="raw_audio_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    transcript_local = AgentStarterEvidence(
+        key="transcript_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            raw_audio_local,
+            transcript_local,
+        ],
+        requirements=[
+            AgentStarterRequirement(
+                key="raw_audio_must_stay_local",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[raw_audio_local],
+            ),
+            AgentStarterRequirement(
+                key="transcript_must_stay_local",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[transcript_local],
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "local-voice-pipeline",
+        "hybrid-voice-pipeline",
+        "cloud-voice-pipeline",
     ]
