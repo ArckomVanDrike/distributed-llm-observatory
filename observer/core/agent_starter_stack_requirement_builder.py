@@ -51,6 +51,56 @@ def build_agent_starter_stack_requirements(
             )
         ]
 
+    if goal is AgentStarterGoal.KNOWLEDGE_RAG:
+        llm_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+        retrieval_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_retrieval_pipeline"
+        ]
+
+        if (
+            len(llm_evidence) != 1
+            or not isinstance(llm_evidence[0].value, bool)
+            or llm_evidence[0].value is not True
+        ):
+            raise ValueError(
+                "Knowledge stack mapping requires exactly one "
+                "candidate_uses_llm evidence value equal to true."
+            )
+
+        if (
+            len(retrieval_evidence) != 1
+            or not isinstance(
+                retrieval_evidence[0].value,
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Knowledge stack mapping requires exactly one "
+                "candidate_uses_retrieval_pipeline boolean "
+                "evidence value."
+            )
+
+        return [
+            AgentStarterStackRequirement(
+                component_type=(
+                    AgentStarterCatalogComponentType.LLM
+                ),
+                supporting_evidence=[
+                    llm_evidence[0],
+                ],
+                reason=(
+                    "The knowledge-assistant architecture "
+                    "requires a language model for generation."
+                ),
+            )
+        ]
+
     if goal is not AgentStarterGoal.CODING:
         raise ValueError(
             "Stack requirement mapping is not defined for "
