@@ -311,3 +311,36 @@ def test_assessment_orchestrator_preserves_compatibility_evidence():
     )
 
     assert compatibility_evidence in assessment.supporting_evidence
+
+
+def test_assessment_orchestrator_rejects_compatibility_for_unknown_candidate():
+    import pytest
+
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    prepared = prepare_agent_starter_input(
+        AgentStarterIntake(
+            goal=AgentStarterGoal.CODING,
+        )
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Synthetic compatibility for an unknown candidate.",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="unknown candidate architecture",
+    ):
+        assess_agent_starter_candidates(
+            prepared=prepared,
+            compatibility_by_architecture={
+                "local-coding-agnt": compatibility,
+            },
+        )

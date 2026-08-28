@@ -25,7 +25,26 @@ def assess_agent_starter_candidates(
 ) -> list[CandidateArchitectureAssessment]:
     assessments: list[CandidateArchitectureAssessment] = []
 
-    for candidate in generate_agent_starter_candidates(prepared):
+    candidates = generate_agent_starter_candidates(prepared)
+
+    if compatibility_by_architecture is not None:
+        candidate_ids = {
+            candidate.architecture_id
+            for candidate in candidates
+        }
+        unknown_ids = (
+            set(compatibility_by_architecture)
+            - candidate_ids
+        )
+
+        if unknown_ids:
+            raise ValueError(
+                "Compatibility provided for unknown candidate "
+                "architecture: "
+                + ", ".join(sorted(unknown_ids))
+            )
+
+    for candidate in candidates:
         compatibility_assessment = None
         if compatibility_by_architecture is not None:
             compatibility_assessment = (
