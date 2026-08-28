@@ -75,6 +75,15 @@ def test_repository_catalog_matches_coding_through_catalog_pipeline():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding-agent architecture uses an LLM "
+                    "for coding assistance."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="source_code_remote_processing",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -162,6 +171,24 @@ def test_repository_catalog_matches_voice_through_catalog_pipeline():
             "The voice architecture satisfies the requirements.",
         ],
         supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_stt",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses speech-to-text "
+                    "for speech input processing."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses text-to-speech "
+                    "for speech output generation."
+                ),
+            ),
             AgentStarterEvidence(
                 key="candidate_raw_audio_remote_processing",
                 source=EvidenceSource.DERIVED,

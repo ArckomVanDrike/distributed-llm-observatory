@@ -447,6 +447,24 @@ def test_catalog_query_builder_maps_voice_pipeline_to_stt_and_tts_queries():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_stt",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses speech-to-text "
+                    "for speech input processing."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses text-to-speech "
+                    "for speech output generation."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_raw_audio_remote_processing",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -500,6 +518,24 @@ def test_catalog_query_builder_does_not_infer_deployment_for_hybrid_voice():
             "The hybrid voice architecture satisfies the requirements.",
         ],
         supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_stt",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses speech-to-text "
+                    "for speech input processing."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses text-to-speech "
+                    "for speech output generation."
+                ),
+            ),
             AgentStarterEvidence(
                 key="candidate_raw_audio_remote_processing",
                 source=EvidenceSource.DERIVED,
@@ -556,6 +592,24 @@ def test_catalog_query_builder_rejects_voice_without_transcript_boundary_evidenc
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_stt",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses speech-to-text "
+                    "for speech input processing."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The voice-pipeline architecture uses text-to-speech "
+                    "for speech output generation."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_raw_audio_remote_processing",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -570,8 +624,8 @@ def test_catalog_query_builder_rejects_voice_without_transcript_boundary_evidenc
     with pytest.raises(
         ValueError,
         match=(
-            "Voice catalog mapping requires exactly one "
-            "candidate_transcript_remote_processing evidence value"
+            "Voice stack mapping requires exactly one "
+            "candidate_transcript_remote_processing boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -860,5 +914,54 @@ def test_catalog_query_builder_routes_rag_validation_through_stack_requirements(
     ):
         build_agent_starter_catalog_queries(
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_routes_voice_validation_through_stack_requirements():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "STT usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The voice stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses text-to-speech.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Raw audio remains local.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Transcripts remain local.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Voice stack mapping requires exactly one "
+            "candidate_uses_stt evidence value equal to true"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.VOICE,
             assessment=assessment,
         )
