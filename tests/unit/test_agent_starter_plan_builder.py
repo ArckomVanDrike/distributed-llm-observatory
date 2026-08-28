@@ -204,3 +204,46 @@ def test_plan_builder_does_not_infer_conflict_from_recommendation_alone():
     )
 
     assert result.constraint_conflict is None
+
+
+def test_plan_builder_does_not_infer_conflict_from_different_blockers():
+    local_only = _local_only_requirement()
+
+    offline_evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    offline = AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[offline_evidence],
+    )
+
+    local_blocked = _blocked_candidate(
+        architecture_id="candidate_a",
+        requirement=local_only,
+    )
+    offline_blocked = _blocked_candidate(
+        architecture_id="candidate_b",
+        requirement=offline,
+    )
+
+    result = build_agent_starter_plan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            local_only,
+            offline,
+        ],
+        candidate_assessments=[
+            local_blocked,
+            offline_blocked,
+        ],
+    )
+
+    assert result.candidate_assessments == [
+        local_blocked,
+        offline_blocked,
+    ]
+    assert result.constraint_conflict is None
