@@ -62,6 +62,121 @@ def derive_agent_starter_requirements(
 def derive_agent_starter_capability_evidence(
     intake: AgentStarterIntake,
 ) -> list[AgentStarterEvidence]:
+    if intake.goal is AgentStarterGoal.KNOWLEDGE_RAG:
+        derived: list[AgentStarterEvidence] = []
+
+        corpus_is_very_small = bool(
+            _declared_true_evidence(
+                intake,
+                key="corpus_is_very_small",
+            )
+        )
+
+        if corpus_is_very_small:
+            reason = (
+                "A user-declared very small corpus can fit direct "
+                "context without requiring a retrieval pipeline."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="corpus_fits_direct_context",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
+                    ),
+                    AgentStarterEvidence(
+                        key="retrieval_required",
+                        source=EvidenceSource.DERIVED,
+                        value=False,
+                        reason=reason,
+                    ),
+                ]
+            )
+
+        documents_include_scanned_pages = bool(
+            _declared_true_evidence(
+                intake,
+                key="document_input_includes_scanned_pages",
+            )
+        )
+
+        if documents_include_scanned_pages:
+            derived.append(
+                AgentStarterEvidence(
+                    key="documents_include_scans",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user declared that document input "
+                        "includes scanned pages."
+                    ),
+                )
+            )
+
+        user_requires_citations = bool(
+            _declared_true_evidence(
+                intake,
+                key="user_requires_citations",
+            )
+        )
+
+        if user_requires_citations:
+            derived.append(
+                AgentStarterEvidence(
+                    key="citations_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user explicitly requires citations "
+                        "in knowledge answers."
+                    ),
+                )
+            )
+
+        knowledge_changes_frequently = bool(
+            _declared_true_evidence(
+                intake,
+                key="knowledge_changes_frequently",
+            )
+        )
+
+        if knowledge_changes_frequently:
+            derived.append(
+                AgentStarterEvidence(
+                    key="corpus_updates_frequent",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user declared that the knowledge "
+                        "corpus changes frequently."
+                    ),
+                )
+            )
+
+        exact_identifier_search_needed = bool(
+            _declared_true_evidence(
+                intake,
+                key="exact_identifier_search_needed",
+            )
+        )
+
+        if exact_identifier_search_needed:
+            derived.append(
+                AgentStarterEvidence(
+                    key="exact_identifier_lookup_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user requires exact identifier "
+                        "lookup in the knowledge corpus."
+                    ),
+                )
+            )
+
+        return derived
+
     if intake.goal is not AgentStarterGoal.CODING:
         return []
 

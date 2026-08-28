@@ -512,3 +512,380 @@ def test_coding_capability_rules_do_not_leak_into_other_goals():
     )
 
     assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_very_small_rag_corpus_derives_direct_context_without_retrieval():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="corpus_is_very_small",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "corpus_fits_direct_context",
+        "retrieval_required",
+    ]
+
+    assert derived[0].value is True
+    assert derived[1].value is False
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for evidence in derived
+    )
+    assert all(
+        evidence.reason
+        for evidence in derived
+    )
+
+
+def test_small_corpus_rag_rule_does_not_leak_into_other_goals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="corpus_is_very_small",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_false_small_corpus_claim_does_not_assume_retrieval_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="corpus_is_very_small",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_scanned_document_input_derives_rag_scan_requirement_evidence():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "documents_include_scans",
+    ]
+
+    evidence = derived[0]
+
+    assert evidence.source is EvidenceSource.DERIVED
+    assert evidence.value is True
+    assert evidence.reason
+
+
+def test_false_scanned_document_input_does_not_derive_scan_evidence():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_rag_scan_rule_does_not_leak_into_other_goals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_rag_capability_derivations_accumulate_independent_signals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="corpus_is_very_small",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "corpus_fits_direct_context",
+        "retrieval_required",
+        "documents_include_scans",
+    ]
+
+    assert [
+        evidence.value
+        for evidence in derived
+    ] == [
+        True,
+        False,
+        True,
+    ]
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for evidence in derived
+    )
+
+
+def test_rag_citation_request_derives_citations_required():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "citations_required",
+    ]
+    assert derived[0].source is EvidenceSource.DERIVED
+    assert derived[0].value is True
+    assert derived[0].reason
+
+
+def test_frequently_changing_knowledge_derives_update_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="knowledge_changes_frequently",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "corpus_updates_frequent",
+    ]
+    assert derived[0].source is EvidenceSource.DERIVED
+    assert derived[0].value is True
+    assert derived[0].reason
+
+
+def test_exact_identifier_search_derives_lookup_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="exact_identifier_search_needed",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "exact_identifier_lookup_required",
+    ]
+    assert derived[0].source is EvidenceSource.DERIVED
+    assert derived[0].value is True
+    assert derived[0].reason
+
+
+def test_false_rag_preferences_do_not_derive_requirements():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+            AgentStarterEvidence(
+                key="knowledge_changes_frequently",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+            AgentStarterEvidence(
+                key="exact_identifier_search_needed",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_observed_rag_preferences_do_not_derive_user_intent():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="knowledge_changes_frequently",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="exact_identifier_search_needed",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_rag_decision_evidence_has_canonical_order():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="exact_identifier_search_needed",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="knowledge_changes_frequently",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "citations_required",
+        "corpus_updates_frequent",
+        "exact_identifier_lookup_required",
+    ]
