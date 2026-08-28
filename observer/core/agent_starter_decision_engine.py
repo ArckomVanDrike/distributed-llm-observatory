@@ -244,6 +244,18 @@ def assess_automation_candidate(
         )
     )
 
+    availability_24_7_required = any(
+        evidence.key == "availability_24_7_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_not_always_available = any(
+        evidence.key == "candidate_always_available"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
     high_impact_actions = any(
         evidence.key == "destructive_or_high_impact_actions"
         and evidence.value is True
@@ -280,6 +292,26 @@ def assess_automation_candidate(
             recommendation_reasons=[
                 "Autonomous destructive or high-impact actions "
                 "without human approval are not recommended."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        availability_24_7_required
+        and candidate_explicitly_not_always_available
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate cannot satisfy the requested 24/7 "
+                "availability because its deployment is not "
+                "continuously available."
             ],
             supporting_evidence=supporting_evidence,
         )
