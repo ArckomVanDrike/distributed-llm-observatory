@@ -445,9 +445,70 @@ def assess_rag_candidate(
         )
     )
 
+    citations_required = any(
+        evidence.key == "citations_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_source_provenance = any(
+        evidence.key == "candidate_provides_source_provenance"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    source_provenance_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_provides_source_provenance"
+    ]
+
+    source_provenance_unknown = (
+        citations_required
+        and (
+            not source_provenance_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in source_provenance_evidence
+            )
+        )
+    )
+
     technical_reason = (
         "The candidate is technically feasible."
     )
+
+    if (
+        citations_required
+        and candidate_explicitly_lacks_source_provenance
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Citations are required, but the candidate does not "
+                "retain source provenance for retrieved evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if source_provenance_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Source provenance is unknown or insufficiently "
+                "established for the requested citations."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
 
     if (
         corpus_fits_direct_context
