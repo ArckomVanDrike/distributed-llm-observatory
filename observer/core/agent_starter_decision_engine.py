@@ -689,6 +689,58 @@ def assess_rag_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    knowledge_local_only_requirements = [
+        requirement
+        for requirement in requirements
+        if (
+            requirement.key == "knowledge_data_must_stay_local"
+            and requirement.value is True
+            and requirement.strength is ConstraintStrength.HARD
+        )
+    ]
+
+    candidate_knowledge_data_remote_processing = any(
+        evidence.key == "candidate_knowledge_data_remote_processing"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    knowledge_processing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_knowledge_data_remote_processing"
+    ]
+
+    knowledge_processing_unknown = (
+        bool(knowledge_local_only_requirements)
+        and (
+            not knowledge_processing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in knowledge_processing_evidence
+            )
+        )
+    )
+
+    if (
+        knowledge_local_only_requirements
+        and candidate_knowledge_data_remote_processing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate violates the hard requirement "
+                "that private knowledge data must stay local."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=knowledge_local_only_requirements,
+        )
+
     if (
         citations_required
         and candidate_explicitly_lacks_source_provenance
@@ -723,6 +775,62 @@ def assess_rag_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    if knowledge_processing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Compliance with the hard requirement that private "
+                "knowledge data must stay local cannot be verified "
+                "from the available evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=[],
+        )
+
+    if (
+        corpus_updates_frequent
+        and candidate_explicitly_lacks_incremental_indexing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The corpus changes frequently, but the candidate "
+                "does not support incremental indexing, making it "
+                "a poor operational fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        exact_identifier_lookup_required
+        and candidate_explicitly_lacks_lexical_or_hybrid_retrieval
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Exact identifier lookup is required, but the "
+                "candidate lacks lexical or hybrid retrieval, "
+                "making it a poor retrieval fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     if ocr_support_unknown:
         return CandidateArchitectureAssessment(
             architecture_id=architecture_id,
@@ -751,26 +859,6 @@ def assess_rag_candidate(
             supporting_evidence=supporting_evidence,
         )
 
-    if (
-        corpus_updates_frequent
-        and candidate_explicitly_lacks_incremental_indexing
-    ):
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=(
-                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
-            ),
-            confidence=RecommendationConfidence.HIGH,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "The corpus changes frequently, but the candidate "
-                "does not support incremental indexing, making it "
-                "a poor operational fit."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
-
     if incremental_indexing_unknown:
         return CandidateArchitectureAssessment(
             architecture_id=architecture_id,
@@ -782,26 +870,6 @@ def assess_rag_candidate(
                 "Incremental indexing support is unknown or "
                 "insufficiently established for the frequently "
                 "updated corpus."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
-
-    if (
-        exact_identifier_lookup_required
-        and candidate_explicitly_lacks_lexical_or_hybrid_retrieval
-    ):
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=(
-                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
-            ),
-            confidence=RecommendationConfidence.HIGH,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "Exact identifier lookup is required, but the "
-                "candidate lacks lexical or hybrid retrieval, "
-                "making it a poor retrieval fit."
             ],
             supporting_evidence=supporting_evidence,
         )

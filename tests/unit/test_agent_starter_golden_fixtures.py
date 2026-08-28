@@ -464,3 +464,129 @@ def test_golden_04_tiny_documents_rag_unnecessary():
         )
         assert assessment.confidence is candidate.expected_confidence
         assert assessment.blocking_requirements == []
+
+
+PRIVATE_KNOWLEDGE_LOCAL_ONLY_REQUIREMENT = AgentStarterRequirement(
+    key="knowledge_data_must_stay_local",
+    value=True,
+    strength=ConstraintStrength.HARD,
+    evidence=[
+        AgentStarterEvidence(
+            key="knowledge_data_local_only",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ],
+)
+
+
+def _private_medium_rag_evidence(
+    *,
+    candidate_knowledge_data_remote_processing: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The medium knowledge corpus does not fit "
+                "reliably in direct working context."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Retrieval is required for the medium "
+                "knowledge corpus."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate uses a retrieval pipeline."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="citations_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_provides_source_provenance",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Retrieved evidence retains source provenance "
+                "for citation."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_knowledge_data_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=candidate_knowledge_data_remote_processing,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether private knowledge data is processed "
+                "outside the observed device."
+            ),
+        ),
+    )
+
+
+GOLDEN_05_PRIVATE_MEDIUM_RAG = AgentStarterGoldenFixture(
+    fixture_id="golden-05-private-medium-rag",
+    goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    requirements=(PRIVATE_KNOWLEDGE_LOCAL_ONLY_REQUIREMENT,),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="local-private-rag",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_private_medium_rag_evidence(
+                candidate_knowledge_data_remote_processing=False,
+            ),
+            expected_recommendation=RecommendationVerdict.POSSIBLE,
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="remote-private-rag",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_private_medium_rag_evidence(
+                candidate_knowledge_data_remote_processing=True,
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+            expected_blocking_requirement_keys=(
+                "knowledge_data_must_stay_local",
+            ),
+        ),
+    ),
+)
+
+
+def test_golden_05_private_medium_rag():
+    fixture = GOLDEN_05_PRIVATE_MEDIUM_RAG
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.KNOWLEDGE_RAG
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert {
+            requirement.key
+            for requirement in assessment.blocking_requirements
+        } == set(candidate.expected_blocking_requirement_keys)
