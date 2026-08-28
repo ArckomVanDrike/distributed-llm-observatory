@@ -2014,3 +2014,136 @@ def test_missing_transcript_processing_does_not_assume_local_only_compliance():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _interruptible_voice_evidence(
+    *,
+    candidate_supports_barge_in_turn_management: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_barge_in_turn_management",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_barge_in_turn_management,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether interruptions and conversational turn "
+                "management are supported."
+            ),
+        ),
+    ]
+
+
+def test_interruptible_voice_with_turn_management_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="interruptible_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_interruptible_voice_evidence(
+            candidate_supports_barge_in_turn_management=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_interruptible_voice_without_turn_management_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="non_interruptible_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_interruptible_voice_evidence(
+            candidate_supports_barge_in_turn_management=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "interrupt" in reason.lower()
+        or "turn" in reason.lower()
+        or "barge" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_turn_management_limits_interruptible_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_barge_in_turn_management",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports barge-in or turn management."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "interrupt" in reason.lower()
+            or "turn" in reason.lower()
+            or "barge" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_turn_management_does_not_assume_interruptible_voice_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="interruptions_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "interrupt" in reason.lower()
+            or "turn" in reason.lower()
+            or "barge" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

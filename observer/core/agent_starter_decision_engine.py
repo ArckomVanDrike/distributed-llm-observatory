@@ -1100,6 +1100,71 @@ def assess_voice_candidate(
             blocking_requirements=[],
         )
 
+    interruptions_required = any(
+        evidence.key == "interruptions_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_barge_in_turn_management = any(
+        evidence.key == "candidate_supports_barge_in_turn_management"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    turn_management_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_barge_in_turn_management"
+    ]
+
+    turn_management_unknown = (
+        interruptions_required
+        and (
+            not turn_management_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in turn_management_evidence
+            )
+        )
+    )
+
+    if (
+        interruptions_required
+        and candidate_explicitly_lacks_barge_in_turn_management
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Interruptions are required, but the candidate "
+                "does not support barge-in or conversational "
+                "turn management."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if turn_management_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Barge-in or conversational turn management "
+                "support is unknown or insufficiently established "
+                "for the requested interruptions."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     realtime_voice_required = any(
         evidence.key == "realtime_voice_required"
         and evidence.value is True
