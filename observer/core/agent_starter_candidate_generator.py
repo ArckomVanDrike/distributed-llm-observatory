@@ -132,11 +132,22 @@ def _generate_coding_candidates(
         ),
     )
 
+    coding_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The coding-agent architecture uses an LLM "
+            "for coding assistance."
+        ),
+    )
+
     return [
         AgentStarterCandidateArchitecture(
             architecture_id="local-coding-agent",
             goal=AgentStarterGoal.CODING,
             evidence=[
+                coding_llm_usage,
                 local_evidence,
                 local_filesystem_read,
                 local_filesystem_write,
@@ -148,6 +159,7 @@ def _generate_coding_candidates(
             architecture_id="remote-coding-agent",
             goal=AgentStarterGoal.CODING,
             evidence=[
+                coding_llm_usage,
                 remote_evidence,
                 remote_filesystem_read,
                 remote_filesystem_write,
@@ -160,6 +172,16 @@ def _generate_coding_candidates(
 
 def _generate_rag_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    rag_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The knowledge-assistant architecture uses an LLM "
+            "for generation."
+        ),
+    )
+
     direct_context_evidence = AgentStarterEvidence(
         key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
@@ -184,19 +206,47 @@ def _generate_rag_candidates(
         AgentStarterCandidateArchitecture(
             architecture_id="direct-context-knowledge-assistant",
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
-            evidence=[direct_context_evidence],
+            evidence=[
+                rag_llm_usage,
+                direct_context_evidence,
+            ],
         ),
         AgentStarterCandidateArchitecture(
             architecture_id="full-rag-pipeline",
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
-            evidence=[full_rag_evidence],
+            evidence=[
+                rag_llm_usage,
+                full_rag_evidence,
+            ],
         ),
     ]
 
 
 def _generate_voice_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    voice_stt_usage = AgentStarterEvidence(
+        key="candidate_uses_stt",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses speech-to-text "
+            "for speech input processing."
+        ),
+    )
+
+    voice_tts_usage = AgentStarterEvidence(
+        key="candidate_uses_tts",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses text-to-speech "
+            "for speech output generation."
+        ),
+    )
+
     local_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
@@ -218,6 +268,8 @@ def _generate_voice_candidates(
     ]
 
     hybrid_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
@@ -239,6 +291,8 @@ def _generate_voice_candidates(
     ]
 
     cloud_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
@@ -357,7 +411,18 @@ def _generate_automation_candidates(
 
 def _generate_personal_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    personal_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The personal-assistant architecture uses an LLM "
+            "for language interaction."
+        ),
+    )
+
     session_only_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,
@@ -370,6 +435,7 @@ def _generate_personal_candidates(
     ]
 
     opaque_memory_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,
@@ -391,6 +457,7 @@ def _generate_personal_candidates(
     ]
 
     controlled_memory_evidence = [
+        personal_llm_usage,
         AgentStarterEvidence(
             key="candidate_supports_persistent_memory",
             source=EvidenceSource.DERIVED,

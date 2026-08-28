@@ -1,0 +1,158 @@
+{
+  "schema_version": "0.1",
+  "snapshot_id": "agent-starter-catalog-v0-1",
+  "generated_at": "2026-08-28T22:00:00+00:00",
+  "entries": [
+    {
+      "schema_version": "0.1",
+      "identifier": "qwen2.5-coder-7b-instruct",
+      "component_type": "llm",
+      "vendor": "Qwen",
+      "family": "Qwen2.5-Coder",
+      "version": "2.5",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following"
+      ],
+      "deployment_modes": [
+        "on_device",
+        "remote"
+      ],
+      "supported_runtimes": [
+        "transformers",
+        "vllm",
+        "sglang",
+        "llama.cpp",
+        "ollama",
+        "lm-studio"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 7.61,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072,
+        "long_context_support": true
+      },
+      "language_support": [
+        "en"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "privacy_implications": [
+        "Data exposure depends on selected deployment mode."
+      ],
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct"
+      ],
+      "verified_at": "2026-08-28T22:00:00+00:00"
+    },
+    {
+      "schema_version": "0.1",
+      "identifier": "ollama-v0.33.1",
+      "component_type": "runtime",
+      "vendor": "Ollama",
+      "family": "Ollama",
+      "version": "0.33.1",
+      "capabilities": [
+        "model_runtime",
+        "local_api"
+      ],
+      "deployment_modes": [
+        "on_device",
+        "remote"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {},
+      "context_characteristics": {},
+      "language_support": [],
+      "streaming_support": null,
+      "license": "MIT",
+      "pricing_class": "free",
+      "privacy_implications": [
+        "Local and cloud execution paths are distinct."
+      ],
+      "sources": [
+        "https://github.com/ollama/ollama/releases/tag/v0.33.1",
+        "https://github.com/ollama/ollama/blob/main/LICENSE",
+        "https://github.com/ollama/ollama/blob/main/docs/api/introduction.mdx"
+      ],
+      "verified_at": "2026-08-28T22:00:00+00:00"
+    },
+    {
+      "schema_version": "0.1",
+      "identifier": "whisper.cpp-v1.9.2",
+      "component_type": "stt",
+      "vendor": "ggml-org",
+      "family": "whisper.cpp",
+      "version": "1.9.2",
+      "capabilities": [
+        "speech_to_text",
+        "offline",
+        "realtime"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {},
+      "context_characteristics": {},
+      "language_support": [],
+      "streaming_support": true,
+      "license": "MIT",
+      "pricing_class": "free",
+      "privacy_implications": [
+        "Can perform speech recognition fully offline on-device."
+      ],
+      "sources": [
+        "https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.2",
+        "https://github.com/ggml-org/whisper.cpp/blob/master/README.md",
+        "https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE"
+      ],
+      "verified_at": "2026-08-28T22:00:00+00:00"
+    },
+    {
+      "schema_version": "0.1",
+      "identifier": "kokoro-82m-v1.0",
+      "component_type": "tts",
+      "vendor": "hexgrad",
+      "family": "Kokoro-82M",
+      "version": "1.0",
+      "capabilities": [
+        "text_to_speech"
+      ],
+      "deployment_modes": [
+        "on_device",
+        "remote"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {
+        "parameter_count_million": 82
+      },
+      "context_characteristics": {},
+      "language_support": [
+        "en",
+        "ja",
+        "zh",
+        "es",
+        "fr",
+        "hi",
+        "it",
+        "pt-BR"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "privacy_implications": [
+        "Data exposure depends on selected deployment mode."
+      ],
+      "sources": [
+        "https://huggingface.co/hexgrad/Kokoro-82M",
+        "https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md"
+      ],
+      "verified_at": "2026-08-28T22:00:00+00:00"
+    }
+  ]
+}
