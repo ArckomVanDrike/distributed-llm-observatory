@@ -757,3 +757,51 @@ def test_persistent_memory_requirement_is_satisfied_by_controlled_memory_candida
         assessments[0].status
         is TechnicalRequirementStatus.SATISFIED
     )
+
+
+def test_background_scheduling_requirement_remains_unknown_without_candidate_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="background_scheduling_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Proactive behavior requires scheduled "
+                    "or background execution capability."
+                ),
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="controlled-persistent-memory-assistant",
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate supports persistent memory.",
+            ),
+        ],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "background_scheduling_required"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNKNOWN
+    )

@@ -1518,3 +1518,36 @@ def test_cross_session_memory_derives_persistent_memory_requirement():
     )
     assert persistent_memory_required[0].value is True
     assert persistent_memory_required[0].reason
+
+
+def test_proactive_personal_behavior_derives_background_scheduling_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="proactive_behavior_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    scheduling_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "background_scheduling_required"
+    ]
+
+    assert len(scheduling_required) == 1
+    assert (
+        scheduling_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert scheduling_required[0].value is True
+    assert scheduling_required[0].reason

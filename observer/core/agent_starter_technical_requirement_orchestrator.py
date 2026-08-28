@@ -11,6 +11,9 @@ from schemas.agent_starter import (
 )
 
 _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
+    "background_scheduling_required": (
+        "candidate_supports_background_scheduling"
+    ),
     "persistent_memory_required": (
         "candidate_supports_persistent_memory"
     ),

@@ -263,27 +263,48 @@ def derive_agent_starter_capability_evidence(
         return derived
 
     if intake.goal is AgentStarterGoal.PERSONAL:
+        derived: list[AgentStarterEvidence] = []
+
         cross_session_memory_required = bool(
             _declared_true_evidence(
                 intake,
                 key="cross_session_memory_required",
             )
         )
-
-        if not cross_session_memory_required:
-            return []
-
-        return [
-            AgentStarterEvidence(
-                key="persistent_memory_required",
-                source=EvidenceSource.DERIVED,
-                value=True,
-                reason=(
-                    "Memory that must persist across sessions "
-                    "requires persistent memory capability."
-                ),
+        proactive_behavior_required = bool(
+            _declared_true_evidence(
+                intake,
+                key="proactive_behavior_required",
             )
-        ]
+        )
+
+        if cross_session_memory_required:
+            derived.append(
+                AgentStarterEvidence(
+                    key="persistent_memory_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "Memory that must persist across sessions "
+                        "requires persistent memory capability."
+                    ),
+                )
+            )
+
+        if proactive_behavior_required:
+            derived.append(
+                AgentStarterEvidence(
+                    key="background_scheduling_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "Proactive behavior requires scheduled "
+                        "or background execution capability."
+                    ),
+                )
+            )
+
+        return derived
 
     if intake.goal is AgentStarterGoal.AUTOMATION:
         workflow_deterministic = bool(

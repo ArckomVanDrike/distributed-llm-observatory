@@ -730,3 +730,63 @@ def test_required_cross_session_memory_rejects_session_only_candidate():
     ] == [
         "candidate_supports_persistent_memory",
     ]
+
+
+def test_proactive_behavior_without_background_scheduling_is_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="proactive_behavior_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="reactive-only-personal-assistant",
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_background_scheduling",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate does not support scheduled "
+                    "or background execution."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_background_scheduling",
+    ]
