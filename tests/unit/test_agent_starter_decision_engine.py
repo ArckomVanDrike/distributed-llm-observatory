@@ -1552,3 +1552,61 @@ def test_missing_lexical_or_hybrid_support_does_not_assume_exact_identifier_fit(
         )
         for reason in result.recommendation_reasons
     )
+
+
+def test_automation_not_feasible_cannot_be_recommended_by_workflow_fit():
+    result = assess_automation_candidate(
+        architecture_id="traditional_automation",
+        technical_feasibility=TechnicalFeasibility.NOT_FEASIBLE,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "not technically feasible" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_automation_limited_feasibility_cannot_be_strongly_recommended():
+    result = assess_automation_candidate(
+        architecture_id="traditional_automation",
+        technical_feasibility=TechnicalFeasibility.LIMITED,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert any(
+        "limited" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_automation_unknown_feasibility_cannot_be_recommended_from_workflow_fit():
+    result = assess_automation_candidate(
+        architecture_id="traditional_automation",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
