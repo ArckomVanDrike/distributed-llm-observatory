@@ -970,3 +970,74 @@ def test_agent_starter_prepared_input_allows_derived_evidence():
 
     assert prepared.evidence == [derived]
     assert prepared.evidence[0].source is EvidenceSource.DERIVED
+
+
+def test_agent_starter_candidate_architecture_records_identity_and_evidence():
+    from schemas.agent_starter import AgentStarterCandidateArchitecture
+
+    evidence = AgentStarterEvidence(
+        key="source_code_remote_processing",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The local architecture processes source code "
+            "inside the user-controlled environment."
+        ),
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[evidence],
+    )
+
+    assert candidate.architecture_id == "local-coding-agent"
+    assert candidate.goal is AgentStarterGoal.CODING
+    assert candidate.evidence == [evidence]
+
+
+def test_agent_starter_candidate_architecture_can_record_unknown_properties():
+    from schemas.agent_starter import AgentStarterCandidateArchitecture
+
+    unknown = AgentStarterEvidence(
+        key="candidate_meets_realtime_latency_requirement",
+        source=EvidenceSource.UNKNOWN,
+        value=None,
+        reason=(
+            "End-to-end latency has not yet been measured "
+            "for this architecture."
+        ),
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="mobile-voice-pipeline",
+        goal=AgentStarterGoal.VOICE,
+        evidence=[unknown],
+    )
+
+    assert candidate.evidence == [unknown]
+    assert candidate.evidence[0].source is EvidenceSource.UNKNOWN
+
+
+def test_agent_starter_candidate_architecture_can_start_without_evidence():
+    from schemas.agent_starter import AgentStarterCandidateArchitecture
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="traditional-automation",
+        goal=AgentStarterGoal.AUTOMATION,
+    )
+
+    assert candidate.evidence == []
+
+
+def test_agent_starter_candidate_architecture_rejects_empty_identifier():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import AgentStarterCandidateArchitecture
+
+    with pytest.raises(ValidationError):
+        AgentStarterCandidateArchitecture(
+            architecture_id="",
+            goal=AgentStarterGoal.PERSONAL,
+        )
