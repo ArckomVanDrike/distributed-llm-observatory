@@ -1632,6 +1632,15 @@ def _realtime_voice_evidence(
                 "whether streaming voice processing is supported."
             ),
         ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate meets the requested end-to-end "
+                "realtime latency requirement."
+            ),
+        ),
     ]
 
 
@@ -2141,6 +2150,147 @@ def test_missing_turn_management_does_not_assume_interruptible_voice_fit():
             or "turn" in reason.lower()
             or "barge" in reason.lower()
         )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _realtime_latency_voice_evidence(
+    *,
+    candidate_meets_realtime_latency_requirement: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.DERIVED,
+            value=candidate_meets_realtime_latency_requirement,
+            reason=(
+                "The candidate architecture has been assessed against "
+                "the requested end-to-end realtime latency requirement."
+            ),
+        ),
+    ]
+
+
+def test_realtime_voice_with_acceptable_end_to_end_latency_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="low_latency_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_latency_voice_evidence(
+            candidate_meets_realtime_latency_requirement=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_realtime_voice_with_unacceptable_end_to_end_latency_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="slow_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_latency_voice_evidence(
+            candidate_meets_realtime_latency_requirement=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "latency" in reason.lower()
+        or "realtime" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_realtime_latency_fit_limits_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate meets the realtime latency requirement."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "latency" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_realtime_latency_fit_does_not_assume_voice_suitability():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice processing.",
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "latency" in reason.lower()
         and (
             "unknown" in reason.lower()
             or "insufficient" in reason.lower()

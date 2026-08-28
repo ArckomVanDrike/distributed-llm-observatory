@@ -1201,6 +1201,30 @@ def assess_voice_candidate(
         )
     )
 
+    candidate_explicitly_misses_realtime_latency_requirement = any(
+        evidence.key == "candidate_meets_realtime_latency_requirement"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    realtime_latency_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_meets_realtime_latency_requirement"
+    ]
+
+    realtime_latency_unknown = (
+        realtime_voice_required
+        and (
+            not realtime_latency_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in realtime_latency_evidence
+            )
+        )
+    )
+
     if (
         realtime_voice_required
         and candidate_explicitly_lacks_streaming
@@ -1230,6 +1254,39 @@ def assess_voice_candidate(
             recommendation_reasons=[
                 "Streaming support is unknown or insufficiently "
                 "established for the requested realtime voice workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        realtime_voice_required
+        and candidate_explicitly_misses_realtime_latency_requirement
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate does not meet the requested "
+                "end-to-end realtime voice latency requirement."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if realtime_latency_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "End-to-end realtime voice latency suitability "
+                "is unknown or insufficiently established."
             ],
             supporting_evidence=supporting_evidence,
         )
