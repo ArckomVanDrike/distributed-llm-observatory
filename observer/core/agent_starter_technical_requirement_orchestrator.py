@@ -15,6 +15,9 @@ _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
     "filesystem_write": "candidate_supports_filesystem_write",
     "ocr_required": "candidate_supports_ocr",
     "shell_execution": "candidate_supports_shell_execution",
+    "source_provenance_required": (
+        "candidate_provides_source_provenance"
+    ),
     "test_execution": "candidate_supports_test_execution",
 }
 

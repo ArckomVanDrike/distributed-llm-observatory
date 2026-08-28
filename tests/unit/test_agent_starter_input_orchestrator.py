@@ -734,6 +734,7 @@ def test_rag_citation_request_derives_citations_required():
         for evidence in derived
     ] == [
         "citations_required",
+        "source_provenance_required",
     ]
     assert derived[0].source is EvidenceSource.DERIVED
     assert derived[0].value is True
@@ -889,6 +890,7 @@ def test_rag_decision_evidence_has_canonical_order():
         for evidence in derived
     ] == [
         "citations_required",
+        "source_provenance_required",
         "corpus_updates_frequent",
         "exact_identifier_lookup_required",
     ]
@@ -1412,3 +1414,36 @@ def test_scanned_rag_documents_derive_ocr_requirement():
     assert ocr_required[0].source is EvidenceSource.DERIVED
     assert ocr_required[0].value is True
     assert ocr_required[0].reason
+
+
+def test_rag_citations_derive_source_provenance_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    provenance_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "source_provenance_required"
+    ]
+
+    assert len(provenance_required) == 1
+    assert (
+        provenance_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert provenance_required[0].value is True
+    assert provenance_required[0].reason

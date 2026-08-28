@@ -137,16 +137,29 @@ def derive_agent_starter_capability_evidence(
         )
 
         if user_requires_citations:
-            derived.append(
-                AgentStarterEvidence(
-                    key="citations_required",
-                    source=EvidenceSource.DERIVED,
-                    value=True,
-                    reason=(
-                        "The user explicitly requires citations "
-                        "in knowledge answers."
+            reason = (
+                "The user explicitly requires citations "
+                "in knowledge answers."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="citations_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
                     ),
-                )
+                    AgentStarterEvidence(
+                        key="source_provenance_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Reliable citations require source "
+                            "provenance for supporting evidence."
+                        ),
+                    ),
+                ]
             )
 
         knowledge_changes_frequently = bool(

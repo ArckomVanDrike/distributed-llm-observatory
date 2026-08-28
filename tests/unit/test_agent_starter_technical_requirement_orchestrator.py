@@ -555,3 +555,50 @@ def test_ocr_requirement_remains_unknown_without_candidate_ocr_evidence():
         assessments[0].status
         is TechnicalRequirementStatus.UNKNOWN
     )
+
+
+def test_source_provenance_requirement_remains_unknown_without_candidate_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="source_provenance_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Reliable citations require source provenance."
+                ),
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="full-rag-pipeline",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_retrieval_pipeline",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses retrieval.",
+            ),
+        ],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "source_provenance_required"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNKNOWN
+    )

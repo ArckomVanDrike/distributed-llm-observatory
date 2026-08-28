@@ -554,3 +554,62 @@ def test_scanned_documents_with_explicitly_missing_ocr_are_not_feasible():
     ] == [
         "candidate_supports_ocr",
     ]
+
+
+def test_required_citations_without_source_provenance_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="rag-without-provenance",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_provides_source_provenance",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Candidate does not retain source provenance."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_provides_source_provenance",
+    ]
