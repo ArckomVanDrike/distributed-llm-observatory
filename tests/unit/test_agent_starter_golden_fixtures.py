@@ -1090,3 +1090,424 @@ def test_golden_10_supervised_email_automation():
         )
         assert assessment.confidence is candidate.expected_confidence
         assert assessment.blocking_requirements == []
+
+
+def _always_available_automation_evidence(
+    *,
+    candidate_always_available: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "This fixture does not assume a purely "
+                "deterministic workflow."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The automation requires semantic interpretation."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses an LLM.",
+        ),
+        AgentStarterEvidence(
+            key="availability_24_7_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_always_available",
+            source=EvidenceSource.DERIVED,
+            value=candidate_always_available,
+            reason=(
+                "The candidate deployment explicitly defines "
+                "whether it remains continuously available."
+            ),
+        ),
+    )
+
+
+GOLDEN_11_AUTOMATION_24_7_LAPTOP_NOT_ALWAYS_ON = (
+    AgentStarterGoldenFixture(
+        fixture_id="golden-11-automation-24-7-laptop-not-always-on",
+        goal=AgentStarterGoal.AUTOMATION,
+        requirements=(),
+        candidates=(
+            GoldenCandidate(
+                architecture_id="always-on-automation-service",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_always_available_automation_evidence(
+                    candidate_always_available=True,
+                ),
+                expected_recommendation=RecommendationVerdict.POSSIBLE,
+                expected_confidence=RecommendationConfidence.MEDIUM,
+            ),
+            GoldenCandidate(
+                architecture_id="laptop-hosted-automation",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_always_available_automation_evidence(
+                    candidate_always_available=False,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+            ),
+        ),
+    )
+)
+
+
+def test_golden_11_automation_24_7_laptop_not_always_on():
+    fixture = GOLDEN_11_AUTOMATION_24_7_LAPTOP_NOT_ALWAYS_ON
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.AUTOMATION
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+def _selective_persistent_personal_evidence(
+    *,
+    memory_controls: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate persists selected memory "
+                "across sessions."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.DERIVED,
+            value=memory_controls,
+            reason=(
+                "The candidate explicitly defines whether stored "
+                "memory can be inspected, edited, and deleted."
+            ),
+        ),
+    )
+
+
+GOLDEN_12_PERSONAL_SELECTIVE_PERSISTENT_MEMORY = (
+    AgentStarterGoldenFixture(
+        fixture_id="golden-12-personal-selective-persistent-memory",
+        goal=AgentStarterGoal.PERSONAL,
+        requirements=(),
+        candidates=(
+            GoldenCandidate(
+                architecture_id="controlled-persistent-memory-assistant",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_selective_persistent_personal_evidence(
+                    memory_controls=True,
+                ),
+                expected_recommendation=RecommendationVerdict.POSSIBLE,
+                expected_confidence=RecommendationConfidence.MEDIUM,
+            ),
+            GoldenCandidate(
+                architecture_id="opaque-persistent-memory-assistant",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_selective_persistent_personal_evidence(
+                    memory_controls=False,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+            ),
+        ),
+    )
+)
+
+
+def test_golden_12_personal_selective_persistent_memory():
+    fixture = GOLDEN_12_PERSONAL_SELECTIVE_PERSISTENT_MEMORY
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.PERSONAL
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+def _personal_retention_evidence(
+    *,
+    retains_all_conversations_indefinitely: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.DERIVED,
+            value=retains_all_conversations_indefinitely,
+            reason=(
+                "The candidate explicitly defines whether all "
+                "conversation history is retained indefinitely."
+            ),
+        ),
+    )
+
+
+GOLDEN_13_PERSONAL_INDEFINITE_RETENTION_UNNECESSARY = (
+    AgentStarterGoldenFixture(
+        fixture_id=(
+            "golden-13-personal-indefinite-retention-unnecessary"
+        ),
+        goal=AgentStarterGoal.PERSONAL,
+        requirements=(),
+        candidates=(
+            GoldenCandidate(
+                architecture_id="bounded-retention-personal-assistant",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_personal_retention_evidence(
+                    retains_all_conversations_indefinitely=False,
+                ),
+                expected_recommendation=RecommendationVerdict.POSSIBLE,
+                expected_confidence=RecommendationConfidence.MEDIUM,
+            ),
+            GoldenCandidate(
+                architecture_id="retain-everything-personal-assistant",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_personal_retention_evidence(
+                    retains_all_conversations_indefinitely=True,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+            ),
+        ),
+    )
+)
+
+
+def test_golden_13_personal_indefinite_retention_unnecessary():
+    fixture = GOLDEN_13_PERSONAL_INDEFINITE_RETENTION_UNNECESSARY
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.PERSONAL
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+GOLDEN_14_MOBILE_BROWSER_HARDWARE_UNKNOWN = AgentStarterGoldenFixture(
+    fixture_id="golden-14-mobile-browser-hardware-unknown",
+    goal=AgentStarterGoal.CODING,
+    requirements=(),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="mobile-browser-local-coding-agent",
+            technical_feasibility=TechnicalFeasibility.UNKNOWN,
+            evidence=(
+                AgentStarterEvidence(
+                    key="environment_is_mobile_browser",
+                    source=EvidenceSource.DECLARED,
+                    value=True,
+                ),
+                AgentStarterEvidence(
+                    key="important_hardware_information_available",
+                    source=EvidenceSource.UNKNOWN,
+                    value=None,
+                    reason=(
+                        "The browser environment cannot expose enough "
+                        "hardware information to establish local "
+                        "technical feasibility."
+                    ),
+                ),
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "The candidate is intended to process source "
+                        "code locally if the device proves capable."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.LIMITED,
+        ),
+    ),
+)
+
+
+def test_golden_14_mobile_browser_hardware_unknown():
+    fixture = GOLDEN_14_MOBILE_BROWSER_HARDWARE_UNKNOWN
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.CODING
+    assert plan.constraint_conflict is None
+
+    assessment = plan.candidate_assessments[0]
+    candidate = fixture.candidates[0]
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert (
+        assessment.recommendation
+        is candidate.expected_recommendation
+    )
+    assert assessment.confidence is candidate.expected_confidence
+    assert assessment.blocking_requirements == []
+
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in assessment.recommendation_reasons
+    )
+
+
+GOLDEN_15_HARD_CONSTRAINT_CONFLICT = AgentStarterGoldenFixture(
+    fixture_id="golden-15-hard-constraint-conflict",
+    goal=AgentStarterGoal.CODING,
+    requirements=(LOCAL_CODE_REQUIREMENT,),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="remote-cloud-coding-agent-a",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The candidate sends source code outside "
+                        "the observed device."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+            expected_blocking_requirement_keys=(
+                "source_code_must_stay_local",
+            ),
+        ),
+        GoldenCandidate(
+            architecture_id="remote-cloud-coding-agent-b",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The alternative candidate also sends "
+                        "source code outside the observed device."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+            expected_blocking_requirement_keys=(
+                "source_code_must_stay_local",
+            ),
+        ),
+    ),
+    expected_constraint_conflict=True,
+)
+
+
+def test_golden_15_hard_constraint_conflict():
+    fixture = GOLDEN_15_HARD_CONSTRAINT_CONFLICT
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.CODING
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert {
+            requirement.key
+            for requirement in assessment.blocking_requirements
+        } == set(candidate.expected_blocking_requirement_keys)
+
+    assert fixture.expected_constraint_conflict is True
+    assert plan.constraint_conflict is not None
+
+    assert {
+        requirement.key
+        for requirement in plan.constraint_conflict.conflicting_requirements
+    } == {
+        "source_code_must_stay_local",
+    }
+
+    assert plan.constraint_conflict.summary
+    assert plan.constraint_conflict.resolution_options
