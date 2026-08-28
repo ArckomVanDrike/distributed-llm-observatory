@@ -590,3 +590,503 @@ def test_golden_05_private_medium_rag():
             requirement.key
             for requirement in assessment.blocking_requirements
         } == set(candidate.expected_blocking_requirement_keys)
+
+
+def _large_multi_user_rag_evidence() -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The large shared corpus does not fit reliably "
+                "in direct working context."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Retrieval is required for the large multi-user corpus."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="citations_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_provides_source_provenance",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Retrieved evidence preserves source provenance "
+                "for citations."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_incremental_indexing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate supports incremental indexing "
+                "for frequently updated shared content."
+            ),
+        ),
+    )
+
+
+GOLDEN_06_LARGE_MULTI_USER_RAG_CLOUD_ALLOWED = AgentStarterGoldenFixture(
+    fixture_id="golden-06-large-multi-user-rag-cloud-allowed",
+    goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    requirements=(),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="local-large-rag",
+            technical_feasibility=TechnicalFeasibility.LIMITED,
+            evidence=_large_multi_user_rag_evidence(),
+            expected_recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="cloud-large-rag",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_large_multi_user_rag_evidence(),
+            expected_recommendation=RecommendationVerdict.POSSIBLE,
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+    ),
+)
+
+
+def test_golden_06_large_multi_user_rag_cloud_allowed():
+    fixture = GOLDEN_06_LARGE_MULTI_USER_RAG_CLOUD_ALLOWED
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.KNOWLEDGE_RAG
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+RAW_AUDIO_LOCAL_ONLY_REQUIREMENT = AgentStarterRequirement(
+    key="raw_audio_must_stay_local",
+    value=True,
+    strength=ConstraintStrength.HARD,
+    evidence=[
+        AgentStarterEvidence(
+            key="raw_audio_local_only",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ],
+)
+
+
+TRANSCRIPT_LOCAL_ONLY_REQUIREMENT = AgentStarterRequirement(
+    key="transcript_must_stay_local",
+    value=True,
+    strength=ConstraintStrength.HARD,
+    evidence=[
+        AgentStarterEvidence(
+            key="transcript_local_only",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ],
+)
+
+
+def _realtime_voice_evidence(
+    *,
+    raw_audio_remote: bool,
+    transcript_remote: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate supports streaming voice interaction.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_meets_realtime_latency_requirement",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate meets the explicit realtime latency "
+                "requirement for this fixture."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=raw_audio_remote,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether raw audio is processed remotely."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=transcript_remote,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether transcript data is processed remotely."
+            ),
+        ),
+    )
+
+
+GOLDEN_07_REALTIME_OFFLINE_VOICE_CONSTRAINED = AgentStarterGoldenFixture(
+    fixture_id="golden-07-realtime-offline-voice-constrained",
+    goal=AgentStarterGoal.VOICE,
+    requirements=(
+        RAW_AUDIO_LOCAL_ONLY_REQUIREMENT,
+        TRANSCRIPT_LOCAL_ONLY_REQUIREMENT,
+    ),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="local-offline-voice",
+            technical_feasibility=TechnicalFeasibility.LIMITED,
+            evidence=_realtime_voice_evidence(
+                raw_audio_remote=False,
+                transcript_remote=False,
+            ),
+            expected_recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="remote-realtime-voice",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_realtime_voice_evidence(
+                raw_audio_remote=True,
+                transcript_remote=True,
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+            expected_blocking_requirement_keys=(
+                "raw_audio_must_stay_local",
+            ),
+        ),
+    ),
+)
+
+
+def test_golden_07_realtime_offline_voice_constrained():
+    fixture = GOLDEN_07_REALTIME_OFFLINE_VOICE_CONSTRAINED
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.VOICE
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert {
+            requirement.key
+            for requirement in assessment.blocking_requirements
+        } == set(candidate.expected_blocking_requirement_keys)
+
+
+GOLDEN_08_HYBRID_VOICE_LOCAL_AUDIO_REMOTE_TRANSCRIPT = (
+    AgentStarterGoldenFixture(
+        fixture_id=(
+            "golden-08-hybrid-voice-local-audio-remote-transcript"
+        ),
+        goal=AgentStarterGoal.VOICE,
+        requirements=(RAW_AUDIO_LOCAL_ONLY_REQUIREMENT,),
+        candidates=(
+            GoldenCandidate(
+                architecture_id="local-stt-remote-llm-voice",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_realtime_voice_evidence(
+                    raw_audio_remote=False,
+                    transcript_remote=True,
+                ),
+                expected_recommendation=RecommendationVerdict.POSSIBLE,
+                expected_confidence=RecommendationConfidence.MEDIUM,
+            ),
+            GoldenCandidate(
+                architecture_id="remote-stt-remote-llm-voice",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_realtime_voice_evidence(
+                    raw_audio_remote=True,
+                    transcript_remote=True,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.NOT_RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+                expected_blocking_requirement_keys=(
+                    "raw_audio_must_stay_local",
+                ),
+            ),
+        ),
+    )
+)
+
+
+def test_golden_08_hybrid_voice_local_audio_remote_transcript():
+    fixture = (
+        GOLDEN_08_HYBRID_VOICE_LOCAL_AUDIO_REMOTE_TRANSCRIPT
+    )
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.VOICE
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert {
+            requirement.key
+            for requirement in assessment.blocking_requirements
+        } == set(candidate.expected_blocking_requirement_keys)
+
+
+def _deterministic_automation_evidence(
+    *,
+    candidate_uses_llm: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The workflow follows deterministic rules "
+                "with explicit inputs and actions."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The workflow does not require semantic "
+                "interpretation."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=candidate_uses_llm,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether an LLM participates in execution."
+            ),
+        ),
+    )
+
+
+GOLDEN_09_DETERMINISTIC_WORKFLOW_AI_UNNECESSARY = (
+    AgentStarterGoldenFixture(
+        fixture_id="golden-09-deterministic-workflow-ai-unnecessary",
+        goal=AgentStarterGoal.AUTOMATION,
+        requirements=(),
+        candidates=(
+            GoldenCandidate(
+                architecture_id="traditional-deterministic-automation",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_deterministic_automation_evidence(
+                    candidate_uses_llm=False,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+            ),
+            GoldenCandidate(
+                architecture_id="llm-agent-deterministic-automation",
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                evidence=_deterministic_automation_evidence(
+                    candidate_uses_llm=True,
+                ),
+                expected_recommendation=(
+                    RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+                ),
+                expected_confidence=RecommendationConfidence.HIGH,
+            ),
+        ),
+    )
+)
+
+
+def test_golden_09_deterministic_workflow_ai_unnecessary():
+    fixture = GOLDEN_09_DETERMINISTIC_WORKFLOW_AI_UNNECESSARY
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.AUTOMATION
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+def _email_automation_evidence(
+    *,
+    autonomous_execution: bool,
+    human_approval_required: bool,
+) -> tuple[AgentStarterEvidence, ...]:
+    return (
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "Email handling is not fully deterministic because "
+                "message content requires interpretation."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Email content requires semantic interpretation "
+                "before a response can be prepared."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate uses an LLM to interpret and draft "
+                "email content."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="destructive_or_high_impact_actions",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Sending email externally is treated as a "
+                "high-impact write action in this fixture."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_executes_autonomously",
+            source=EvidenceSource.DERIVED,
+            value=autonomous_execution,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether outbound email can be sent autonomously."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="human_approval_required",
+            source=EvidenceSource.DECLARED,
+            value=human_approval_required,
+        ),
+    )
+
+
+GOLDEN_10_SUPERVISED_EMAIL_AUTOMATION = AgentStarterGoldenFixture(
+    fixture_id="golden-10-supervised-email-automation",
+    goal=AgentStarterGoal.AUTOMATION,
+    requirements=(),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="supervised-email-assistant",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_email_automation_evidence(
+                autonomous_execution=False,
+                human_approval_required=True,
+            ),
+            expected_recommendation=RecommendationVerdict.POSSIBLE,
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="autonomous-email-sender",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=_email_automation_evidence(
+                autonomous_execution=True,
+                human_approval_required=False,
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+        ),
+    ),
+)
+
+
+def test_golden_10_supervised_email_automation():
+    fixture = GOLDEN_10_SUPERVISED_EMAIL_AUTOMATION
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.AUTOMATION
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
