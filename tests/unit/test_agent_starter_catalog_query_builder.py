@@ -29,6 +29,15 @@ def test_catalog_query_builder_maps_coding_assessment_to_llm_query():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding-agent architecture uses an LLM "
+                    "for coding assistance."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="source_code_remote_processing",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -695,5 +704,45 @@ def test_catalog_query_builder_rejects_conflicting_personal_memory_evidence():
     ):
         build_agent_starter_catalog_queries(
             goal=AgentStarterGoal.PERSONAL,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_rejects_coding_without_llm_usage_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "LLM usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="unrelated_evidence",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The assessment contains evidence, "
+                    "but not LLM-usage evidence."
+                ),
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Coding stack mapping requires exactly one "
+            "candidate_uses_llm evidence value equal to true"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.CODING,
             assessment=assessment,
         )
