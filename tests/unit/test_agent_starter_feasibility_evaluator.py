@@ -497,3 +497,60 @@ def test_evaluator_keeps_missing_candidate_capability_unknown_automatically():
         assessment.technical_feasibility
         is not TechnicalFeasibility.NOT_FEASIBLE
     )
+
+
+def test_scanned_documents_with_explicitly_missing_ocr_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="rag-without-ocr",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_ocr",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Candidate does not provide OCR.",
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_ocr",
+    ]

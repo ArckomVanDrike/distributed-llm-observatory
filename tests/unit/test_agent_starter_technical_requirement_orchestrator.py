@@ -508,3 +508,50 @@ def test_maps_test_execution_capability_to_candidate_evidence():
         is TechnicalRequirementStatus.SATISFIED
     )
     assert assessments[0].supporting_evidence == [support]
+
+
+def test_ocr_requirement_remains_unknown_without_candidate_ocr_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="ocr_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Scanned document pages require OCR capability."
+                ),
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="full-rag-pipeline",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_retrieval_pipeline",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses retrieval.",
+            ),
+        ],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "ocr_required"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNKNOWN
+    )

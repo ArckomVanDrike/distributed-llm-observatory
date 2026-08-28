@@ -614,6 +614,7 @@ def test_scanned_document_input_derives_rag_scan_requirement_evidence():
         for evidence in derived
     ] == [
         "documents_include_scans",
+        "ocr_required",
     ]
 
     evidence = derived[0]
@@ -691,6 +692,7 @@ def test_rag_capability_derivations_accumulate_independent_signals():
         "corpus_fits_direct_context",
         "retrieval_required",
         "documents_include_scans",
+        "ocr_required",
     ]
 
     assert [
@@ -699,6 +701,7 @@ def test_rag_capability_derivations_accumulate_independent_signals():
     ] == [
         True,
         False,
+        True,
         True,
     ]
 
@@ -1379,3 +1382,33 @@ def test_prepare_agent_starter_input_does_not_mutate_intake():
         "workflow_deterministic",
         "semantic_interpretation_required",
     ]
+
+
+def test_scanned_rag_documents_derive_ocr_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    ocr_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "ocr_required"
+    ]
+
+    assert len(ocr_required) == 1
+    assert ocr_required[0].source is EvidenceSource.DERIVED
+    assert ocr_required[0].value is True
+    assert ocr_required[0].reason

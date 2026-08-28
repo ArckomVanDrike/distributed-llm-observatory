@@ -104,16 +104,29 @@ def derive_agent_starter_capability_evidence(
         )
 
         if documents_include_scanned_pages:
-            derived.append(
-                AgentStarterEvidence(
-                    key="documents_include_scans",
-                    source=EvidenceSource.DERIVED,
-                    value=True,
-                    reason=(
-                        "The user declared that document input "
-                        "includes scanned pages."
+            reason = (
+                "The user declared that document input includes "
+                "scanned pages."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="documents_include_scans",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
                     ),
-                )
+                    AgentStarterEvidence(
+                        key="ocr_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Scanned document pages require OCR "
+                            "capability for text extraction."
+                        ),
+                    ),
+                ]
             )
 
         user_requires_citations = bool(
