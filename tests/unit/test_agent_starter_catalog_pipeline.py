@@ -148,6 +148,15 @@ def test_catalog_pipeline_preserves_coding_query_with_zero_matches():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding-agent architecture uses an LLM "
+                    "for coding assistance."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="source_code_remote_processing",
                 source=EvidenceSource.DERIVED,
                 value=False,

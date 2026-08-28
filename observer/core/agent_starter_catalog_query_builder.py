@@ -35,30 +35,16 @@ def build_agent_starter_catalog_queries(
         ]
 
     if goal is AgentStarterGoal.AUTOMATION:
-        candidate_uses_llm = [
-            evidence.value
-            for evidence in assessment.supporting_evidence
-            if evidence.key == "candidate_uses_llm"
-        ]
-
-        if (
-            len(candidate_uses_llm) != 1
-            or not isinstance(candidate_uses_llm[0], bool)
-        ):
-            raise ValueError(
-                "Automation catalog mapping requires exactly one "
-                "candidate_uses_llm evidence value."
-            )
-
-        if candidate_uses_llm[0] is False:
-            return []
+        requirements = build_agent_starter_stack_requirements(
+            goal=goal,
+            assessment=assessment,
+        )
 
         return [
-            AgentStarterCatalogQuery(
-                component_type=(
-                    AgentStarterCatalogComponentType.LLM
-                ),
+            map_agent_starter_stack_requirement_to_catalog_query(
+                requirement
             )
+            for requirement in requirements
         ]
 
     if goal is AgentStarterGoal.KNOWLEDGE_RAG:

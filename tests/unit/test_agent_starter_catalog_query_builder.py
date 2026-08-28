@@ -176,8 +176,8 @@ def test_catalog_query_builder_rejects_automation_without_llm_usage_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Automation catalog mapping requires exactly one "
-            "candidate_uses_llm evidence value"
+            "Automation stack mapping requires exactly one "
+            "candidate_uses_llm boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -219,8 +219,8 @@ def test_catalog_query_builder_rejects_conflicting_automation_llm_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Automation catalog mapping requires exactly one "
-            "candidate_uses_llm evidence value"
+            "Automation stack mapping requires exactly one "
+            "candidate_uses_llm boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -744,5 +744,45 @@ def test_catalog_query_builder_rejects_coding_without_llm_usage_evidence():
     ):
         build_agent_starter_catalog_queries(
             goal=AgentStarterGoal.CODING,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_routes_automation_validation_through_stack_requirements():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="unknown-automation",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "LLM usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="unrelated_evidence",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The assessment contains evidence, "
+                    "but not LLM-usage evidence."
+                ),
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Automation stack mapping requires exactly one "
+            "candidate_uses_llm boolean evidence value"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.AUTOMATION,
             assessment=assessment,
         )
