@@ -182,3 +182,132 @@ def test_assessment_orchestrator_preserves_technical_supporting_evidence():
 
     for evidence in feasibility.supporting_evidence:
         assert evidence in assessment.supporting_evidence
+
+
+def test_assessment_orchestrator_uses_candidate_specific_compatibility():
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary=(
+            "The local candidate has sufficient technical "
+            "headroom."
+        ),
+        confidence=0.6,
+    )
+
+    assessments = assess_agent_starter_candidates(
+        prepared=prepared,
+        compatibility_by_architecture={
+            "local-coding-agent": compatibility,
+        },
+    )
+
+    local = next(
+        assessment
+        for assessment in assessments
+        if assessment.architecture_id == "local-coding-agent"
+    )
+
+    remote = next(
+        assessment
+        for assessment in assessments
+        if assessment.architecture_id == "remote-coding-agent"
+    )
+
+    assert (
+        local.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert (
+        remote.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+
+
+def test_assessment_orchestrator_preserves_compatibility_evidence():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary=(
+            "The local candidate has sufficient technical "
+            "headroom."
+        ),
+        confidence=0.6,
+    )
+
+    candidate = next(
+        candidate
+        for candidate in generate_agent_starter_candidates(prepared)
+        if candidate.architecture_id == "local-coding-agent"
+    )
+
+    feasibility = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+        compatibility_assessment=compatibility,
+    )
+
+    assessments = assess_agent_starter_candidates(
+        prepared=prepared,
+        compatibility_by_architecture={
+            candidate.architecture_id: compatibility,
+        },
+    )
+
+    assessment = next(
+        assessment
+        for assessment in assessments
+        if assessment.architecture_id == candidate.architecture_id
+    )
+
+    compatibility_evidence = next(
+        evidence
+        for evidence in feasibility.supporting_evidence
+        if evidence.key == "candidate_compatibility_verdict"
+    )
+
+    assert compatibility_evidence in assessment.supporting_evidence

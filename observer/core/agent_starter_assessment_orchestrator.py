@@ -13,18 +13,31 @@ from schemas.agent_starter import (
     AgentStarterPreparedInput,
     CandidateArchitectureAssessment,
 )
+from schemas.compatibility import CompatibilityAssessment
 
 
 def assess_agent_starter_candidates(
     *,
     prepared: AgentStarterPreparedInput,
+    compatibility_by_architecture: (
+        dict[str, CompatibilityAssessment] | None
+    ) = None,
 ) -> list[CandidateArchitectureAssessment]:
     assessments: list[CandidateArchitectureAssessment] = []
 
     for candidate in generate_agent_starter_candidates(prepared):
+        compatibility_assessment = None
+        if compatibility_by_architecture is not None:
+            compatibility_assessment = (
+                compatibility_by_architecture.get(
+                    candidate.architecture_id
+                )
+            )
+
         feasibility = evaluate_agent_starter_technical_feasibility(
             prepared=prepared,
             candidate=candidate,
+            compatibility_assessment=compatibility_assessment,
         )
 
         assessment = assess_agent_starter_candidate(
@@ -40,9 +53,18 @@ def assess_agent_starter_candidates(
             ],
         )
 
+        supporting_evidence = list(
+            assessment.supporting_evidence
+        )
+
+        for evidence in feasibility.supporting_evidence:
+            if evidence not in supporting_evidence:
+                supporting_evidence.append(evidence)
+
         assessment = assessment.model_copy(
             update={
                 "technical_reasons": list(feasibility.reasons),
+                "supporting_evidence": supporting_evidence,
             }
         )
 
