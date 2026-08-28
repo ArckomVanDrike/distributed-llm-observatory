@@ -92,6 +92,26 @@ def _generate_coding_candidates(
         ),
     )
 
+    local_shell_execution = AgentStarterEvidence(
+        key="candidate_supports_shell_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes shell "
+            "execution capability."
+        ),
+    )
+
+    remote_shell_execution = AgentStarterEvidence(
+        key="candidate_supports_shell_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes shell "
+            "execution capability."
+        ),
+    )
+
     return [
         AgentStarterCandidateArchitecture(
             architecture_id="local-coding-agent",
@@ -100,6 +120,7 @@ def _generate_coding_candidates(
                 local_evidence,
                 local_filesystem_read,
                 local_filesystem_write,
+                local_shell_execution,
             ],
         ),
         AgentStarterCandidateArchitecture(
@@ -109,6 +130,7 @@ def _generate_coding_candidates(
                 remote_evidence,
                 remote_filesystem_read,
                 remote_filesystem_write,
+                remote_shell_execution,
             ],
         ),
     ]

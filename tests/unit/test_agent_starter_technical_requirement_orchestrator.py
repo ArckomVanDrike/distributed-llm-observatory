@@ -125,10 +125,10 @@ def test_unmapped_derived_capability_is_not_silently_inferred():
         goal=AgentStarterGoal.CODING,
         evidence=[
             AgentStarterEvidence(
-                key="shell_execution",
+                key="test_execution",
                 source=EvidenceSource.DERIVED,
                 value=True,
-                reason="Running tests requires shell execution.",
+                reason="Running tests requires test execution.",
             ),
         ],
     )
@@ -145,7 +145,6 @@ def test_unmapped_derived_capability_is_not_silently_inferred():
         )
         == []
     )
-
 
 def test_declared_evidence_is_not_reinterpreted_as_derived_capability():
     from observer.core.agent_starter_technical_requirement_orchestrator import (
@@ -358,4 +357,107 @@ def test_real_modify_files_intent_assesses_both_filesystem_capabilities():
         assessment.status
         is TechnicalRequirementStatus.SATISFIED
         for assessment in assessments
+    )
+
+
+def test_maps_shell_execution_capability_to_candidate_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="shell_execution",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="Running tests requires shell execution.",
+            ),
+        ],
+    )
+
+    support = AgentStarterEvidence(
+        key="candidate_supports_shell_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="Candidate provides shell execution.",
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[support],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "shell_execution"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.SATISFIED
+    )
+    assert assessments[0].supporting_evidence == [support]
+
+
+def test_real_run_tests_intent_assesses_shell_but_not_unmapped_test_execution():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    local_candidate, _ = generate_agent_starter_candidates(
+        prepared
+    )
+
+    assert [
+        evidence.key
+        for evidence in prepared.evidence
+    ] == [
+        "run_tests",
+        "shell_execution",
+        "test_execution",
+    ]
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=local_candidate,
+        )
+    )
+
+    assert [
+        assessment.key
+        for assessment in assessments
+    ] == [
+        "shell_execution",
+    ]
+
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.SATISFIED
     )
