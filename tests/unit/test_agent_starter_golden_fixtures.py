@@ -216,3 +216,251 @@ def test_agent_starter_dispatches_all_supported_goals(monkeypatch):
         assert result.architecture_id == f"{goal.value}-candidate"
 
     assert calls == list(routes)
+
+
+GOLDEN_02_CPU_ONLY_CODING_CLOUD_ALLOWED = AgentStarterGoldenFixture(
+    fixture_id="golden-02-cpu-only-coding-cloud-allowed",
+    goal=AgentStarterGoal.CODING,
+    requirements=(),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="local-cpu-coding-agent",
+            technical_feasibility=TechnicalFeasibility.LIMITED,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "The local architecture keeps source code "
+                        "on the observed CPU-only device."
+                    ),
+                ),
+            ),
+            expected_recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="cloud-coding-agent",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The cloud architecture processes source code "
+                        "remotely, which is allowed in this scenario."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.POSSIBLE,
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+    ),
+)
+
+
+def test_golden_02_cpu_only_coding_cloud_allowed():
+    fixture = GOLDEN_02_CPU_ONLY_CODING_CLOUD_ALLOWED
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.CODING
+    assert plan.constraint_conflict is None
+
+    assert [
+        assessment.architecture_id
+        for assessment in plan.candidate_assessments
+    ] == [
+        "local-cpu-coding-agent",
+        "cloud-coding-agent",
+    ]
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
+
+
+GOLDEN_03_CPU_ONLY_CODING_LOCAL_ONLY = AgentStarterGoldenFixture(
+    fixture_id="golden-03-cpu-only-coding-local-only",
+    goal=AgentStarterGoal.CODING,
+    requirements=(LOCAL_CODE_REQUIREMENT,),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="local-cpu-coding-agent",
+            technical_feasibility=TechnicalFeasibility.LIMITED,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "The local architecture keeps source code "
+                        "on the observed CPU-only device."
+                    ),
+                ),
+            ),
+            expected_recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            expected_confidence=RecommendationConfidence.MEDIUM,
+        ),
+        GoldenCandidate(
+            architecture_id="cloud-coding-agent",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="source_code_remote_processing",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The cloud architecture would send source "
+                        "code outside the observed device."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+            expected_blocking_requirement_keys=(
+                "source_code_must_stay_local",
+            ),
+        ),
+    ),
+)
+
+
+def test_golden_03_cpu_only_coding_local_only():
+    fixture = GOLDEN_03_CPU_ONLY_CODING_LOCAL_ONLY
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.CODING
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert {
+            requirement.key
+            for requirement in assessment.blocking_requirements
+        } == set(candidate.expected_blocking_requirement_keys)
+
+
+GOLDEN_04_TINY_DOCUMENTS_RAG_UNNECESSARY = AgentStarterGoldenFixture(
+    fixture_id="golden-04-tiny-documents-rag-unnecessary",
+    goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    requirements=(),
+    candidates=(
+        GoldenCandidate(
+            architecture_id="direct-context-knowledge-assistant",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="corpus_fits_direct_context",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The document collection is small enough "
+                        "to fit directly in the working context."
+                    ),
+                ),
+                AgentStarterEvidence(
+                    key="retrieval_required",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "A retrieval layer is not required for "
+                        "this small document collection."
+                    ),
+                ),
+                AgentStarterEvidence(
+                    key="candidate_uses_retrieval_pipeline",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "The candidate uses direct context instead "
+                        "of a retrieval pipeline."
+                    ),
+                ),
+            ),
+            expected_recommendation=RecommendationVerdict.RECOMMENDED,
+            expected_confidence=RecommendationConfidence.HIGH,
+        ),
+        GoldenCandidate(
+            architecture_id="full-rag-pipeline",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            evidence=(
+                AgentStarterEvidence(
+                    key="corpus_fits_direct_context",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The document collection is small enough "
+                        "to fit directly in the working context."
+                    ),
+                ),
+                AgentStarterEvidence(
+                    key="retrieval_required",
+                    source=EvidenceSource.DERIVED,
+                    value=False,
+                    reason=(
+                        "A retrieval layer is not required for "
+                        "this small document collection."
+                    ),
+                ),
+                AgentStarterEvidence(
+                    key="candidate_uses_retrieval_pipeline",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The candidate introduces a full retrieval "
+                        "pipeline despite the corpus fitting context."
+                    ),
+                ),
+            ),
+            expected_recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            expected_confidence=RecommendationConfidence.HIGH,
+        ),
+    ),
+)
+
+
+def test_golden_04_tiny_documents_rag_unnecessary():
+    fixture = GOLDEN_04_TINY_DOCUMENTS_RAG_UNNECESSARY
+
+    plan = _run_golden_fixture(fixture)
+
+    assert plan.goal is AgentStarterGoal.KNOWLEDGE_RAG
+    assert plan.constraint_conflict is None
+
+    for candidate, assessment in zip(
+        fixture.candidates,
+        plan.candidate_assessments,
+        strict=True,
+    ):
+        assert (
+            assessment.recommendation
+            is candidate.expected_recommendation
+        )
+        assert assessment.confidence is candidate.expected_confidence
+        assert assessment.blocking_requirements == []
