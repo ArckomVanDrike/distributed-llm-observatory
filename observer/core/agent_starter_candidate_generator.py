@@ -69,7 +69,7 @@ def _generate_coding_candidates(
 def _generate_rag_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
     direct_context_evidence = AgentStarterEvidence(
-        key="candidate_uses_retrieval",
+        key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
         value=False,
         reason=(
@@ -79,7 +79,7 @@ def _generate_rag_candidates(
     )
 
     full_rag_evidence = AgentStarterEvidence(
-        key="candidate_uses_retrieval",
+        key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
         value=True,
         reason=(

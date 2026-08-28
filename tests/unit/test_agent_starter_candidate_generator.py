@@ -184,7 +184,7 @@ def test_rag_candidates_record_retrieval_architecture_evidence():
         evidence.key
         for evidence in direct_context.evidence
     ] == [
-        "candidate_uses_retrieval",
+        "candidate_uses_retrieval_pipeline",
     ]
     assert direct_context.evidence[0].value is False
 
@@ -192,7 +192,7 @@ def test_rag_candidates_record_retrieval_architecture_evidence():
         evidence.key
         for evidence in full_rag.evidence
     ] == [
-        "candidate_uses_retrieval",
+        "candidate_uses_retrieval_pipeline",
     ]
     assert full_rag.evidence[0].value is True
 
