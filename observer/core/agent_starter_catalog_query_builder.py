@@ -11,7 +11,6 @@ from schemas.agent_starter import (
     CandidateArchitectureAssessment,
 )
 from schemas.agent_starter_catalog import (
-    AgentStarterCatalogComponentType,
     AgentStarterCatalogQuery,
 )
 
@@ -74,32 +73,16 @@ def build_agent_starter_catalog_queries(
         ]
 
     if goal is AgentStarterGoal.PERSONAL:
-        supports_persistent_memory = [
-            evidence.value
-            for evidence in assessment.supporting_evidence
-            if evidence.key
-            == "candidate_supports_persistent_memory"
-        ]
-
-        if (
-            len(supports_persistent_memory) != 1
-            or not isinstance(
-                supports_persistent_memory[0],
-                bool,
-            )
-        ):
-            raise ValueError(
-                "Personal catalog mapping requires exactly one "
-                "candidate_supports_persistent_memory "
-                "evidence value."
-            )
+        requirements = build_agent_starter_stack_requirements(
+            goal=goal,
+            assessment=assessment,
+        )
 
         return [
-            AgentStarterCatalogQuery(
-                component_type=(
-                    AgentStarterCatalogComponentType.LLM
-                ),
+            map_agent_starter_stack_requirement_to_catalog_query(
+                requirement
             )
+            for requirement in requirements
         ]
 
     raise ValueError(

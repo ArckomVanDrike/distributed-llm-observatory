@@ -648,6 +648,15 @@ def test_catalog_query_builder_maps_session_only_personal_to_llm_query():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The personal-assistant architecture uses an LLM "
+                    "for language interaction."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_supports_persistent_memory",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -692,6 +701,15 @@ def test_catalog_query_builder_maps_persistent_memory_personal_to_llm_query():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The personal-assistant architecture uses an LLM "
+                    "for language interaction."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_supports_persistent_memory",
                 source=EvidenceSource.DERIVED,
                 value=True,
@@ -734,6 +752,15 @@ def test_catalog_query_builder_rejects_personal_without_memory_evidence():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The personal-assistant architecture uses an LLM "
+                    "for language interaction."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="unrelated_evidence",
                 source=EvidenceSource.DERIVED,
                 value=True,
@@ -745,8 +772,9 @@ def test_catalog_query_builder_rejects_personal_without_memory_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Personal catalog mapping requires exactly one "
-            "candidate_supports_persistent_memory evidence value"
+            "Personal stack mapping requires exactly one "
+            "candidate_supports_persistent_memory "
+                "boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -771,6 +799,15 @@ def test_catalog_query_builder_rejects_conflicting_personal_memory_evidence():
         ],
         supporting_evidence=[
             AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The personal-assistant architecture uses an LLM "
+                    "for language interaction."
+                ),
+            ),
+            AgentStarterEvidence(
                 key="candidate_supports_persistent_memory",
                 source=EvidenceSource.DERIVED,
                 value=False,
@@ -788,8 +825,9 @@ def test_catalog_query_builder_rejects_conflicting_personal_memory_evidence():
     with pytest.raises(
         ValueError,
         match=(
-            "Personal catalog mapping requires exactly one "
-            "candidate_supports_persistent_memory evidence value"
+            "Personal stack mapping requires exactly one "
+            "candidate_supports_persistent_memory "
+                "boolean evidence value"
         ),
     ):
         build_agent_starter_catalog_queries(
@@ -963,5 +1001,42 @@ def test_catalog_query_builder_routes_voice_validation_through_stack_requirement
     ):
         build_agent_starter_catalog_queries(
             goal=AgentStarterGoal.VOICE,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_routes_personal_validation_through_stack_requirements():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "LLM usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The personal stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate supports persistent memory.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Personal stack mapping requires exactly one "
+            "candidate_uses_llm evidence value equal to true"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.PERSONAL,
             assessment=assessment,
         )
