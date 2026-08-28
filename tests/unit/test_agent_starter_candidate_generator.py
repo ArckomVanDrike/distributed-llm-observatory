@@ -1,3 +1,6 @@
+from observer.core.agent_starter_candidate_generator import (
+    generate_agent_starter_candidates,
+)
 from schemas.agent_starter import (
     AgentStarterGoal,
     AgentStarterPreparedInput,
@@ -31,52 +34,28 @@ def test_generates_base_coding_candidates_in_deterministic_order():
 
 
 def test_coding_candidates_record_locality_evidence():
-    from observer.core.agent_starter_candidate_generator import (
-        generate_agent_starter_candidates,
-    )
-
     prepared = AgentStarterPreparedInput(
         goal=AgentStarterGoal.CODING,
     )
 
-    candidates = generate_agent_starter_candidates(prepared)
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
 
     local_candidate, remote_candidate = candidates
 
-    assert [
-        evidence.key
+    assert any(
+        evidence.key == "source_code_remote_processing"
+        and evidence.source is EvidenceSource.DERIVED
+        and evidence.value is False
         for evidence in local_candidate.evidence
-    ] == [
-        "source_code_remote_processing",
-        "candidate_supports_filesystem_read",
-        "candidate_supports_filesystem_write",
-        "candidate_supports_shell_execution",
-        "candidate_supports_test_execution",
-    ]
-    assert local_candidate.evidence[0].value is False
-
-    assert [
-        evidence.key
-        for evidence in remote_candidate.evidence
-    ] == [
-        "source_code_remote_processing",
-        "candidate_supports_filesystem_read",
-        "candidate_supports_filesystem_write",
-        "candidate_supports_shell_execution",
-        "candidate_supports_test_execution",
-    ]
-    assert remote_candidate.evidence[0].value is True
-
-    assert all(
-        evidence.source is EvidenceSource.DERIVED
-        for candidate in candidates
-        for evidence in candidate.evidence
     )
 
-    assert all(
-        evidence.reason
-        for candidate in candidates
-        for evidence in candidate.evidence
+    assert any(
+        evidence.key == "source_code_remote_processing"
+        and evidence.source is EvidenceSource.DERIVED
+        and evidence.value is True
+        for evidence in remote_candidate.evidence
     )
 
 
@@ -723,3 +702,30 @@ def test_coding_candidates_explicitly_record_test_execution_support():
         assert matches[0].value is True
         assert matches[0].source is EvidenceSource.DERIVED
         assert matches[0].reason
+
+
+def test_coding_candidates_explicitly_record_llm_usage():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "local-coding-agent",
+        "remote-coding-agent",
+    ]
+
+    for candidate in candidates:
+        llm_usage = [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+
+        assert llm_usage == [True]

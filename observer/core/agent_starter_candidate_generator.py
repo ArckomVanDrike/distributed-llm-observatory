@@ -132,11 +132,22 @@ def _generate_coding_candidates(
         ),
     )
 
+    coding_llm_usage = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The coding-agent architecture uses an LLM "
+            "for coding assistance."
+        ),
+    )
+
     return [
         AgentStarterCandidateArchitecture(
             architecture_id="local-coding-agent",
             goal=AgentStarterGoal.CODING,
             evidence=[
+                coding_llm_usage,
                 local_evidence,
                 local_filesystem_read,
                 local_filesystem_write,
@@ -148,6 +159,7 @@ def _generate_coding_candidates(
             architecture_id="remote-coding-agent",
             goal=AgentStarterGoal.CODING,
             evidence=[
+                coding_llm_usage,
                 remote_evidence,
                 remote_filesystem_read,
                 remote_filesystem_write,
