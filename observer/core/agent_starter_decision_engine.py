@@ -886,3 +886,176 @@ def assess_rag_candidate(
         ],
         supporting_evidence=supporting_evidence,
     )
+
+
+def assess_voice_candidate(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not technically feasible."
+        )
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        technical_reason = (
+            "The candidate's technical feasibility is unknown."
+        )
+    else:
+        technical_reason = (
+            "The candidate is technically feasible."
+        )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.LIMITED:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Limited technical feasibility makes this "
+                "candidate a possible but currently "
+                "not recommended choice."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "technical feasibility for this candidate."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    realtime_voice_required = any(
+        evidence.key == "realtime_voice_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_supports_streaming = any(
+        evidence.key == "candidate_supports_streaming"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_streaming = any(
+        evidence.key == "candidate_supports_streaming"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    streaming_support_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_streaming"
+    ]
+
+    streaming_support_unknown = (
+        realtime_voice_required
+        and (
+            not streaming_support_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in streaming_support_evidence
+            )
+        )
+    )
+
+    if (
+        realtime_voice_required
+        and candidate_explicitly_lacks_streaming
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Realtime voice interaction is required, but the "
+                "candidate does not support streaming processing."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if streaming_support_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Streaming support is unknown or insufficiently "
+                "established for the requested realtime voice workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if realtime_voice_required and candidate_supports_streaming:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate supports streaming processing "
+                "required by the realtime voice workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "The available voice evidence does not yet justify "
+            "a stronger architecture recommendation."
+        ],
+        supporting_evidence=supporting_evidence,
+    )

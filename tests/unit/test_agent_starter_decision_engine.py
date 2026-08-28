@@ -2,6 +2,7 @@ from observer.core.agent_starter_decision_engine import (
     assess_automation_candidate,
     assess_coding_candidate,
     assess_rag_candidate,
+    assess_voice_candidate,
     technical_feasibility_from_compatibility,
 )
 from schemas.agent_starter import (
@@ -1608,5 +1609,129 @@ def test_automation_unknown_feasibility_cannot_be_recommended_from_workflow_fit(
     assert any(
         "insufficient" in reason.lower()
         or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _realtime_voice_evidence(
+    *,
+    candidate_supports_streaming: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_streaming,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether streaming voice processing is supported."
+            ),
+        ),
+    ]
+
+
+def test_realtime_voice_with_streaming_can_proceed():
+    result = assess_voice_candidate(
+        architecture_id="streaming_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_voice_evidence(
+            candidate_supports_streaming=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_realtime_voice_without_streaming_is_not_preferred():
+    result = assess_voice_candidate(
+        architecture_id="non_streaming_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_realtime_voice_evidence(
+            candidate_supports_streaming=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "streaming" in reason.lower()
+        or "realtime" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_streaming_support_limits_realtime_voice_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_streaming",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports streaming voice processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "streaming" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_streaming_support_does_not_assume_realtime_voice_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="realtime_voice_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "streaming" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
         for reason in result.recommendation_reasons
     )
