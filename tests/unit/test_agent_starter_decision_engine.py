@@ -479,3 +479,83 @@ def test_missing_semantic_need_does_not_make_ai_unnecessary():
         or "unknown" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def _high_impact_automation_evidence(
+    *,
+    human_approval_required: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses LLM inference.",
+        ),
+        AgentStarterEvidence(
+            key="destructive_or_high_impact_actions",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_executes_autonomously",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate can execute external write actions "
+                "without waiting for a user command."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="human_approval_required",
+            source=EvidenceSource.DECLARED,
+            value=human_approval_required,
+        ),
+    ]
+
+
+def test_autonomous_high_impact_automation_without_approval_is_not_recommended():
+    result = assess_automation_candidate(
+        architecture_id="autonomous_workflow_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_high_impact_automation_evidence(
+            human_approval_required=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "approval" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_high_impact_automation_with_human_approval_can_proceed():
+    result = assess_automation_candidate(
+        architecture_id="supervised_workflow_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_high_impact_automation_evidence(
+            human_approval_required=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM

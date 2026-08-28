@@ -244,9 +244,45 @@ def assess_automation_candidate(
         )
     )
 
+    high_impact_actions = any(
+        evidence.key == "destructive_or_high_impact_actions"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    autonomous_execution = any(
+        evidence.key == "candidate_executes_autonomously"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    approval_explicitly_not_required = any(
+        evidence.key == "human_approval_required"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
     technical_reason = (
         "The candidate is technically feasible."
     )
+
+    if (
+        high_impact_actions
+        and autonomous_execution
+        and approval_explicitly_not_required
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Autonomous destructive or high-impact actions "
+                "without human approval are not recommended."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
 
     if (
         workflow_deterministic
