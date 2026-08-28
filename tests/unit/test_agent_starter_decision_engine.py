@@ -1869,3 +1869,148 @@ def test_missing_raw_audio_processing_does_not_assume_local_only_compliance():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _transcript_local_only_requirement() -> AgentStarterRequirement:
+    return AgentStarterRequirement(
+        key="transcript_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            AgentStarterEvidence(
+                key="transcript_local_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+
+def test_hybrid_voice_allows_remote_transcript_when_raw_audio_stays_local():
+    raw_audio_requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="Raw audio is transcribed locally.",
+        ),
+        AgentStarterEvidence(
+            key="transcript_remote_processing_allowed",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "Only the locally produced transcript is sent "
+                "to a remote downstream component."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="hybrid_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[raw_audio_requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_remote_transcript_processing_violates_local_only_transcript_requirement():
+    requirement = _transcript_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate sends the transcript to a remote "
+                "component for downstream processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="remote_transcript_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [requirement]
+    assert any(
+        "transcript" in reason.lower()
+        and "local" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_transcript_processing_cannot_verify_local_only_compliance():
+    requirement = _transcript_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_transcript_remote_processing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the transcript is sent to remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "transcript" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_transcript_processing_does_not_assume_local_only_compliance():
+    requirement = _transcript_local_only_requirement()
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "transcript" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
