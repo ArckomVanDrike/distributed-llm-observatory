@@ -95,6 +95,15 @@ def test_catalog_orchestrator_matches_coding_architecture():
                     "user-controlled environment."
                 ),
             ),
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding-agent architecture requires "
+                    "a language model."
+                ),
+            ),
         ],
     )
 
@@ -215,6 +224,15 @@ def test_catalog_orchestrator_preserves_query_with_zero_matches():
                 reason=(
                     "Source code remains inside the "
                     "user-controlled environment."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding-agent architecture requires "
+                    "a language model."
                 ),
             ),
         ],
