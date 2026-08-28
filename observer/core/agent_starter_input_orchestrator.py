@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from schemas.agent_starter import (
     AgentStarterEvidence,
+    AgentStarterGoal,
     AgentStarterIntake,
     AgentStarterRequirement,
     ConstraintStrength,
@@ -61,6 +62,9 @@ def derive_agent_starter_requirements(
 def derive_agent_starter_capability_evidence(
     intake: AgentStarterIntake,
 ) -> list[AgentStarterEvidence]:
+    if intake.goal is not AgentStarterGoal.CODING:
+        return []
+
     derived: list[AgentStarterEvidence] = []
 
     modify_files = bool(

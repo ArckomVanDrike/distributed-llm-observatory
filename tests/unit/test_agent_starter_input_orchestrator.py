@@ -488,3 +488,27 @@ def test_observed_coding_activity_does_not_derive_user_intent_capabilities():
     derived = derive_agent_starter_capability_evidence(intake)
 
     assert derived == []
+
+
+def test_coding_capability_rules_do_not_leak_into_other_goals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
