@@ -7,7 +7,7 @@ from schemas.agent_starter import (
     AgentStarterCandidateArchitecture,
     AgentStarterPreparedInput,
     AgentStarterTechnicalRequirementAssessment,
-    ConstraintStrength,
+    EvidenceSource,
 )
 
 _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
@@ -24,35 +24,24 @@ def build_agent_starter_technical_requirement_assessments(
         AgentStarterTechnicalRequirementAssessment
     ] = []
 
-    for requirement in prepared.requirements:
-        if requirement.strength is not ConstraintStrength.HARD:
+    for evidence in prepared.evidence:
+        if evidence.source is not EvidenceSource.DERIVED:
             continue
 
-        if requirement.value is not True:
+        if evidence.value is not True:
             continue
 
         candidate_evidence_key = (
             _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT.get(
-                requirement.key
+                evidence.key
             )
         )
         if candidate_evidence_key is None:
             continue
 
-        required_capability = next(
-            (
-                evidence
-                for evidence in requirement.evidence
-                if evidence.key == requirement.key
-            ),
-            None,
-        )
-        if required_capability is None:
-            continue
-
         assessments.append(
             assess_agent_starter_technical_requirement(
-                required_capability=required_capability,
+                required_capability=evidence,
                 candidate_evidence=candidate.evidence,
                 candidate_evidence_key=candidate_evidence_key,
             )

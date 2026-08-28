@@ -2,38 +2,32 @@ from schemas.agent_starter import (
     AgentStarterCandidateArchitecture,
     AgentStarterEvidence,
     AgentStarterGoal,
+    AgentStarterIntake,
     AgentStarterPreparedInput,
-    AgentStarterRequirement,
-    ConstraintStrength,
     EvidenceSource,
     TechnicalRequirementStatus,
 )
 
 
-def _filesystem_write_requirement() -> AgentStarterRequirement:
-    evidence = AgentStarterEvidence(
-        key="filesystem_write",
-        source=EvidenceSource.DERIVED,
-        value=True,
-        reason="Code modification requires filesystem write.",
-    )
-
-    return AgentStarterRequirement(
-        key="filesystem_write",
-        value=True,
-        strength=ConstraintStrength.HARD,
-        evidence=[evidence],
+def _prepared_with_filesystem_write() -> AgentStarterPreparedInput:
+    return AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="filesystem_write",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Code modification requires filesystem write."
+                ),
+            ),
+        ],
     )
 
 
 def test_builds_satisfied_filesystem_write_assessment():
     from observer.core.agent_starter_technical_requirement_orchestrator import (
         build_agent_starter_technical_requirement_assessments,
-    )
-
-    prepared = AgentStarterPreparedInput(
-        goal=AgentStarterGoal.CODING,
-        requirements=[_filesystem_write_requirement()],
     )
 
     support = AgentStarterEvidence(
@@ -51,7 +45,7 @@ def test_builds_satisfied_filesystem_write_assessment():
 
     assessments = (
         build_agent_starter_technical_requirement_assessments(
-            prepared=prepared,
+            prepared=_prepared_with_filesystem_write(),
             candidate=candidate,
         )
     )
@@ -70,10 +64,170 @@ def test_builds_unsatisfied_filesystem_write_assessment():
         build_agent_starter_technical_requirement_assessments,
     )
 
+    lack = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason="Candidate cannot write files.",
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="restricted-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[lack],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=_prepared_with_filesystem_write(),
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNSATISFIED
+    )
+    assert assessments[0].supporting_evidence == [lack]
+
+
+def test_missing_candidate_support_remains_unknown():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="unknown-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=_prepared_with_filesystem_write(),
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNKNOWN
+    )
+
+
+def test_unmapped_derived_capability_is_not_silently_inferred():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
     prepared = AgentStarterPreparedInput(
         goal=AgentStarterGoal.CODING,
-        requirements=[_filesystem_write_requirement()],
+        evidence=[
+            AgentStarterEvidence(
+                key="shell_execution",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="Running tests requires shell execution.",
+            ),
+        ],
     )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assert (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+        == []
+    )
+
+
+def test_declared_evidence_is_not_reinterpreted_as_derived_capability():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="filesystem_write",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assert (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+        == []
+    )
+
+
+def test_false_derived_capability_is_not_treated_as_required():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="filesystem_write",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Filesystem write is not required.",
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assert (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+        == []
+    )
+
+
+def test_builds_requirement_from_real_prepared_capability_evidence():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
 
     lack = AgentStarterEvidence(
         key="candidate_supports_filesystem_write",
@@ -95,124 +249,15 @@ def test_builds_unsatisfied_filesystem_write_assessment():
         )
     )
 
-    assert len(assessments) == 1
+    filesystem_write = [
+        assessment
+        for assessment in assessments
+        if assessment.key == "filesystem_write"
+    ]
+
+    assert len(filesystem_write) == 1
     assert (
-        assessments[0].status
+        filesystem_write[0].status
         is TechnicalRequirementStatus.UNSATISFIED
     )
-    assert assessments[0].supporting_evidence == [lack]
-
-
-def test_missing_candidate_support_remains_unknown():
-    from observer.core.agent_starter_technical_requirement_orchestrator import (
-        build_agent_starter_technical_requirement_assessments,
-    )
-
-    prepared = AgentStarterPreparedInput(
-        goal=AgentStarterGoal.CODING,
-        requirements=[_filesystem_write_requirement()],
-    )
-
-    candidate = AgentStarterCandidateArchitecture(
-        architecture_id="unknown-coding-agent",
-        goal=AgentStarterGoal.CODING,
-    )
-
-    assessments = (
-        build_agent_starter_technical_requirement_assessments(
-            prepared=prepared,
-            candidate=candidate,
-        )
-    )
-
-    assert len(assessments) == 1
-    assert (
-        assessments[0].status
-        is TechnicalRequirementStatus.UNKNOWN
-    )
-
-
-def test_unmapped_requirement_is_not_silently_inferred():
-    from observer.core.agent_starter_technical_requirement_orchestrator import (
-        build_agent_starter_technical_requirement_assessments,
-    )
-
-    evidence = AgentStarterEvidence(
-        key="shell_execution",
-        source=EvidenceSource.DERIVED,
-        value=True,
-        reason="Running tests requires shell execution.",
-    )
-
-    prepared = AgentStarterPreparedInput(
-        goal=AgentStarterGoal.CODING,
-        requirements=[
-            AgentStarterRequirement(
-                key="shell_execution",
-                value=True,
-                strength=ConstraintStrength.HARD,
-                evidence=[evidence],
-            ),
-        ],
-    )
-
-    candidate = AgentStarterCandidateArchitecture(
-        architecture_id="local-coding-agent",
-        goal=AgentStarterGoal.CODING,
-        evidence=[
-            AgentStarterEvidence(
-                key="source_code_remote_processing",
-                source=EvidenceSource.DERIVED,
-                value=False,
-                reason="Source code remains local.",
-            ),
-        ],
-    )
-
-    assessments = (
-        build_agent_starter_technical_requirement_assessments(
-            prepared=prepared,
-            candidate=candidate,
-        )
-    )
-
-    assert assessments == []
-
-
-def test_soft_requirement_is_not_a_hard_technical_blocker():
-    from observer.core.agent_starter_technical_requirement_orchestrator import (
-        build_agent_starter_technical_requirement_assessments,
-    )
-
-    evidence = AgentStarterEvidence(
-        key="filesystem_write",
-        source=EvidenceSource.DERIVED,
-        value=True,
-        reason="Filesystem write is preferred.",
-    )
-
-    prepared = AgentStarterPreparedInput(
-        goal=AgentStarterGoal.CODING,
-        requirements=[
-            AgentStarterRequirement(
-                key="filesystem_write",
-                value=True,
-                strength=ConstraintStrength.SOFT,
-                evidence=[evidence],
-            ),
-        ],
-    )
-
-    candidate = AgentStarterCandidateArchitecture(
-        architecture_id="local-coding-agent",
-        goal=AgentStarterGoal.CODING,
-    )
-
-    assessments = (
-        build_agent_starter_technical_requirement_assessments(
-            prepared=prepared,
-            candidate=candidate,
-        )
-    )
-
-    assert assessments == []
+    assert filesystem_write[0].supporting_evidence == [lack]
