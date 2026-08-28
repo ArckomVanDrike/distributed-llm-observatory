@@ -180,3 +180,136 @@ def assess_coding_candidate(
         ],
         supporting_evidence=supporting_evidence,
     )
+
+
+def assess_automation_candidate(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    workflow_deterministic = any(
+        evidence.key == "workflow_deterministic"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    semantic_interpretation_not_required = any(
+        evidence.key == "semantic_interpretation_required"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    candidate_uses_llm = any(
+        evidence.key == "candidate_uses_llm"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_does_not_use_llm = any(
+        evidence.key == "candidate_uses_llm"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    required_decision_keys = {
+        "workflow_deterministic",
+        "semantic_interpretation_required",
+        "candidate_uses_llm",
+    }
+    decision_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key in required_decision_keys
+    ]
+    observed_decision_keys = {
+        evidence.key
+        for evidence in decision_evidence
+    }
+
+    decision_evidence_incomplete = (
+        observed_decision_keys != required_decision_keys
+        or any(
+            evidence.source is EvidenceSource.UNKNOWN
+            or evidence.value is None
+            for evidence in decision_evidence
+        )
+    )
+
+    technical_reason = (
+        "The candidate is technically feasible."
+    )
+
+    if (
+        workflow_deterministic
+        and semantic_interpretation_not_required
+        and candidate_explicitly_does_not_use_llm
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The workflow is deterministic and does not "
+                "require semantic interpretation, so traditional "
+                "automation is the simpler recommended architecture."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        workflow_deterministic
+        and semantic_interpretation_not_required
+        and candidate_uses_llm
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "LLM inference is not required for this deterministic "
+                "workflow and would add unnecessary complexity."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if decision_evidence_incomplete:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "whether AI is necessary for this automation."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "The available automation evidence does not yet justify "
+            "a stronger architecture recommendation."
+        ],
+        supporting_evidence=supporting_evidence,
+    )

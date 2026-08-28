@@ -1,4 +1,5 @@
 from observer.core.agent_starter_decision_engine import (
+    assess_automation_candidate,
     assess_coding_candidate,
     technical_feasibility_from_compatibility,
 )
@@ -329,3 +330,152 @@ def test_unknown_local_only_compliance_is_not_recorded_as_proven_blocker():
         is RecommendationVerdict.NOT_RECOMMENDED
     )
     assert result.blocking_requirements == []
+
+
+def _deterministic_automation_evidence(
+    *,
+    candidate_uses_llm: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The declared workflow consists of fixed "
+                "deterministic steps."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=candidate_uses_llm,
+            reason=(
+                "The candidate architecture explicitly "
+                "defines whether LLM inference is used."
+            ),
+        ),
+    ]
+
+
+def test_deterministic_workflow_recommends_traditional_automation():
+    result = assess_automation_candidate(
+        architecture_id="traditional_automation",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "deterministic" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_deterministic_workflow_does_not_recommend_unnecessary_llm_agent():
+    result = assess_automation_candidate(
+        architecture_id="llm_automation_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_deterministic_automation_evidence(
+            candidate_uses_llm=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "unnecessary" in reason.lower()
+        or "not required" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_llm_usage_limits_automation_recommendation_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="semantic_interpretation_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The declared workflow consists of fixed "
+                "deterministic steps."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "The candidate architecture does not provide "
+                "enough evidence to establish LLM usage."
+            ),
+        ),
+    ]
+
+    result = assess_automation_candidate(
+        architecture_id="automation_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_semantic_need_does_not_make_ai_unnecessary():
+    evidence = [
+        AgentStarterEvidence(
+            key="workflow_deterministic",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_llm",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate architecture uses LLM inference."
+            ),
+        ),
+    ]
+
+    result = assess_automation_candidate(
+        architecture_id="llm_automation_agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
