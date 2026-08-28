@@ -4,6 +4,7 @@ from schemas.agent_starter import (
     AgentStarterCandidateArchitecture,
     AgentStarterGoal,
     AgentStarterPreparedInput,
+    EvidenceSource,
     TechnicalFeasibility,
 )
 from schemas.hardware import (
@@ -123,3 +124,120 @@ def test_feasibility_rejects_goal_mismatch():
             prepared=prepared,
             candidate=candidate,
         )
+
+
+@pytest.mark.parametrize(
+    (
+        "compatibility_verdict",
+        "expected_feasibility",
+    ),
+    [
+        (
+            "compatible",
+            TechnicalFeasibility.FEASIBLE,
+        ),
+        (
+            "constrained",
+            TechnicalFeasibility.LIMITED,
+        ),
+        (
+            "not_recommended",
+            TechnicalFeasibility.LIMITED,
+        ),
+        (
+            "unknown",
+            TechnicalFeasibility.UNKNOWN,
+        ),
+    ],
+)
+def test_feasibility_uses_compatibility_assessment_as_technical_basis(
+    compatibility_verdict,
+    expected_feasibility,
+):
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict(compatibility_verdict),
+        summary="Candidate-specific compatibility assessment.",
+        reasons=[
+            "Compatibility was evaluated from known technical inputs.",
+        ],
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+        compatibility_assessment=compatibility,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is expected_feasibility
+    )
+
+    assert assessment.reasons == [
+        "Candidate-specific compatibility assessment.",
+        "Compatibility was evaluated from known technical inputs.",
+    ]
+
+    assert len(assessment.supporting_evidence) == 1
+
+    evidence = assessment.supporting_evidence[0]
+
+    assert evidence.key == "candidate_compatibility_verdict"
+    assert evidence.source is EvidenceSource.DERIVED
+    assert evidence.value == compatibility_verdict
+    assert evidence.reason == compatibility.summary
+
+
+def test_not_recommended_compatibility_never_becomes_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.NOT_RECOMMENDED,
+        summary="Estimated local headroom is insufficiently comfortable.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.LIMITED
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
