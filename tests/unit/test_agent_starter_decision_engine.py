@@ -279,3 +279,53 @@ def test_local_only_requirement_without_processing_evidence_is_not_recommended()
         or "insufficient" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def test_proven_local_only_violation_records_blocking_requirement():
+    requirement = _local_only_requirement()
+
+    remote_processing = AgentStarterEvidence(
+        key="source_code_remote_processing",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The candidate architecture sends repository context "
+            "to remote inference."
+        ),
+    )
+
+    result = assess_coding_candidate(
+        architecture_id="cloud_coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[remote_processing],
+    )
+
+    assert result.blocking_requirements == [requirement]
+
+
+def test_unknown_local_only_compliance_is_not_recorded_as_proven_blocker():
+    requirement = _local_only_requirement()
+
+    unknown_processing = AgentStarterEvidence(
+        key="source_code_remote_processing",
+        source=EvidenceSource.UNKNOWN,
+        value=None,
+        reason=(
+            "It is not known whether the candidate sends "
+            "repository context to remote inference."
+        ),
+    )
+
+    result = assess_coding_candidate(
+        architecture_id="coding_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[unknown_processing],
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.blocking_requirements == []

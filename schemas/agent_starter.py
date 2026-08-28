@@ -144,6 +144,9 @@ class CandidateArchitectureAssessment(BaseModel):
     supporting_evidence: list[AgentStarterEvidence] = Field(
         default_factory=list,
     )
+    blocking_requirements: list[AgentStarterRequirement] = Field(
+        default_factory=list,
+    )
 
     @model_validator(mode="after")
     def validate_assessment(
@@ -165,6 +168,14 @@ class CandidateArchitectureAssessment(BaseModel):
             raise ValueError(
                 "Candidate assessment must record "
                 "supporting evidence."
+            )
+
+        if any(
+            requirement.strength is not ConstraintStrength.HARD
+            for requirement in self.blocking_requirements
+        ):
+            raise ValueError(
+                "Blocking requirements must be hard constraints."
             )
 
         return self
