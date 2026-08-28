@@ -72,11 +72,12 @@ def assess_agent_starter_candidates(
             ],
         )
 
-        supporting_evidence = list(
-            assessment.supporting_evidence
-        )
+        supporting_evidence = []
 
-        for evidence in feasibility.supporting_evidence:
+        for evidence in [
+            *assessment.supporting_evidence,
+            *feasibility.supporting_evidence,
+        ]:
             if evidence not in supporting_evidence:
                 supporting_evidence.append(evidence)
 

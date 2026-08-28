@@ -344,3 +344,50 @@ def test_assessment_orchestrator_rejects_compatibility_for_unknown_candidate():
                 "local-coding-agnt": compatibility,
             },
         )
+
+
+def test_assessment_orchestrator_does_not_duplicate_supporting_evidence():
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="source_code_must_stay_local",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="The candidate is technically available.",
+        confidence=0.6,
+    )
+
+    assessments = assess_agent_starter_candidates(
+        prepared=prepared,
+        compatibility_by_architecture={
+            "local-coding-agent": compatibility,
+            "remote-coding-agent": compatibility,
+        },
+    )
+
+    remote = next(
+        assessment
+        for assessment in assessments
+        if assessment.architecture_id == "remote-coding-agent"
+    )
+
+    for index, evidence in enumerate(
+        remote.supporting_evidence
+    ):
+        assert evidence not in remote.supporting_evidence[:index]
