@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from schemas.agent_starter_catalog import (
-    AgentStarterCatalogComponentType,
     AgentStarterCatalogEntry,
+    AgentStarterCatalogQuery,
     AgentStarterCatalogSnapshot,
 )
 
@@ -10,31 +10,33 @@ from schemas.agent_starter_catalog import (
 def match_agent_starter_catalog_entries(
     *,
     snapshot: AgentStarterCatalogSnapshot,
-    component_type: AgentStarterCatalogComponentType,
-    required_capabilities: list[str],
-    required_deployment_modes: list[str] | None = None,
-    required_runtime: str | None = None,
-    required_pricing_class: str | None = None,
+    query: AgentStarterCatalogQuery,
 ) -> list[AgentStarterCatalogEntry]:
-    required = set(required_capabilities)
-    required_deployment = set(
-        required_deployment_modes or []
+    required_capabilities = set(
+        query.required_capabilities
+    )
+    required_deployment_modes = set(
+        query.required_deployment_modes
     )
 
     return [
         entry
         for entry in snapshot.entries
-        if entry.component_type is component_type
-        and required.issubset(set(entry.capabilities))
-        and required_deployment.issubset(
+        if entry.component_type is query.component_type
+        and required_capabilities.issubset(
+            set(entry.capabilities)
+        )
+        and required_deployment_modes.issubset(
             set(entry.deployment_modes)
         )
         and (
-            required_runtime is None
-            or required_runtime in entry.supported_runtimes
+            query.required_runtime is None
+            or query.required_runtime
+            in entry.supported_runtimes
         )
         and (
-            required_pricing_class is None
-            or entry.pricing_class == required_pricing_class
+            query.required_pricing_class is None
+            or entry.pricing_class
+            == query.required_pricing_class
         )
     ]

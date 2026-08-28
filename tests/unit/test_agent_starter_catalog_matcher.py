@@ -6,6 +6,7 @@ from observer.core.agent_starter_catalog_matcher import (
 from schemas.agent_starter_catalog import (
     AgentStarterCatalogComponentType,
     AgentStarterCatalogEntry,
+    AgentStarterCatalogQuery,
     AgentStarterCatalogSnapshot,
 )
 
@@ -76,11 +77,13 @@ def test_catalog_matcher_returns_all_capability_matches_in_snapshot_order():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
-        component_type=AgentStarterCatalogComponentType.LLM,
-        required_capabilities=[
-            "coding",
-            "tool_use",
-        ],
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[
+                "coding",
+                "tool_use",
+            ],
+        ),
     )
 
     assert [
@@ -140,11 +143,13 @@ def test_catalog_matcher_does_not_cross_component_types():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
-        component_type=AgentStarterCatalogComponentType.LLM,
-        required_capabilities=[
-            "coding",
-            "tool_use",
-        ],
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[
+                "coding",
+                "tool_use",
+            ],
+        ),
     )
 
     assert matches == [llm]
@@ -200,8 +205,10 @@ def test_catalog_matcher_empty_capabilities_returns_all_entries_of_type():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
-        component_type=AgentStarterCatalogComponentType.LLM,
-        required_capabilities=[],
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[],
+        ),
     )
 
     assert matches == [
@@ -279,14 +286,16 @@ def test_catalog_matcher_filters_by_required_deployment_mode():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
-        component_type=AgentStarterCatalogComponentType.LLM,
-        required_capabilities=[
-            "coding",
-            "tool_use",
-        ],
-        required_deployment_modes=[
-            "on_device",
-        ],
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[
+                "coding",
+                "tool_use",
+            ],
+            required_deployment_modes=[
+                "on_device",
+            ],
+        ),
     )
 
     assert matches == [local]
@@ -367,15 +376,17 @@ def test_catalog_matcher_filters_by_required_runtime():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
-        component_type=AgentStarterCatalogComponentType.LLM,
-        required_capabilities=[
-            "coding",
-            "tool_use",
-        ],
-        required_deployment_modes=[
-            "on_device",
-        ],
-        required_runtime="llama.cpp",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[
+                "coding",
+                "tool_use",
+            ],
+            required_deployment_modes=[
+                "on_device",
+            ],
+            required_runtime="llama.cpp",
+        ),
     )
 
     assert matches == [llama_cpp]
@@ -456,6 +467,65 @@ def test_catalog_matcher_filters_by_required_pricing_class():
 
     matches = match_agent_starter_catalog_entries(
         snapshot=snapshot,
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=[
+                "coding",
+                "tool_use",
+            ],
+            required_deployment_modes=[
+                "on_device",
+            ],
+            required_runtime="llama.cpp",
+            required_pricing_class="free",
+        ),
+    )
+
+    assert matches == [free_model]
+
+
+def test_catalog_matcher_accepts_explicit_catalog_query():
+    matching = AgentStarterCatalogEntry(
+        identifier="matching-model",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Example",
+        version="1.0",
+        capabilities=[
+            "coding",
+            "tool_use",
+        ],
+        deployment_modes=[
+            "on_device",
+        ],
+        supported_runtimes=[
+            "llama.cpp",
+        ],
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/matching-model",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="test-catalog",
+        generated_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+        entries=[matching],
+    )
+
+    query = AgentStarterCatalogQuery(
         component_type=AgentStarterCatalogComponentType.LLM,
         required_capabilities=[
             "coding",
@@ -468,4 +538,9 @@ def test_catalog_matcher_filters_by_required_pricing_class():
         required_pricing_class="free",
     )
 
-    assert matches == [free_model]
+    matches = match_agent_starter_catalog_entries(
+        snapshot=snapshot,
+        query=query,
+    )
+
+    assert matches == [matching]
