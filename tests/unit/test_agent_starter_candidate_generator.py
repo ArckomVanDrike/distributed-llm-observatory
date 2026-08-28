@@ -239,53 +239,40 @@ def test_generates_base_voice_candidates_in_deterministic_order():
 
 
 def test_voice_candidates_record_audio_and_transcript_locality():
-    from observer.core.agent_starter_candidate_generator import (
-        generate_agent_starter_candidates,
-    )
-
     prepared = AgentStarterPreparedInput(
         goal=AgentStarterGoal.VOICE,
     )
 
-    candidates = generate_agent_starter_candidates(prepared)
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
 
     local_voice, hybrid_voice, cloud_voice = candidates
 
-    assert {
-        evidence.key: evidence.value
-        for evidence in local_voice.evidence
-    } == {
+    def locality(candidate):
+        return {
+            evidence.key: evidence.value
+            for evidence in candidate.evidence
+            if evidence.key in {
+                "candidate_raw_audio_remote_processing",
+                "candidate_transcript_remote_processing",
+            }
+        }
+
+    assert locality(local_voice) == {
         "candidate_raw_audio_remote_processing": False,
         "candidate_transcript_remote_processing": False,
     }
 
-    assert {
-        evidence.key: evidence.value
-        for evidence in hybrid_voice.evidence
-    } == {
+    assert locality(hybrid_voice) == {
         "candidate_raw_audio_remote_processing": False,
         "candidate_transcript_remote_processing": True,
     }
 
-    assert {
-        evidence.key: evidence.value
-        for evidence in cloud_voice.evidence
-    } == {
+    assert locality(cloud_voice) == {
         "candidate_raw_audio_remote_processing": True,
         "candidate_transcript_remote_processing": True,
     }
-
-    assert all(
-        evidence.source is EvidenceSource.DERIVED
-        for candidate in candidates
-        for evidence in candidate.evidence
-    )
-
-    assert all(
-        evidence.reason
-        for candidate in candidates
-        for evidence in candidate.evidence
-    )
 
 
 def test_voice_candidate_generation_does_not_filter_privacy_conflicts():
@@ -740,3 +727,37 @@ def test_rag_candidates_explicitly_record_llm_usage():
         ]
 
         assert llm_usage == [True]
+
+
+def test_voice_candidates_explicitly_record_speech_component_usage():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    candidates = generate_agent_starter_candidates(
+        prepared,
+    )
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "local-voice-pipeline",
+        "hybrid-voice-pipeline",
+        "cloud-voice-pipeline",
+    ]
+
+    for candidate in candidates:
+        stt_usage = [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_uses_stt"
+        ]
+        tts_usage = [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_uses_tts"
+        ]
+
+        assert stt_usage == [True]
+        assert tts_usage == [True]

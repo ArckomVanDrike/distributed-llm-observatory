@@ -224,7 +224,29 @@ def _generate_rag_candidates(
 
 def _generate_voice_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
+    voice_stt_usage = AgentStarterEvidence(
+        key="candidate_uses_stt",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses speech-to-text "
+            "for speech input processing."
+        ),
+    )
+
+    voice_tts_usage = AgentStarterEvidence(
+        key="candidate_uses_tts",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses text-to-speech "
+            "for speech output generation."
+        ),
+    )
+
     local_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
@@ -246,6 +268,8 @@ def _generate_voice_candidates(
     ]
 
     hybrid_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
@@ -267,6 +291,8 @@ def _generate_voice_candidates(
     ]
 
     cloud_evidence = [
+        voice_stt_usage,
+        voice_tts_usage,
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
