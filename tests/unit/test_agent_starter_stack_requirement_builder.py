@@ -422,3 +422,184 @@ def test_stack_requirement_builder_rejects_rag_without_retrieval_evidence():
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
             assessment=assessment,
         )
+
+
+def test_stack_requirement_builder_maps_voice_to_stt_and_tts():
+    stt_evidence = AgentStarterEvidence(
+        key="candidate_uses_stt",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses speech-to-text "
+            "for speech input processing."
+        ),
+    )
+
+    tts_evidence = AgentStarterEvidence(
+        key="candidate_uses_tts",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The voice-pipeline architecture uses text-to-speech "
+            "for speech output generation."
+        ),
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The voice architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The voice architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            stt_evidence,
+            tts_evidence,
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Raw audio remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Transcripts remain inside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    requirements = build_agent_starter_stack_requirements(
+        goal=AgentStarterGoal.VOICE,
+        assessment=assessment,
+    )
+
+    assert [
+        requirement.component_type
+        for requirement in requirements
+    ] == [
+        AgentStarterCatalogComponentType.STT,
+        AgentStarterCatalogComponentType.TTS,
+    ]
+
+    assert all(
+        requirement.required_deployment_modes == []
+        for requirement in requirements
+    )
+
+    assert requirements[0].supporting_evidence == [
+        stt_evidence,
+    ]
+    assert requirements[1].supporting_evidence == [
+        tts_evidence,
+    ]
+
+
+def test_stack_requirement_builder_rejects_voice_without_stt_usage_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "STT usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The voice stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses text-to-speech.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Raw audio remains local.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Transcripts remain local.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Voice stack mapping requires exactly one "
+            "candidate_uses_stt evidence value equal to true"
+        ),
+    ):
+        build_agent_starter_stack_requirements(
+            goal=AgentStarterGoal.VOICE,
+            assessment=assessment,
+        )
+
+
+def test_stack_requirement_builder_rejects_voice_without_transcript_boundary_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Transcript boundary is not established.",
+        ],
+        recommendation_reasons=[
+            "The voice stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_stt",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses speech-to-text.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_uses_tts",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses text-to-speech.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Raw audio remains local.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Voice stack mapping requires exactly one "
+            "candidate_transcript_remote_processing "
+            "boolean evidence value"
+        ),
+    ):
+        build_agent_starter_stack_requirements(
+            goal=AgentStarterGoal.VOICE,
+            assessment=assessment,
+        )

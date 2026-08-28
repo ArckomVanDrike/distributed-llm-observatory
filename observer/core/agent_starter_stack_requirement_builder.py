@@ -101,6 +101,103 @@ def build_agent_starter_stack_requirements(
             )
         ]
 
+    if goal is AgentStarterGoal.VOICE:
+        stt_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_stt"
+        ]
+        tts_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_tts"
+        ]
+        raw_audio_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_raw_audio_remote_processing"
+        ]
+        transcript_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_transcript_remote_processing"
+        ]
+
+        if (
+            len(stt_evidence) != 1
+            or not isinstance(stt_evidence[0].value, bool)
+            or stt_evidence[0].value is not True
+        ):
+            raise ValueError(
+                "Voice stack mapping requires exactly one "
+                "candidate_uses_stt evidence value equal to true."
+            )
+
+        if (
+            len(tts_evidence) != 1
+            or not isinstance(tts_evidence[0].value, bool)
+            or tts_evidence[0].value is not True
+        ):
+            raise ValueError(
+                "Voice stack mapping requires exactly one "
+                "candidate_uses_tts evidence value equal to true."
+            )
+
+        if (
+            len(raw_audio_evidence) != 1
+            or not isinstance(
+                raw_audio_evidence[0].value,
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Voice stack mapping requires exactly one "
+                "candidate_raw_audio_remote_processing "
+                "boolean evidence value."
+            )
+
+        if (
+            len(transcript_evidence) != 1
+            or not isinstance(
+                transcript_evidence[0].value,
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Voice stack mapping requires exactly one "
+                "candidate_transcript_remote_processing "
+                "boolean evidence value."
+            )
+
+        return [
+            AgentStarterStackRequirement(
+                component_type=(
+                    AgentStarterCatalogComponentType.STT
+                ),
+                supporting_evidence=[
+                    stt_evidence[0],
+                ],
+                reason=(
+                    "The voice-pipeline architecture requires "
+                    "speech-to-text for speech input processing."
+                ),
+            ),
+            AgentStarterStackRequirement(
+                component_type=(
+                    AgentStarterCatalogComponentType.TTS
+                ),
+                supporting_evidence=[
+                    tts_evidence[0],
+                ],
+                reason=(
+                    "The voice-pipeline architecture requires "
+                    "text-to-speech for speech output generation."
+                ),
+            ),
+        ]
+
     if goal is not AgentStarterGoal.CODING:
         raise ValueError(
             "Stack requirement mapping is not defined for "
