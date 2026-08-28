@@ -613,3 +613,63 @@ def test_required_citations_without_source_provenance_are_not_feasible():
     ] == [
         "candidate_provides_source_provenance",
     ]
+
+
+def test_requested_voice_interruptions_without_turn_management_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="voice-without-turn-management",
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_barge_in_turn_management",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Candidate does not support barge-in or "
+                    "conversational turn management."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_barge_in_turn_management",
+    ]

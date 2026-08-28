@@ -235,16 +235,29 @@ def derive_agent_starter_capability_evidence(
         )
 
         if interruptions_requested:
-            derived.append(
-                AgentStarterEvidence(
-                    key="interruptions_required",
-                    source=EvidenceSource.DERIVED,
-                    value=True,
-                    reason=(
-                        "The user requested interruption or "
-                        "barge-in behavior during voice interaction."
+            reason = (
+                "The user requested interruption or barge-in "
+                "behavior during voice interaction."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="interruptions_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
                     ),
-                )
+                    AgentStarterEvidence(
+                        key="barge_in_turn_management_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Interruptible voice interaction requires "
+                            "barge-in or conversational turn management."
+                        ),
+                    ),
+                ]
             )
 
         return derived

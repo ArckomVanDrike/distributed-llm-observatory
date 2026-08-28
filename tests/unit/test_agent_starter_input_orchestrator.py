@@ -948,6 +948,7 @@ def test_voice_interruptions_request_derives_interruptions_requirement():
         for evidence in derived
     ] == [
         "interruptions_required",
+        "barge_in_turn_management_required",
     ]
     assert derived[0].source is EvidenceSource.DERIVED
     assert derived[0].value is True
@@ -1026,6 +1027,7 @@ def test_voice_requirements_accumulate_in_canonical_order():
     ] == [
         "realtime_voice_required",
         "interruptions_required",
+        "barge_in_turn_management_required",
     ]
 
 
@@ -1447,3 +1449,39 @@ def test_rag_citations_derive_source_provenance_requirement():
     )
     assert provenance_required[0].value is True
     assert provenance_required[0].reason
+
+
+def test_voice_interruptions_derive_turn_management_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    turn_management_required = [
+        evidence
+        for evidence in derived
+        if (
+            evidence.key
+            == "barge_in_turn_management_required"
+        )
+    ]
+
+    assert len(turn_management_required) == 1
+    assert (
+        turn_management_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert turn_management_required[0].value is True
+    assert turn_management_required[0].reason

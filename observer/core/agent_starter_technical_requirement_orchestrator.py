@@ -11,6 +11,9 @@ from schemas.agent_starter import (
 )
 
 _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
+    "barge_in_turn_management_required": (
+        "candidate_supports_barge_in_turn_management"
+    ),
     "filesystem_read": "candidate_supports_filesystem_read",
     "filesystem_write": "candidate_supports_filesystem_write",
     "ocr_required": "candidate_supports_ocr",

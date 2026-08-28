@@ -602,3 +602,54 @@ def test_source_provenance_requirement_remains_unknown_without_candidate_evidenc
         assessments[0].status
         is TechnicalRequirementStatus.UNKNOWN
     )
+
+
+def test_turn_management_requirement_remains_unknown_without_candidate_evidence():
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="barge_in_turn_management_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Interruptible voice interaction requires "
+                    "barge-in or conversational turn management."
+                ),
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-voice-pipeline",
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Raw audio remains local.",
+            ),
+        ],
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert (
+        assessments[0].key
+        == "barge_in_turn_management_required"
+    )
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNKNOWN
+    )
