@@ -131,6 +131,35 @@ def build_agent_starter_catalog_queries(
             ),
         ]
 
+    if goal is AgentStarterGoal.PERSONAL:
+        supports_persistent_memory = [
+            evidence.value
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_supports_persistent_memory"
+        ]
+
+        if (
+            len(supports_persistent_memory) != 1
+            or not isinstance(
+                supports_persistent_memory[0],
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Personal catalog mapping requires exactly one "
+                "candidate_supports_persistent_memory "
+                "evidence value."
+            )
+
+        return [
+            AgentStarterCatalogQuery(
+                component_type=(
+                    AgentStarterCatalogComponentType.LLM
+                ),
+            )
+        ]
+
     raise ValueError(
         "Catalog query mapping is not defined for "
         f"goal: {goal.value}"

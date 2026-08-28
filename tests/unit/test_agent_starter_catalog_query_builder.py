@@ -493,3 +493,207 @@ def test_catalog_query_builder_does_not_infer_deployment_for_hybrid_voice():
         query.required_deployment_modes == []
         for query in queries
     )
+
+
+def test_catalog_query_builder_rejects_voice_without_transcript_boundary_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Transcript processing boundary is unknown.",
+        ],
+        recommendation_reasons=[
+            "The voice architecture cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Raw audio remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Voice catalog mapping requires exactly one "
+            "candidate_transcript_remote_processing evidence value"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.VOICE,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_maps_session_only_personal_to_llm_query():
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="session-only-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The personal assistant architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The personal assistant satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The session-only architecture does not retain "
+                    "memory across sessions."
+                ),
+            ),
+        ],
+    )
+
+    queries = build_agent_starter_catalog_queries(
+        goal=AgentStarterGoal.PERSONAL,
+        assessment=assessment,
+    )
+
+    assert len(queries) == 1
+
+    query = queries[0]
+
+    assert (
+        query.component_type
+        is AgentStarterCatalogComponentType.LLM
+    )
+    assert query.required_capabilities == []
+    assert query.required_deployment_modes == []
+    assert query.required_runtime is None
+    assert query.required_pricing_class is None
+
+
+def test_catalog_query_builder_maps_persistent_memory_personal_to_llm_query():
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="controlled-persistent-memory-assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The persistent-memory architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The persistent-memory architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The architecture retains memory across sessions."
+                ),
+            ),
+        ],
+    )
+
+    queries = build_agent_starter_catalog_queries(
+        goal=AgentStarterGoal.PERSONAL,
+        assessment=assessment,
+    )
+
+    assert len(queries) == 1
+    assert (
+        queries[0].component_type
+        is AgentStarterCatalogComponentType.LLM
+    )
+    assert queries[0].required_capabilities == []
+    assert queries[0].required_deployment_modes == []
+    assert queries[0].required_runtime is None
+    assert queries[0].required_pricing_class is None
+
+
+def test_catalog_query_builder_rejects_personal_without_memory_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="unknown-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Persistent-memory behavior is unknown.",
+        ],
+        recommendation_reasons=[
+            "The personal architecture cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="unrelated_evidence",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="Unrelated evidence.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Personal catalog mapping requires exactly one "
+            "candidate_supports_persistent_memory evidence value"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.PERSONAL,
+            assessment=assessment,
+        )
+
+
+def test_catalog_query_builder_rejects_conflicting_personal_memory_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="conflicting-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Persistent-memory evidence conflicts.",
+        ],
+        recommendation_reasons=[
+            "The personal architecture cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="The candidate has no persistent memory.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate has persistent memory.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Personal catalog mapping requires exactly one "
+            "candidate_supports_persistent_memory evidence value"
+        ),
+    ):
+        build_agent_starter_catalog_queries(
+            goal=AgentStarterGoal.PERSONAL,
+            assessment=assessment,
+        )
