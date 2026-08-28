@@ -52,6 +52,16 @@ def _generate_coding_candidates(
         ),
     )
 
+    local_filesystem_read = AgentStarterEvidence(
+        key="candidate_supports_filesystem_read",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes filesystem "
+            "read capability for repository access."
+        ),
+    )
+
     local_filesystem_write = AgentStarterEvidence(
         key="candidate_supports_filesystem_write",
         source=EvidenceSource.DERIVED,
@@ -59,6 +69,16 @@ def _generate_coding_candidates(
         reason=(
             "The local coding-agent template includes filesystem "
             "write capability for code modification."
+        ),
+    )
+
+    remote_filesystem_read = AgentStarterEvidence(
+        key="candidate_supports_filesystem_read",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes filesystem "
+            "read capability for repository access."
         ),
     )
 
@@ -78,6 +98,7 @@ def _generate_coding_candidates(
             goal=AgentStarterGoal.CODING,
             evidence=[
                 local_evidence,
+                local_filesystem_read,
                 local_filesystem_write,
             ],
         ),
@@ -86,6 +107,7 @@ def _generate_coding_candidates(
             goal=AgentStarterGoal.CODING,
             evidence=[
                 remote_evidence,
+                remote_filesystem_read,
                 remote_filesystem_write,
             ],
         ),

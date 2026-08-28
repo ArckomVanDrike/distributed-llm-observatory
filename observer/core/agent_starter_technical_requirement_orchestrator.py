@@ -11,6 +11,7 @@ from schemas.agent_starter import (
 )
 
 _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
+    "filesystem_read": "candidate_supports_filesystem_read",
     "filesystem_write": "candidate_supports_filesystem_write",
 }
 
