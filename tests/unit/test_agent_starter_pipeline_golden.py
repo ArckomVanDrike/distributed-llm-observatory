@@ -342,3 +342,65 @@ def test_pipeline_golden_personal_cross_session_memory():
     ] is False
 
     assert plan.constraint_conflict is None
+
+
+def test_pipeline_golden_voice_interruptions_remain_unknown_without_turn_management_evidence():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    plan = run_agent_starter_pipeline(
+        intake=intake,
+        compatibility_by_architecture={
+            "local-voice-pipeline": _compatible(
+                "The local voice pipeline is technically available."
+            ),
+            "hybrid-voice-pipeline": _compatible(
+                "The hybrid voice pipeline is technically available."
+            ),
+            "cloud-voice-pipeline": _compatible(
+                "The cloud voice pipeline is technically available."
+            ),
+        },
+    )
+
+    assert [
+        candidate.architecture_id
+        for candidate in plan.candidate_assessments
+    ] == [
+        "local-voice-pipeline",
+        "hybrid-voice-pipeline",
+        "cloud-voice-pipeline",
+    ]
+
+    for candidate in plan.candidate_assessments:
+        assert (
+            candidate.technical_feasibility
+            is TechnicalFeasibility.UNKNOWN
+        )
+        assert (
+            candidate.recommendation
+            is RecommendationVerdict.NOT_RECOMMENDED
+        )
+        assert (
+            candidate.confidence
+            is RecommendationConfidence.LIMITED
+        )
+        assert candidate.blocking_requirements == []
+
+        evidence = {
+            item.key: item.value
+            for item in candidate.supporting_evidence
+        }
+
+        assert evidence["voice_interruptions_requested"] is True
+        assert evidence["interruptions_required"] is True
+
+    assert plan.constraint_conflict is None
