@@ -1,0 +1,139 @@
+from datetime import datetime, timezone
+
+from schemas.agent_starter_catalog import (
+    AgentStarterCatalogComponentType,
+    AgentStarterCatalogEntry,
+)
+from schemas.model_profile import (
+    ExecutionLocation,
+    ModelProfile,
+)
+
+
+def test_catalog_entry_keeps_recommendation_metadata_outside_model_profile():
+    model = ModelProfile(
+        model_id="example-7b",
+        parameter_count=7_000_000_000,
+        quantization="q4",
+        runtime="llama.cpp",
+        execution_location=ExecutionLocation.ON_DEVICE,
+    )
+
+    entry = AgentStarterCatalogEntry(
+        identifier="example-7b-q4-local",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Example",
+        version="1.0",
+        capabilities=[
+            "coding",
+            "tool_use",
+        ],
+        deployment_modes=[
+            "on_device",
+        ],
+        supported_runtimes=[
+            "llama.cpp",
+        ],
+        license="example-license",
+        pricing_class="free",
+        privacy_implications=[
+            "Can run entirely on device.",
+        ],
+        sources=[
+            "https://example.invalid/model-card",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+        model_profile=model,
+    )
+
+    assert entry.identifier == "example-7b-q4-local"
+    assert (
+        entry.component_type
+        is AgentStarterCatalogComponentType.LLM
+    )
+    assert entry.model_profile == model
+    assert entry.capabilities == [
+        "coding",
+        "tool_use",
+    ]
+    assert entry.verified_at.tzinfo is not None
+
+    assert "vendor" not in ModelProfile.model_fields
+    assert "pricing_class" not in ModelProfile.model_fields
+    assert "sources" not in ModelProfile.model_fields
+    assert "verified_at" not in ModelProfile.model_fields
+
+
+def test_catalog_entry_requires_at_least_one_source():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogEntry(
+            identifier="example-runtime",
+            component_type=AgentStarterCatalogComponentType.RUNTIME,
+            vendor="Example Vendor",
+            family="Example Runtime",
+            version="1.0",
+            license="example-license",
+            pricing_class="free",
+            sources=[],
+            verified_at=datetime(
+                2026,
+                8,
+                28,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+
+def test_catalog_entry_requires_timezone_aware_verified_at():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogEntry(
+            identifier="example-runtime",
+            component_type=AgentStarterCatalogComponentType.RUNTIME,
+            vendor="Example Vendor",
+            family="Example Runtime",
+            version="1.0",
+            license="example-license",
+            pricing_class="free",
+            sources=[
+                "https://example.invalid/runtime",
+            ],
+            verified_at=datetime(
+                2026,
+                8,
+                28,
+            ),
+        )
+
+
+def test_catalog_entry_requires_sources_field():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogEntry(
+            identifier="example-runtime",
+            component_type=AgentStarterCatalogComponentType.RUNTIME,
+            vendor="Example Vendor",
+            family="Example Runtime",
+            version="1.0",
+            license="example-license",
+            pricing_class="free",
+            verified_at=datetime(
+                2026,
+                8,
+                28,
+                tzinfo=timezone.utc,
+            ),
+        )
