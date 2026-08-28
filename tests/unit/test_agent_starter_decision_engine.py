@@ -1,6 +1,7 @@
 from observer.core.agent_starter_decision_engine import (
     assess_automation_candidate,
     assess_coding_candidate,
+    assess_personal_candidate,
     assess_rag_candidate,
     assess_voice_candidate,
     technical_feasibility_from_compatibility,
@@ -2297,3 +2298,680 @@ def test_missing_realtime_latency_fit_does_not_assume_voice_suitability():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _cross_session_memory_evidence(
+    *,
+    candidate_supports_persistent_memory: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_persistent_memory,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether memory persists across sessions."
+            ),
+        ),
+    ]
+
+
+def test_personal_assistant_with_required_persistent_memory_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="persistent_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_cross_session_memory_evidence(
+            candidate_supports_persistent_memory=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_personal_assistant_without_required_persistent_memory_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="session_only_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_cross_session_memory_evidence(
+            candidate_supports_persistent_memory=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_persistent_memory_limits_cross_session_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "memory persists across sessions."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_persistent_memory_does_not_assume_cross_session_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _selective_memory_evidence(
+    *,
+    candidate_supports_memory_inspect_edit_delete: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_memory_inspect_edit_delete,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether stored memory can be inspected, edited, "
+                "and deleted."
+            ),
+        ),
+    ]
+
+
+def test_selective_memory_with_user_controls_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="controllable_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_selective_memory_evidence(
+            candidate_supports_memory_inspect_edit_delete=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_selective_memory_without_user_controls_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="opaque_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_selective_memory_evidence(
+            candidate_supports_memory_inspect_edit_delete=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "inspect" in reason.lower()
+        or "edit" in reason.lower()
+        or "delete" in reason.lower()
+        or "selective" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_memory_controls_limit_selective_memory_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "stored memory can be inspected, edited, and deleted."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "inspect" in reason.lower()
+            or "edit" in reason.lower()
+            or "delete" in reason.lower()
+            or "selective" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_memory_controls_does_not_assume_selective_memory_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "inspect" in reason.lower()
+            or "edit" in reason.lower()
+            or "delete" in reason.lower()
+            or "selective" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _retention_personal_evidence(
+    *,
+    candidate_retains_all_conversations_indefinitely: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.DERIVED,
+            value=candidate_retains_all_conversations_indefinitely,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether all conversation history is retained "
+                "without a bounded retention policy."
+            ),
+        ),
+    ]
+
+
+def test_personal_assistant_without_unnecessary_indefinite_retention_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="selective_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_retention_personal_evidence(
+            candidate_retains_all_conversations_indefinitely=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_unnecessary_indefinite_conversation_retention_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="retain_everything_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_retention_personal_evidence(
+            candidate_retains_all_conversations_indefinitely=True,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "retain" in reason.lower()
+        or "retention" in reason.lower()
+        or "indefinite" in reason.lower()
+        or "conversation" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_indefinite_retention_behavior_limits_personal_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate retains all conversations indefinitely."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "retention" in reason.lower()
+            or "retain" in reason.lower()
+            or "conversation" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_indefinite_retention_behavior_does_not_assume_personal_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "retention" in reason.lower()
+            or "retain" in reason.lower()
+            or "conversation" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _proactive_personal_evidence(
+    *,
+    candidate_supports_background_scheduling: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_background_scheduling,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether scheduled or background execution is available."
+            ),
+        ),
+    ]
+
+
+def test_proactive_personal_assistant_with_background_scheduling_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="proactive_personal_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_proactive_personal_evidence(
+            candidate_supports_background_scheduling=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_proactive_personal_assistant_without_background_scheduling_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="reactive_only_personal_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_proactive_personal_evidence(
+            candidate_supports_background_scheduling=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "background" in reason.lower()
+        or "schedul" in reason.lower()
+        or "proactive" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_background_scheduling_limits_proactive_personal_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "scheduled or background execution is supported."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "background" in reason.lower()
+            or "schedul" in reason.lower()
+            or "proactive" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_background_scheduling_does_not_assume_proactive_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "background" in reason.lower()
+            or "schedul" in reason.lower()
+            or "proactive" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_personal_explicit_persistent_memory_failure_beats_proactive_unknown():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason="Background scheduling support is unknown.",
+        ),
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The candidate does not persist memory across sessions.",
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_personal_explicit_memory_control_failure_beats_retention_unknown():
+    evidence = [
+        AgentStarterEvidence(
+            key="indefinite_all_conversation_retention_required",
+            source=EvidenceSource.DECLARED,
+            value=False,
+        ),
+        AgentStarterEvidence(
+            key="candidate_retains_all_conversations_indefinitely",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason="Conversation retention behavior is unknown.",
+        ),
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="Stored memory cannot be inspected, edited, or deleted.",
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_personal_explicit_persistent_failure_beats_memory_controls_unknown():
+    evidence = [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason="Memory management controls are unknown.",
+        ),
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The candidate does not persist memory across sessions.",
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_personal_technical_infeasibility_beats_all_personal_fit_evidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="proactive_behavior_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_background_scheduling",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="Background execution is supported.",
+        ),
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="Persistent memory is supported.",
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.NOT_FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
