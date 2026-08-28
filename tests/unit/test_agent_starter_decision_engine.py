@@ -1735,3 +1735,137 @@ def test_missing_streaming_support_does_not_assume_realtime_voice_fit():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _raw_audio_local_only_requirement() -> AgentStarterRequirement:
+    return AgentStarterRequirement(
+        key="raw_audio_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            AgentStarterEvidence(
+                key="raw_audio_local_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+
+def test_remote_raw_audio_processing_violates_local_only_voice_requirement():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The candidate sends raw audio to a remote STT "
+                "component for transcription."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="remote_stt_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [requirement]
+    assert any(
+        "raw audio" in reason.lower()
+        or "local" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_local_raw_audio_processing_satisfies_local_only_boundary():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "Raw audio is processed locally before any "
+                "downstream remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="local_stt_voice_pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_unknown_raw_audio_processing_cannot_verify_local_only_compliance():
+    requirement = _raw_audio_local_only_requirement()
+
+    evidence = [
+        AgentStarterEvidence(
+            key="candidate_raw_audio_remote_processing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "raw audio is sent to remote processing."
+            ),
+        ),
+    ]
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "raw audio" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_raw_audio_processing_does_not_assume_local_only_compliance():
+    requirement = _raw_audio_local_only_requirement()
+
+    result = assess_voice_candidate(
+        architecture_id="voice_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "raw audio" in reason.lower()
+        and (
+            "cannot" in reason.lower()
+            or "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

@@ -964,6 +964,74 @@ def assess_voice_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    raw_audio_local_only_requirements = [
+        requirement
+        for requirement in requirements
+        if (
+            requirement.key == "raw_audio_must_stay_local"
+            and requirement.value is True
+            and requirement.strength is ConstraintStrength.HARD
+        )
+    ]
+
+    candidate_raw_audio_remote_processing = any(
+        evidence.key == "candidate_raw_audio_remote_processing"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    raw_audio_processing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_raw_audio_remote_processing"
+    ]
+
+    raw_audio_processing_unknown = (
+        bool(raw_audio_local_only_requirements)
+        and (
+            not raw_audio_processing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in raw_audio_processing_evidence
+            )
+        )
+    )
+
+    if (
+        raw_audio_local_only_requirements
+        and candidate_raw_audio_remote_processing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate violates the hard requirement "
+                "that raw audio must stay local."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=raw_audio_local_only_requirements,
+        )
+
+    if raw_audio_processing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Compliance with the hard requirement that raw "
+                "audio must stay local cannot be verified from "
+                "the available evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=[],
+        )
+
     realtime_voice_required = any(
         evidence.key == "realtime_voice_required"
         and evidence.value is True
