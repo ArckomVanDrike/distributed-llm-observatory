@@ -673,3 +673,60 @@ def test_requested_voice_interruptions_without_turn_management_are_not_feasible(
     ] == [
         "candidate_supports_barge_in_turn_management",
     ]
+
+
+def test_required_cross_session_memory_rejects_session_only_candidate():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="cross_session_memory_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+    candidates = generate_agent_starter_candidates(prepared)
+
+    candidate = next(
+        candidate
+        for candidate in candidates
+        if (
+            candidate.architecture_id
+            == "session-only-personal-assistant"
+        )
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_persistent_memory",
+    ]

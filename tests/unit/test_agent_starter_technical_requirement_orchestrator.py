@@ -653,3 +653,107 @@ def test_turn_management_requirement_remains_unknown_without_candidate_evidence(
         assessments[0].status
         is TechnicalRequirementStatus.UNKNOWN
     )
+
+
+def test_persistent_memory_requirement_is_unsatisfied_by_session_only_candidate():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="persistent_memory_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Cross-session memory requires persistent "
+                    "memory capability."
+                ),
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    candidate = next(
+        candidate
+        for candidate in candidates
+        if (
+            candidate.architecture_id
+            == "session-only-personal-assistant"
+        )
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "persistent_memory_required"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.UNSATISFIED
+    )
+    assert [
+        evidence.key
+        for evidence in assessments[0].supporting_evidence
+    ] == [
+        "candidate_supports_persistent_memory",
+    ]
+
+
+def test_persistent_memory_requirement_is_satisfied_by_controlled_memory_candidate():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_technical_requirement_orchestrator import (
+        build_agent_starter_technical_requirement_assessments,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="persistent_memory_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Cross-session memory requires persistent "
+                    "memory capability."
+                ),
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    candidate = next(
+        candidate
+        for candidate in candidates
+        if (
+            candidate.architecture_id
+            == "controlled-persistent-memory-assistant"
+        )
+    )
+
+    assessments = (
+        build_agent_starter_technical_requirement_assessments(
+            prepared=prepared,
+            candidate=candidate,
+        )
+    )
+
+    assert len(assessments) == 1
+    assert assessments[0].key == "persistent_memory_required"
+    assert (
+        assessments[0].status
+        is TechnicalRequirementStatus.SATISFIED
+    )

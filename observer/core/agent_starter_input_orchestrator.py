@@ -262,6 +262,29 @@ def derive_agent_starter_capability_evidence(
 
         return derived
 
+    if intake.goal is AgentStarterGoal.PERSONAL:
+        cross_session_memory_required = bool(
+            _declared_true_evidence(
+                intake,
+                key="cross_session_memory_required",
+            )
+        )
+
+        if not cross_session_memory_required:
+            return []
+
+        return [
+            AgentStarterEvidence(
+                key="persistent_memory_required",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Memory that must persist across sessions "
+                    "requires persistent memory capability."
+                ),
+            )
+        ]
+
     if intake.goal is AgentStarterGoal.AUTOMATION:
         workflow_deterministic = bool(
             _declared_true_evidence(

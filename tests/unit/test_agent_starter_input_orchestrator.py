@@ -1485,3 +1485,36 @@ def test_voice_interruptions_derive_turn_management_requirement():
     )
     assert turn_management_required[0].value is True
     assert turn_management_required[0].reason
+
+
+def test_cross_session_memory_derives_persistent_memory_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="cross_session_memory_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    persistent_memory_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "persistent_memory_required"
+    ]
+
+    assert len(persistent_memory_required) == 1
+    assert (
+        persistent_memory_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert persistent_memory_required[0].value is True
+    assert persistent_memory_required[0].reason

@@ -11,6 +11,9 @@ from schemas.agent_starter import (
 )
 
 _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
+    "persistent_memory_required": (
+        "candidate_supports_persistent_memory"
+    ),
     "barge_in_turn_management_required": (
         "candidate_supports_barge_in_turn_management"
     ),
