@@ -129,19 +129,17 @@ def test_coding_candidate_generation_does_not_add_assessment_state():
         assert not hasattr(candidate, "confidence")
 
 
-def test_candidate_generation_returns_empty_for_unimplemented_goals():
+def test_candidate_generation_supports_all_agent_starter_goals():
     from observer.core.agent_starter_candidate_generator import (
         generate_agent_starter_candidates,
     )
 
-    for goal in (
-        AgentStarterGoal.PERSONAL,
-    ):
+    for goal in AgentStarterGoal:
         prepared = AgentStarterPreparedInput(
             goal=goal,
         )
 
-        assert generate_agent_starter_candidates(prepared) == []
+        assert generate_agent_starter_candidates(prepared)
 
 
 def test_generates_base_rag_candidates_in_deterministic_order():
@@ -484,4 +482,116 @@ def test_automation_generation_does_not_filter_deterministic_workflows():
         "traditional-deterministic-automation",
         "supervised-automation-agent",
         "autonomous-workflow-agent",
+    ]
+
+
+def test_generates_base_personal_candidates_in_deterministic_order():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "session-only-personal-assistant",
+        "opaque-persistent-memory-assistant",
+        "controlled-persistent-memory-assistant",
+    ]
+
+    assert all(
+        candidate.goal is AgentStarterGoal.PERSONAL
+        for candidate in candidates
+    )
+
+
+def test_personal_candidates_record_memory_properties():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    session_only, opaque_memory, controlled_memory = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in session_only.evidence
+    } == {
+        "candidate_supports_persistent_memory": False,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in opaque_memory.evidence
+    } == {
+        "candidate_supports_persistent_memory": True,
+        "candidate_supports_memory_inspect_edit_delete": False,
+    }
+
+    assert {
+        evidence.key: evidence.value
+        for evidence in controlled_memory.evidence
+    } == {
+        "candidate_supports_persistent_memory": True,
+        "candidate_supports_memory_inspect_edit_delete": True,
+    }
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for candidate in (
+            session_only,
+            opaque_memory,
+            controlled_memory,
+        )
+        for evidence in candidate.evidence
+    )
+
+    assert all(
+        evidence.reason
+        for candidate in (
+            session_only,
+            opaque_memory,
+            controlled_memory,
+        )
+        for evidence in candidate.evidence
+    )
+
+
+def test_personal_generation_does_not_filter_selective_memory_conflicts():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from schemas.agent_starter import AgentStarterEvidence
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="selective_memory_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "session-only-personal-assistant",
+        "opaque-persistent-memory-assistant",
+        "controlled-persistent-memory-assistant",
     ]
