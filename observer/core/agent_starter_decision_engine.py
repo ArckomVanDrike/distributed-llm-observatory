@@ -274,9 +274,67 @@ def assess_automation_candidate(
         for evidence in candidate_evidence
     )
 
-    technical_reason = (
-        "The candidate is technically feasible."
-    )
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not technically feasible."
+        )
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        technical_reason = (
+            "The candidate's technical feasibility is unknown."
+        )
+    else:
+        technical_reason = (
+            "The candidate is technically feasible."
+        )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.LIMITED:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Limited technical feasibility makes this "
+                "candidate a possible but currently "
+                "not recommended choice."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "technical feasibility for this candidate."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
 
     if (
         high_impact_actions
