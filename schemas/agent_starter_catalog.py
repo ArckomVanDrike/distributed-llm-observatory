@@ -102,3 +102,17 @@ class AgentStarterCatalogSnapshot(BaseModel):
             )
 
         return self
+
+
+class AgentStarterCatalogQuery(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    component_type: AgentStarterCatalogComponentType
+    required_capabilities: list[str] = Field(
+        default_factory=list,
+    )
+    required_deployment_modes: list[str] = Field(
+        default_factory=list,
+    )
+    required_runtime: str | None = None
+    required_pricing_class: str | None = None

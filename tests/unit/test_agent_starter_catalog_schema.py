@@ -265,3 +265,36 @@ def test_catalog_snapshot_rejects_duplicate_entry_identifiers():
                 second,
             ],
         )
+
+
+def test_catalog_query_records_explicit_matching_properties():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogQuery,
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type=AgentStarterCatalogComponentType.LLM,
+        required_capabilities=[
+            "coding",
+            "tool_use",
+        ],
+        required_deployment_modes=[
+            "on_device",
+        ],
+        required_runtime="llama.cpp",
+        required_pricing_class="free",
+    )
+
+    assert (
+        query.component_type
+        is AgentStarterCatalogComponentType.LLM
+    )
+    assert query.required_capabilities == [
+        "coding",
+        "tool_use",
+    ]
+    assert query.required_deployment_modes == [
+        "on_device",
+    ]
+    assert query.required_runtime == "llama.cpp"
+    assert query.required_pricing_class == "free"
