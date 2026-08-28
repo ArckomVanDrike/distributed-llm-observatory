@@ -1395,6 +1395,71 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
+    selective_memory_required = any(
+        evidence.key == "selective_memory_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_memory_controls = any(
+        evidence.key == "candidate_supports_memory_inspect_edit_delete"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    memory_controls_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_memory_inspect_edit_delete"
+    ]
+
+    memory_controls_unknown = (
+        selective_memory_required
+        and (
+            not memory_controls_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in memory_controls_evidence
+            )
+        )
+    )
+
+    if (
+        selective_memory_required
+        and candidate_explicitly_lacks_memory_controls
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Selective memory is required, but the candidate "
+                "does not support inspection, editing, and deletion "
+                "of stored memory."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if memory_controls_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Memory inspection, editing, and deletion support "
+                "is unknown or insufficiently established for the "
+                "requested selective memory workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
     cross_session_memory_required = any(
         evidence.key == "cross_session_memory_required"
         and evidence.value is True

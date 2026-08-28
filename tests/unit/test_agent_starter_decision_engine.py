@@ -2416,3 +2416,139 @@ def test_missing_persistent_memory_does_not_assume_cross_session_fit():
         or "cross-session" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def _selective_memory_evidence(
+    *,
+    candidate_supports_memory_inspect_edit_delete: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_memory_inspect_edit_delete,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether stored memory can be inspected, edited, "
+                "and deleted."
+            ),
+        ),
+    ]
+
+
+def test_selective_memory_with_user_controls_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="controllable_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_selective_memory_evidence(
+            candidate_supports_memory_inspect_edit_delete=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_selective_memory_without_user_controls_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="opaque_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_selective_memory_evidence(
+            candidate_supports_memory_inspect_edit_delete=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "inspect" in reason.lower()
+        or "edit" in reason.lower()
+        or "delete" in reason.lower()
+        or "selective" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_memory_controls_limit_selective_memory_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_memory_inspect_edit_delete",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "stored memory can be inspected, edited, and deleted."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "inspect" in reason.lower()
+            or "edit" in reason.lower()
+            or "delete" in reason.lower()
+            or "selective" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_memory_controls_does_not_assume_selective_memory_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="selective_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "inspect" in reason.lower()
+            or "edit" in reason.lower()
+            or "delete" in reason.lower()
+            or "selective" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
