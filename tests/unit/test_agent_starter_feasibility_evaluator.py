@@ -411,3 +411,106 @@ def test_satisfied_requirements_allow_compatibility_mapping_to_proceed():
         is TechnicalFeasibility.FEASIBLE
     )
     assert capability in assessment.supporting_evidence
+
+
+def test_evaluator_builds_unsatisfied_technical_requirements_automatically():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    requirement_evidence = AgentStarterEvidence(
+        key="filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="Code modification requires filesystem write.",
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            AgentStarterRequirement(
+                key="filesystem_write",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[requirement_evidence],
+            ),
+        ],
+    )
+
+    lack = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason="Candidate cannot write files.",
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="restricted-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[lack],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert assessment.supporting_evidence == [lack]
+
+
+def test_evaluator_keeps_missing_candidate_capability_unknown_automatically():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    requirement_evidence = AgentStarterEvidence(
+        key="filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="Code modification requires filesystem write.",
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            AgentStarterRequirement(
+                key="filesystem_write",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[requirement_evidence],
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="unknown-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )

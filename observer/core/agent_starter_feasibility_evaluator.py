@@ -3,6 +3,9 @@ from __future__ import annotations
 from observer.core.agent_starter_feasibility import (
     technical_feasibility_from_compatibility,
 )
+from observer.core.agent_starter_technical_requirement_orchestrator import (
+    build_agent_starter_technical_requirement_assessments,
+)
 from schemas.agent_starter import (
     AgentStarterCandidateArchitecture,
     AgentStarterEvidence,
@@ -30,7 +33,15 @@ def evaluate_agent_starter_technical_feasibility(
             "Candidate goal must match prepared input goal."
         )
 
-    requirement_assessments = technical_requirements or []
+    if technical_requirements is None:
+        requirement_assessments = (
+            build_agent_starter_technical_requirement_assessments(
+                prepared=prepared,
+                candidate=candidate,
+            )
+        )
+    else:
+        requirement_assessments = technical_requirements
 
     unsatisfied_requirements = [
         requirement
