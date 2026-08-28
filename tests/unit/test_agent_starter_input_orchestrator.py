@@ -614,6 +614,7 @@ def test_scanned_document_input_derives_rag_scan_requirement_evidence():
         for evidence in derived
     ] == [
         "documents_include_scans",
+        "ocr_required",
     ]
 
     evidence = derived[0]
@@ -691,6 +692,7 @@ def test_rag_capability_derivations_accumulate_independent_signals():
         "corpus_fits_direct_context",
         "retrieval_required",
         "documents_include_scans",
+        "ocr_required",
     ]
 
     assert [
@@ -699,6 +701,7 @@ def test_rag_capability_derivations_accumulate_independent_signals():
     ] == [
         True,
         False,
+        True,
         True,
     ]
 
@@ -731,6 +734,7 @@ def test_rag_citation_request_derives_citations_required():
         for evidence in derived
     ] == [
         "citations_required",
+        "source_provenance_required",
     ]
     assert derived[0].source is EvidenceSource.DERIVED
     assert derived[0].value is True
@@ -886,6 +890,7 @@ def test_rag_decision_evidence_has_canonical_order():
         for evidence in derived
     ] == [
         "citations_required",
+        "source_provenance_required",
         "corpus_updates_frequent",
         "exact_identifier_lookup_required",
     ]
@@ -943,6 +948,7 @@ def test_voice_interruptions_request_derives_interruptions_requirement():
         for evidence in derived
     ] == [
         "interruptions_required",
+        "barge_in_turn_management_required",
     ]
     assert derived[0].source is EvidenceSource.DERIVED
     assert derived[0].value is True
@@ -1021,6 +1027,7 @@ def test_voice_requirements_accumulate_in_canonical_order():
     ] == [
         "realtime_voice_required",
         "interruptions_required",
+        "barge_in_turn_management_required",
     ]
 
 
@@ -1379,3 +1386,168 @@ def test_prepare_agent_starter_input_does_not_mutate_intake():
         "workflow_deterministic",
         "semantic_interpretation_required",
     ]
+
+
+def test_scanned_rag_documents_derive_ocr_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    ocr_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "ocr_required"
+    ]
+
+    assert len(ocr_required) == 1
+    assert ocr_required[0].source is EvidenceSource.DERIVED
+    assert ocr_required[0].value is True
+    assert ocr_required[0].reason
+
+
+def test_rag_citations_derive_source_provenance_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    provenance_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "source_provenance_required"
+    ]
+
+    assert len(provenance_required) == 1
+    assert (
+        provenance_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert provenance_required[0].value is True
+    assert provenance_required[0].reason
+
+
+def test_voice_interruptions_derive_turn_management_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    turn_management_required = [
+        evidence
+        for evidence in derived
+        if (
+            evidence.key
+            == "barge_in_turn_management_required"
+        )
+    ]
+
+    assert len(turn_management_required) == 1
+    assert (
+        turn_management_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert turn_management_required[0].value is True
+    assert turn_management_required[0].reason
+
+
+def test_cross_session_memory_derives_persistent_memory_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="cross_session_memory_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    persistent_memory_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "persistent_memory_required"
+    ]
+
+    assert len(persistent_memory_required) == 1
+    assert (
+        persistent_memory_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert persistent_memory_required[0].value is True
+    assert persistent_memory_required[0].reason
+
+
+def test_proactive_personal_behavior_derives_background_scheduling_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="proactive_behavior_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    scheduling_required = [
+        evidence
+        for evidence in derived
+        if evidence.key == "background_scheduling_required"
+    ]
+
+    assert len(scheduling_required) == 1
+    assert (
+        scheduling_required[0].source
+        is EvidenceSource.DERIVED
+    )
+    assert scheduling_required[0].value is True
+    assert scheduling_required[0].reason

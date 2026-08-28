@@ -48,6 +48,10 @@ def test_coding_candidates_record_locality_evidence():
         for evidence in local_candidate.evidence
     ] == [
         "source_code_remote_processing",
+        "candidate_supports_filesystem_read",
+        "candidate_supports_filesystem_write",
+        "candidate_supports_shell_execution",
+        "candidate_supports_test_execution",
     ]
     assert local_candidate.evidence[0].value is False
 
@@ -56,6 +60,10 @@ def test_coding_candidates_record_locality_evidence():
         for evidence in remote_candidate.evidence
     ] == [
         "source_code_remote_processing",
+        "candidate_supports_filesystem_read",
+        "candidate_supports_filesystem_write",
+        "candidate_supports_shell_execution",
+        "candidate_supports_test_execution",
     ]
     assert remote_candidate.evidence[0].value is True
 
@@ -184,7 +192,7 @@ def test_rag_candidates_record_retrieval_architecture_evidence():
         evidence.key
         for evidence in direct_context.evidence
     ] == [
-        "candidate_uses_retrieval",
+        "candidate_uses_retrieval_pipeline",
     ]
     assert direct_context.evidence[0].value is False
 
@@ -192,7 +200,7 @@ def test_rag_candidates_record_retrieval_architecture_evidence():
         evidence.key
         for evidence in full_rag.evidence
     ] == [
-        "candidate_uses_retrieval",
+        "candidate_uses_retrieval_pipeline",
     ]
     assert full_rag.evidence[0].value is True
 
@@ -595,3 +603,123 @@ def test_personal_generation_does_not_filter_selective_memory_conflicts():
         "opaque-persistent-memory-assistant",
         "controlled-persistent-memory-assistant",
     ]
+
+
+def test_coding_candidates_explicitly_record_filesystem_write_support():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    local_candidate, remote_candidate = candidates
+
+    for candidate in (
+        local_candidate,
+        remote_candidate,
+    ):
+        matches = [
+            evidence
+            for evidence in candidate.evidence
+            if evidence.key
+            == "candidate_supports_filesystem_write"
+        ]
+
+        assert len(matches) == 1
+        assert matches[0].value is True
+        assert matches[0].source is EvidenceSource.DERIVED
+        assert matches[0].reason
+
+
+def test_coding_candidates_explicitly_record_filesystem_read_support():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    local_candidate, remote_candidate = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    for candidate in (
+        local_candidate,
+        remote_candidate,
+    ):
+        matches = [
+            evidence
+            for evidence in candidate.evidence
+            if evidence.key
+            == "candidate_supports_filesystem_read"
+        ]
+
+        assert len(matches) == 1
+        assert matches[0].value is True
+        assert matches[0].source is EvidenceSource.DERIVED
+        assert matches[0].reason
+
+
+def test_coding_candidates_explicitly_record_shell_execution_support():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    local_candidate, remote_candidate = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    for candidate in (
+        local_candidate,
+        remote_candidate,
+    ):
+        matches = [
+            evidence
+            for evidence in candidate.evidence
+            if evidence.key
+            == "candidate_supports_shell_execution"
+        ]
+
+        assert len(matches) == 1
+        assert matches[0].value is True
+        assert matches[0].source is EvidenceSource.DERIVED
+        assert matches[0].reason
+
+
+def test_coding_candidates_explicitly_record_test_execution_support():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    local_candidate, remote_candidate = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    for candidate in (
+        local_candidate,
+        remote_candidate,
+    ):
+        matches = [
+            evidence
+            for evidence in candidate.evidence
+            if evidence.key
+            == "candidate_supports_test_execution"
+        ]
+
+        assert len(matches) == 1
+        assert matches[0].value is True
+        assert matches[0].source is EvidenceSource.DERIVED
+        assert matches[0].reason

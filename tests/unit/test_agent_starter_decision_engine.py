@@ -4,6 +4,8 @@ from observer.core.agent_starter_decision_engine import (
     assess_personal_candidate,
     assess_rag_candidate,
     assess_voice_candidate,
+)
+from observer.core.agent_starter_feasibility import (
     technical_feasibility_from_compatibility,
 )
 from schemas.agent_starter import (

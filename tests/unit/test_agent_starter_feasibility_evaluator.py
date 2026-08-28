@@ -1,0 +1,792 @@
+import pytest
+
+from schemas.agent_starter import (
+    AgentStarterCandidateArchitecture,
+    AgentStarterGoal,
+    AgentStarterPreparedInput,
+    EvidenceSource,
+    TechnicalFeasibility,
+)
+from schemas.hardware import (
+    DeviceClass,
+    HardwareProfile,
+    HardwareProfileSource,
+)
+
+
+def test_feasibility_is_unknown_without_technical_basis():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert assessment.architecture_id == "local-coding-agent"
+    assert assessment.goal is AgentStarterGoal.CODING
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert assessment.reasons
+    assert assessment.supporting_evidence == []
+
+
+def test_hardware_profile_alone_does_not_imply_feasibility():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=16 * 1024**3,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        hardware_profile=hardware,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert assessment.supporting_evidence == []
+    assert assessment.reasons
+
+
+def test_missing_technical_information_never_defaults_to_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-voice-pipeline",
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+
+
+def test_feasibility_rejects_goal_mismatch():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="cloud-voice-pipeline",
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="goal",
+    ):
+        evaluate_agent_starter_technical_feasibility(
+            prepared=prepared,
+            candidate=candidate,
+        )
+
+
+@pytest.mark.parametrize(
+    (
+        "compatibility_verdict",
+        "expected_feasibility",
+    ),
+    [
+        (
+            "compatible",
+            TechnicalFeasibility.FEASIBLE,
+        ),
+        (
+            "constrained",
+            TechnicalFeasibility.LIMITED,
+        ),
+        (
+            "not_recommended",
+            TechnicalFeasibility.LIMITED,
+        ),
+        (
+            "unknown",
+            TechnicalFeasibility.UNKNOWN,
+        ),
+    ],
+)
+def test_feasibility_uses_compatibility_assessment_as_technical_basis(
+    compatibility_verdict,
+    expected_feasibility,
+):
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict(compatibility_verdict),
+        summary="Candidate-specific compatibility assessment.",
+        reasons=[
+            "Compatibility was evaluated from known technical inputs.",
+        ],
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="local-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+        compatibility_assessment=compatibility,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is expected_feasibility
+    )
+
+    assert assessment.reasons == [
+        "Candidate-specific compatibility assessment.",
+        "Compatibility was evaluated from known technical inputs.",
+    ]
+
+    assert len(assessment.supporting_evidence) == 1
+
+    evidence = assessment.supporting_evidence[0]
+
+    assert evidence.key == "candidate_compatibility_verdict"
+    assert evidence.source is EvidenceSource.DERIVED
+    assert evidence.value == compatibility_verdict
+    assert evidence.reason == compatibility.summary
+
+
+def test_not_recommended_compatibility_never_becomes_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.NOT_RECOMMENDED,
+        summary="Estimated local headroom is insufficiently comfortable.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.LIMITED
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+
+def test_known_unsatisfied_requirement_makes_candidate_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    missing_capability = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The candidate does not provide filesystem write."
+        ),
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="filesystem_write",
+        status=TechnicalRequirementStatus.UNSATISFIED,
+        reasons=[
+            "Filesystem write is required but unavailable.",
+        ],
+        supporting_evidence=[missing_capability],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is otherwise adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert missing_capability in assessment.supporting_evidence
+    assert any(
+        "filesystem write" in reason.lower()
+        for reason in assessment.reasons
+    )
+
+
+def test_unknown_required_capability_prevents_feasible_default():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="shell_execution",
+        status=TechnicalRequirementStatus.UNKNOWN,
+        reasons=[
+            "Shell execution support has not been established.",
+        ],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+
+def test_satisfied_requirements_allow_compatibility_mapping_to_proceed():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    capability = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The candidate provides filesystem write."
+        ),
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="filesystem_write",
+        status=TechnicalRequirementStatus.SATISFIED,
+        reasons=[
+            "Filesystem write capability is available.",
+        ],
+        supporting_evidence=[capability],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert capability in assessment.supporting_evidence
+
+
+
+def test_evaluator_builds_unsatisfied_technical_requirements_automatically():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import AgentStarterEvidence
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="filesystem_write",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Code modification requires filesystem write."
+                ),
+            ),
+        ],
+    )
+
+    lack = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason="Candidate cannot write files.",
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="restricted-coding-agent",
+        goal=AgentStarterGoal.CODING,
+        evidence=[lack],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert assessment.supporting_evidence == [lack]
+
+
+def test_evaluator_keeps_missing_candidate_capability_unknown_automatically():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import AgentStarterEvidence
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="filesystem_write",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Code modification requires filesystem write."
+                ),
+            ),
+        ],
+    )
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="unknown-coding-agent",
+        goal=AgentStarterGoal.CODING,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+
+def test_scanned_documents_with_explicitly_missing_ocr_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="document_input_includes_scanned_pages",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="rag-without-ocr",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_ocr",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Candidate does not provide OCR.",
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_ocr",
+    ]
+
+
+def test_required_citations_without_source_provenance_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="user_requires_citations",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="rag-without-provenance",
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_provides_source_provenance",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Candidate does not retain source provenance."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_provides_source_provenance",
+    ]
+
+
+def test_requested_voice_interruptions_without_turn_management_are_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="voice-without-turn-management",
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_barge_in_turn_management",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Candidate does not support barge-in or "
+                    "conversational turn management."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_barge_in_turn_management",
+    ]
+
+
+def test_required_cross_session_memory_rejects_session_only_candidate():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="cross_session_memory_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+    candidates = generate_agent_starter_candidates(prepared)
+
+    candidate = next(
+        candidate
+        for candidate in candidates
+        if (
+            candidate.architecture_id
+            == "session-only-personal-assistant"
+        )
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_persistent_memory",
+    ]
+
+
+def test_proactive_behavior_without_background_scheduling_is_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="proactive_behavior_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    candidate = AgentStarterCandidateArchitecture(
+        architecture_id="reactive-only-personal-assistant",
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_background_scheduling",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate does not support scheduled "
+                    "or background execution."
+                ),
+            ),
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=prepared,
+        candidate=candidate,
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+    assert [
+        evidence.key
+        for evidence in assessment.supporting_evidence
+    ] == [
+        "candidate_supports_background_scheduling",
+    ]

@@ -104,16 +104,29 @@ def derive_agent_starter_capability_evidence(
         )
 
         if documents_include_scanned_pages:
-            derived.append(
-                AgentStarterEvidence(
-                    key="documents_include_scans",
-                    source=EvidenceSource.DERIVED,
-                    value=True,
-                    reason=(
-                        "The user declared that document input "
-                        "includes scanned pages."
+            reason = (
+                "The user declared that document input includes "
+                "scanned pages."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="documents_include_scans",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
                     ),
-                )
+                    AgentStarterEvidence(
+                        key="ocr_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Scanned document pages require OCR "
+                            "capability for text extraction."
+                        ),
+                    ),
+                ]
             )
 
         user_requires_citations = bool(
@@ -124,16 +137,29 @@ def derive_agent_starter_capability_evidence(
         )
 
         if user_requires_citations:
-            derived.append(
-                AgentStarterEvidence(
-                    key="citations_required",
-                    source=EvidenceSource.DERIVED,
-                    value=True,
-                    reason=(
-                        "The user explicitly requires citations "
-                        "in knowledge answers."
+            reason = (
+                "The user explicitly requires citations "
+                "in knowledge answers."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="citations_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
                     ),
-                )
+                    AgentStarterEvidence(
+                        key="source_provenance_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Reliable citations require source "
+                            "provenance for supporting evidence."
+                        ),
+                    ),
+                ]
             )
 
         knowledge_changes_frequently = bool(
@@ -209,14 +235,71 @@ def derive_agent_starter_capability_evidence(
         )
 
         if interruptions_requested:
+            reason = (
+                "The user requested interruption or barge-in "
+                "behavior during voice interaction."
+            )
+
+            derived.extend(
+                [
+                    AgentStarterEvidence(
+                        key="interruptions_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=reason,
+                    ),
+                    AgentStarterEvidence(
+                        key="barge_in_turn_management_required",
+                        source=EvidenceSource.DERIVED,
+                        value=True,
+                        reason=(
+                            "Interruptible voice interaction requires "
+                            "barge-in or conversational turn management."
+                        ),
+                    ),
+                ]
+            )
+
+        return derived
+
+    if intake.goal is AgentStarterGoal.PERSONAL:
+        derived: list[AgentStarterEvidence] = []
+
+        cross_session_memory_required = bool(
+            _declared_true_evidence(
+                intake,
+                key="cross_session_memory_required",
+            )
+        )
+        proactive_behavior_required = bool(
+            _declared_true_evidence(
+                intake,
+                key="proactive_behavior_required",
+            )
+        )
+
+        if cross_session_memory_required:
             derived.append(
                 AgentStarterEvidence(
-                    key="interruptions_required",
+                    key="persistent_memory_required",
                     source=EvidenceSource.DERIVED,
                     value=True,
                     reason=(
-                        "The user requested interruption or "
-                        "barge-in behavior during voice interaction."
+                        "Memory that must persist across sessions "
+                        "requires persistent memory capability."
+                    ),
+                )
+            )
+
+        if proactive_behavior_required:
+            derived.append(
+                AgentStarterEvidence(
+                    key="background_scheduling_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "Proactive behavior requires scheduled "
+                        "or background execution capability."
                     ),
                 )
             )

@@ -52,16 +52,108 @@ def _generate_coding_candidates(
         ),
     )
 
+    local_filesystem_read = AgentStarterEvidence(
+        key="candidate_supports_filesystem_read",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes filesystem "
+            "read capability for repository access."
+        ),
+    )
+
+    local_filesystem_write = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes filesystem "
+            "write capability for code modification."
+        ),
+    )
+
+    remote_filesystem_read = AgentStarterEvidence(
+        key="candidate_supports_filesystem_read",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes filesystem "
+            "read capability for repository access."
+        ),
+    )
+
+    remote_filesystem_write = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes filesystem "
+            "write capability for code modification."
+        ),
+    )
+
+    local_shell_execution = AgentStarterEvidence(
+        key="candidate_supports_shell_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes shell "
+            "execution capability."
+        ),
+    )
+
+    remote_shell_execution = AgentStarterEvidence(
+        key="candidate_supports_shell_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes shell "
+            "execution capability."
+        ),
+    )
+
+    local_test_execution = AgentStarterEvidence(
+        key="candidate_supports_test_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The local coding-agent template includes test "
+            "execution capability."
+        ),
+    )
+
+    remote_test_execution = AgentStarterEvidence(
+        key="candidate_supports_test_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The remote coding-agent template includes test "
+            "execution capability."
+        ),
+    )
+
     return [
         AgentStarterCandidateArchitecture(
             architecture_id="local-coding-agent",
             goal=AgentStarterGoal.CODING,
-            evidence=[local_evidence],
+            evidence=[
+                local_evidence,
+                local_filesystem_read,
+                local_filesystem_write,
+                local_shell_execution,
+                local_test_execution,
+            ],
         ),
         AgentStarterCandidateArchitecture(
             architecture_id="remote-coding-agent",
             goal=AgentStarterGoal.CODING,
-            evidence=[remote_evidence],
+            evidence=[
+                remote_evidence,
+                remote_filesystem_read,
+                remote_filesystem_write,
+                remote_shell_execution,
+                remote_test_execution,
+            ],
         ),
     ]
 
@@ -69,7 +161,7 @@ def _generate_coding_candidates(
 def _generate_rag_candidates(
 ) -> list[AgentStarterCandidateArchitecture]:
     direct_context_evidence = AgentStarterEvidence(
-        key="candidate_uses_retrieval",
+        key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
         value=False,
         reason=(
@@ -79,7 +171,7 @@ def _generate_rag_candidates(
     )
 
     full_rag_evidence = AgentStarterEvidence(
-        key="candidate_uses_retrieval",
+        key="candidate_uses_retrieval_pipeline",
         source=EvidenceSource.DERIVED,
         value=True,
         reason=(
