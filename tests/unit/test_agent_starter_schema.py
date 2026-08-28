@@ -717,3 +717,67 @@ def test_agent_starter_plan_conflict_rejects_recommended_candidate():
             candidate_assessments=[candidate],
             constraint_conflict=conflict,
         )
+
+
+def test_candidate_assessment_records_blocking_hard_requirement():
+    evidence = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    requirement = AgentStarterRequirement(
+        key="source_code_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="cloud_coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "Remote inference is technically available.",
+        ],
+        recommendation_reasons=[
+            "The candidate violates the local-only boundary.",
+        ],
+        supporting_evidence=[evidence],
+        blocking_requirements=[requirement],
+    )
+
+    assert assessment.blocking_requirements == [requirement]
+
+
+def test_candidate_assessment_rejects_soft_blocking_requirement():
+    evidence = AgentStarterEvidence(
+        key="prefer_local_execution",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    preference = AgentStarterRequirement(
+        key="prefer_local_execution",
+        value=True,
+        strength=ConstraintStrength.SOFT,
+        evidence=[evidence],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Blocking requirements must be hard constraints",
+    ):
+        CandidateArchitectureAssessment(
+            architecture_id="cloud_coding",
+            technical_feasibility=TechnicalFeasibility.FEASIBLE,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[
+                "Remote inference is technically available.",
+            ],
+            recommendation_reasons=[
+                "Local execution is preferred.",
+            ],
+            supporting_evidence=[evidence],
+            blocking_requirements=[preference],
+        )
