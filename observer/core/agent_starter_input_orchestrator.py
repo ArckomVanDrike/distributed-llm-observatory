@@ -177,6 +177,51 @@ def derive_agent_starter_capability_evidence(
 
         return derived
 
+    if intake.goal is AgentStarterGoal.VOICE:
+        derived: list[AgentStarterEvidence] = []
+
+        realtime_requested = bool(
+            _declared_true_evidence(
+                intake,
+                key="voice_realtime_interaction_requested",
+            )
+        )
+
+        if realtime_requested:
+            derived.append(
+                AgentStarterEvidence(
+                    key="realtime_voice_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user requested realtime voice "
+                        "interaction."
+                    ),
+                )
+            )
+
+        interruptions_requested = bool(
+            _declared_true_evidence(
+                intake,
+                key="voice_interruptions_requested",
+            )
+        )
+
+        if interruptions_requested:
+            derived.append(
+                AgentStarterEvidence(
+                    key="interruptions_required",
+                    source=EvidenceSource.DERIVED,
+                    value=True,
+                    reason=(
+                        "The user requested interruption or "
+                        "barge-in behavior during voice interaction."
+                    ),
+                )
+            )
+
+        return derived
+
     if intake.goal is not AgentStarterGoal.CODING:
         return []
 

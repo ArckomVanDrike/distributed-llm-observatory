@@ -889,3 +889,184 @@ def test_rag_decision_evidence_has_canonical_order():
         "corpus_updates_frequent",
         "exact_identifier_lookup_required",
     ]
+
+
+def test_realtime_voice_request_derives_realtime_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_realtime_interaction_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "realtime_voice_required",
+    ]
+    assert derived[0].source is EvidenceSource.DERIVED
+    assert derived[0].value is True
+    assert derived[0].reason
+
+
+def test_voice_interruptions_request_derives_interruptions_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "interruptions_required",
+    ]
+    assert derived[0].source is EvidenceSource.DERIVED
+    assert derived[0].value is True
+    assert derived[0].reason
+
+
+def test_uploaded_audio_does_not_imply_realtime_voice():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_input_is_uploaded_audio",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_voice_requirement_rules_do_not_leak_into_other_goals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_realtime_interaction_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_voice_requirements_accumulate_in_canonical_order():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="voice_realtime_interaction_requested",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "realtime_voice_required",
+        "interruptions_required",
+    ]
+
+
+def test_false_voice_requests_do_not_derive_requirements():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_realtime_interaction_requested",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_observed_voice_behavior_does_not_derive_user_requirements():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="voice_realtime_interaction_requested",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="voice_interruptions_requested",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
