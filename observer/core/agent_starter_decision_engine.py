@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from schemas.agent_starter import (
     AgentStarterEvidence,
+    AgentStarterGoal,
     AgentStarterRequirement,
     CandidateArchitectureAssessment,
     ConstraintStrength,
@@ -1690,4 +1691,35 @@ def assess_personal_candidate(
             "yet justify a stronger architecture recommendation."
         ],
         supporting_evidence=supporting_evidence,
+    )
+
+
+def assess_agent_starter_candidate(
+    *,
+    goal: AgentStarterGoal,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    if goal is AgentStarterGoal.CODING:
+        assessor = assess_coding_candidate
+    elif goal is AgentStarterGoal.AUTOMATION:
+        assessor = assess_automation_candidate
+    elif goal is AgentStarterGoal.KNOWLEDGE_RAG:
+        assessor = assess_rag_candidate
+    elif goal is AgentStarterGoal.VOICE:
+        assessor = assess_voice_candidate
+    elif goal is AgentStarterGoal.PERSONAL:
+        assessor = assess_personal_candidate
+    else:
+        raise ValueError(
+            f"Unsupported Agent Starter goal: {goal!r}"
+        )
+
+    return assessor(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        requirements=requirements,
+        candidate_evidence=candidate_evidence,
     )
