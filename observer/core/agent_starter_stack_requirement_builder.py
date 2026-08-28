@@ -198,6 +198,57 @@ def build_agent_starter_stack_requirements(
             ),
         ]
 
+    if goal is AgentStarterGoal.PERSONAL:
+        llm_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+        memory_evidence = [
+            evidence
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_supports_persistent_memory"
+        ]
+
+        if (
+            len(llm_evidence) != 1
+            or not isinstance(llm_evidence[0].value, bool)
+            or llm_evidence[0].value is not True
+        ):
+            raise ValueError(
+                "Personal stack mapping requires exactly one "
+                "candidate_uses_llm evidence value equal to true."
+            )
+
+        if (
+            len(memory_evidence) != 1
+            or not isinstance(
+                memory_evidence[0].value,
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Personal stack mapping requires exactly one "
+                "candidate_supports_persistent_memory "
+                "boolean evidence value."
+            )
+
+        return [
+            AgentStarterStackRequirement(
+                component_type=(
+                    AgentStarterCatalogComponentType.LLM
+                ),
+                supporting_evidence=[
+                    llm_evidence[0],
+                ],
+                reason=(
+                    "The personal-assistant architecture requires "
+                    "a language model for language interaction."
+                ),
+            )
+        ]
+
     if goal is not AgentStarterGoal.CODING:
         raise ValueError(
             "Stack requirement mapping is not defined for "

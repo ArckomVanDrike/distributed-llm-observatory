@@ -603,3 +603,134 @@ def test_stack_requirement_builder_rejects_voice_without_transcript_boundary_evi
             goal=AgentStarterGoal.VOICE,
             assessment=assessment,
         )
+
+
+def test_stack_requirement_builder_maps_personal_to_llm_without_memory_storage_inference():
+    llm_evidence = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The personal-assistant architecture uses an LLM "
+            "for language interaction."
+        ),
+    )
+
+    memory_evidence = AgentStarterEvidence(
+        key="candidate_supports_persistent_memory",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The personal-assistant architecture supports "
+            "persistent memory."
+        ),
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="persistent-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The personal-assistant architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The personal-assistant architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            llm_evidence,
+            memory_evidence,
+        ],
+    )
+
+    requirements = build_agent_starter_stack_requirements(
+        goal=AgentStarterGoal.PERSONAL,
+        assessment=assessment,
+    )
+
+    assert len(requirements) == 1
+    assert requirements[0].component_type == (
+        AgentStarterCatalogComponentType.LLM
+    )
+    assert requirements[0].required_capabilities == []
+    assert requirements[0].required_deployment_modes == []
+    assert requirements[0].required_runtime is None
+    assert requirements[0].required_pricing_class is None
+    assert requirements[0].supporting_evidence == [
+        llm_evidence,
+    ]
+
+
+def test_stack_requirement_builder_rejects_personal_without_llm_usage_evidence():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "LLM usage is not established.",
+        ],
+        recommendation_reasons=[
+            "The personal stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_persistent_memory",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate supports persistent memory.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Personal stack mapping requires exactly one "
+            "candidate_uses_llm evidence value equal to true"
+        ),
+    ):
+        build_agent_starter_stack_requirements(
+            goal=AgentStarterGoal.PERSONAL,
+            assessment=assessment,
+        )
+
+
+def test_stack_requirement_builder_rejects_personal_without_memory_characterization():
+    import pytest
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="incomplete-personal-assistant",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[
+            "Memory behavior is not established.",
+        ],
+        recommendation_reasons=[
+            "The personal stack cannot be mapped safely.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason="The candidate uses a language model.",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Personal stack mapping requires exactly one "
+            "candidate_supports_persistent_memory "
+            "boolean evidence value"
+        ),
+    ):
+        build_agent_starter_stack_requirements(
+            goal=AgentStarterGoal.PERSONAL,
+            assessment=assessment,
+        )
