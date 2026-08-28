@@ -84,3 +84,46 @@ def test_plan_builder_preserves_all_candidate_assessments():
         cloud_candidate,
     ]
     assert result.constraint_conflict is None
+
+
+def test_plan_builder_preserves_rejected_candidates_with_explicit_conflict():
+    requirement = _local_only_requirement()
+
+    local_candidate = _candidate(
+        architecture_id="local_coding",
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+    )
+    cloud_candidate = _candidate(
+        architecture_id="cloud_coding",
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+    )
+
+    from schemas.agent_starter import AgentStarterConstraintConflict
+
+    conflict = AgentStarterConstraintConflict(
+        conflicting_requirements=[requirement],
+        summary=(
+            "No evaluated candidate satisfies the hard "
+            "local-only source-code requirement."
+        ),
+        resolution_options=[
+            "Change the hard requirement.",
+            "Evaluate another local architecture.",
+        ],
+    )
+
+    result = build_agent_starter_plan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[requirement],
+        candidate_assessments=[
+            local_candidate,
+            cloud_candidate,
+        ],
+        constraint_conflict=conflict,
+    )
+
+    assert result.candidate_assessments == [
+        local_candidate,
+        cloud_candidate,
+    ]
+    assert result.constraint_conflict == conflict
