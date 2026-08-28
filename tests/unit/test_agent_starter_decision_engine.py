@@ -2975,3 +2975,307 @@ def test_personal_technical_infeasibility_beats_all_personal_fit_evidence():
 
     assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
     assert result.confidence is RecommendationConfidence.HIGH
+
+
+def _private_knowledge_local_only_requirement():
+    return AgentStarterRequirement(
+        key="knowledge_data_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            AgentStarterEvidence(
+                key="knowledge_data_local_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+
+def _complete_rag_evidence():
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus does not fit direct context.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="Retrieval is required.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses retrieval.",
+        ),
+    ]
+
+
+def test_unknown_private_knowledge_processing_does_not_assume_local_compliance():
+    evidence = _complete_rag_evidence()
+    evidence.append(
+        AgentStarterEvidence(
+            key="candidate_knowledge_data_remote_processing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "private knowledge data is processed remotely."
+            ),
+        )
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="private-rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[_private_knowledge_local_only_requirement()],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+
+
+def test_missing_private_knowledge_processing_does_not_assume_local_compliance():
+    result = assess_rag_candidate(
+        architecture_id="private-rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[_private_knowledge_local_only_requirement()],
+        candidate_evidence=_complete_rag_evidence(),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+
+
+def test_rag_explicit_provenance_failure_beats_privacy_unknown():
+    evidence = _complete_rag_evidence()
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="candidate_knowledge_data_remote_processing",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "Available evidence does not establish whether "
+                    "private knowledge data is processed remotely."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="citations_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_provides_source_provenance",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate does not preserve source "
+                    "provenance for retrieved evidence."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="private-rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[_private_knowledge_local_only_requirement()],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == []
+    assert any(
+        "citation" in reason.lower()
+        or "provenance" in reason.lower()
+        or "source" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_incremental_failure_beats_ocr_unknown():
+    evidence = _complete_rag_evidence()
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="documents_include_scans",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_ocr",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason="OCR support is unknown.",
+            ),
+            AgentStarterEvidence(
+                key="corpus_updates_frequent",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_incremental_indexing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate does not support incremental indexing."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_rag_exact_retrieval_failure_beats_provenance_unknown():
+    evidence = _complete_rag_evidence()
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="citations_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_provides_source_provenance",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason="Source provenance support is unknown.",
+            ),
+            AgentStarterEvidence(
+                key="exact_identifier_lookup_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_lexical_or_hybrid_retrieval",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate lacks lexical or hybrid retrieval."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_rag_exact_retrieval_failure_beats_incremental_unknown():
+    evidence = _complete_rag_evidence()
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="corpus_updates_frequent",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_incremental_indexing",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason="Incremental indexing support is unknown.",
+            ),
+            AgentStarterEvidence(
+                key="exact_identifier_lookup_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_lexical_or_hybrid_retrieval",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate lacks lexical or hybrid retrieval."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+
+
+def test_rag_hard_privacy_unknown_beats_soft_exact_retrieval_failure():
+    evidence = _complete_rag_evidence()
+    evidence.extend(
+        [
+            AgentStarterEvidence(
+                key="candidate_knowledge_data_remote_processing",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "Private knowledge processing boundary is unknown."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="exact_identifier_lookup_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="candidate_supports_lexical_or_hybrid_retrieval",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate lacks lexical or hybrid retrieval."
+                ),
+            ),
+        ]
+    )
+
+    result = assess_rag_candidate(
+        architecture_id="private-rag-candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[_private_knowledge_local_only_requirement()],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "must stay local" in reason.lower()
+        or "cannot be verified" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
