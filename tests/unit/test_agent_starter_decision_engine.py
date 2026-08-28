@@ -1312,3 +1312,61 @@ def test_missing_incremental_indexing_does_not_assume_frequent_update_fit():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def test_rag_not_feasible_cannot_be_recommended_by_architecture_fit():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.NOT_FEASIBLE,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "not technically feasible" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_limited_feasibility_cannot_be_strongly_recommended():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.LIMITED,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert any(
+        "limited" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_unknown_feasibility_cannot_be_recommended_from_feature_fit():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
