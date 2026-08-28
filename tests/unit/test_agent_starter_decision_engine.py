@@ -1138,3 +1138,177 @@ def test_missing_ocr_support_does_not_assume_scanned_document_compatibility():
         )
         for reason in result.recommendation_reasons
     )
+
+
+def _frequently_updated_rag_evidence(
+    *,
+    candidate_supports_incremental_indexing: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_incremental_indexing",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_incremental_indexing,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether corpus updates can be indexed incrementally."
+            ),
+        ),
+    ]
+
+
+def test_frequently_updated_rag_with_incremental_indexing_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="incremental_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_frequently_updated_rag_evidence(
+            candidate_supports_incremental_indexing=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_frequently_updated_rag_without_incremental_indexing_is_not_preferred():
+    result = assess_rag_candidate(
+        architecture_id="static_reindex_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_frequently_updated_rag_evidence(
+            candidate_supports_incremental_indexing=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "incremental" in reason.lower()
+        or "frequent" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_incremental_indexing_limits_frequent_update_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_incremental_indexing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports incremental indexing."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "incremental" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_incremental_indexing_does_not_assume_frequent_update_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "incremental" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

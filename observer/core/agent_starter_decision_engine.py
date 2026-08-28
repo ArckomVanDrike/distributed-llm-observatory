@@ -505,6 +505,36 @@ def assess_rag_candidate(
         )
     )
 
+    corpus_updates_frequent = any(
+        evidence.key == "corpus_updates_frequent"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_incremental_indexing = any(
+        evidence.key == "candidate_supports_incremental_indexing"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    incremental_indexing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_incremental_indexing"
+    ]
+
+    incremental_indexing_unknown = (
+        corpus_updates_frequent
+        and (
+            not incremental_indexing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in incremental_indexing_evidence
+            )
+        )
+    )
+
     technical_reason = (
         "The candidate is technically feasible."
     )
@@ -567,6 +597,41 @@ def assess_rag_candidate(
             recommendation_reasons=[
                 "Source provenance is unknown or insufficiently "
                 "established for the requested citations."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        corpus_updates_frequent
+        and candidate_explicitly_lacks_incremental_indexing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The corpus changes frequently, but the candidate "
+                "does not support incremental indexing, making it "
+                "a poor operational fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if incremental_indexing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Incremental indexing support is unknown or "
+                "insufficiently established for the frequently "
+                "updated corpus."
             ],
             supporting_evidence=supporting_evidence,
         )
