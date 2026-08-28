@@ -884,3 +884,89 @@ def test_agent_starter_intake_can_start_with_goal_only():
     assert intake.goal is AgentStarterGoal.PERSONAL
     assert intake.evidence == []
     assert intake.hardware_profile is None
+
+
+def test_agent_starter_prepared_input_records_normalized_decision_inputs():
+    from schemas.agent_starter import AgentStarterPreparedInput
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    declared = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    derived = AgentStarterEvidence(
+        key="filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="The user requested repository modification.",
+    )
+
+    requirement = AgentStarterRequirement(
+        key="source_code_must_stay_local",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[declared],
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=16 * 1024**3,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            declared,
+            derived,
+        ],
+        requirements=[requirement],
+        hardware_profile=hardware,
+    )
+
+    assert prepared.goal is AgentStarterGoal.CODING
+    assert prepared.evidence == [
+        declared,
+        derived,
+    ]
+    assert prepared.requirements == [requirement]
+    assert prepared.hardware_profile == hardware
+
+
+def test_agent_starter_prepared_input_can_represent_incomplete_intake():
+    from schemas.agent_starter import AgentStarterPreparedInput
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    assert prepared.evidence == []
+    assert prepared.requirements == []
+    assert prepared.hardware_profile is None
+
+
+def test_agent_starter_prepared_input_allows_derived_evidence():
+    from schemas.agent_starter import AgentStarterPreparedInput
+
+    derived = AgentStarterEvidence(
+        key="semantic_interpretation_required",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The declared workflow is deterministic."
+        ),
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[derived],
+    )
+
+    assert prepared.evidence == [derived]
+    assert prepared.evidence[0].source is EvidenceSource.DERIVED

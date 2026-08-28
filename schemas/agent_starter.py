@@ -155,6 +155,19 @@ class AgentStarterRequirement(BaseModel):
         return self
 
 
+class AgentStarterPreparedInput(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    goal: AgentStarterGoal
+    evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+    requirements: list[AgentStarterRequirement] = Field(
+        default_factory=list,
+    )
+    hardware_profile: HardwareProfile | None = None
+
+
 class CandidateArchitectureAssessment(BaseModel):
     schema_version: Literal["0.1"] = "0.1"
 

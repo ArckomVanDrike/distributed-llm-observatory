@@ -1269,3 +1269,113 @@ def test_build_user_evidence_does_not_mutate_intake():
         "filesystem_read",
         "filesystem_write",
     ]
+
+
+def test_prepare_agent_starter_input_composes_normalized_inputs():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    local_only = AgentStarterEvidence(
+        key="source_code_must_stay_local",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    modify_files = AgentStarterEvidence(
+        key="modify_files",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=16 * 1024**3,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            local_only,
+            modify_files,
+        ],
+        hardware_profile=hardware,
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    assert prepared.goal is AgentStarterGoal.CODING
+    assert prepared.hardware_profile == hardware
+
+    assert [
+        evidence.key
+        for evidence in prepared.evidence
+    ] == [
+        "source_code_must_stay_local",
+        "modify_files",
+        "filesystem_read",
+        "filesystem_write",
+    ]
+
+    assert [
+        requirement.key
+        for requirement in prepared.requirements
+    ] == [
+        "source_code_must_stay_local",
+    ]
+
+    assert prepared.requirements[0].strength is ConstraintStrength.HARD
+    assert prepared.requirements[0].evidence == [local_only]
+
+
+def test_prepare_agent_starter_input_preserves_incomplete_state():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    assert prepared.goal is AgentStarterGoal.PERSONAL
+    assert prepared.evidence == []
+    assert prepared.requirements == []
+    assert prepared.hardware_profile is None
+
+
+def test_prepare_agent_starter_input_does_not_mutate_intake():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+
+    declared = AgentStarterEvidence(
+        key="workflow_deterministic",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[declared],
+    )
+
+    original_evidence = list(intake.evidence)
+
+    prepared = prepare_agent_starter_input(intake)
+
+    assert intake.evidence == original_evidence
+
+    assert [
+        evidence.key
+        for evidence in prepared.evidence
+    ] == [
+        "workflow_deterministic",
+        "semantic_interpretation_required",
+    ]

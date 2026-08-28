@@ -4,6 +4,7 @@ from schemas.agent_starter import (
     AgentStarterEvidence,
     AgentStarterGoal,
     AgentStarterIntake,
+    AgentStarterPreparedInput,
     AgentStarterRequirement,
     ConstraintStrength,
     EvidenceSource,
@@ -319,3 +320,15 @@ def build_agent_starter_user_evidence(
         *intake.evidence,
         *derive_agent_starter_capability_evidence(intake),
     ]
+
+
+
+def prepare_agent_starter_input(
+    intake: AgentStarterIntake,
+) -> AgentStarterPreparedInput:
+    return AgentStarterPreparedInput(
+        goal=intake.goal,
+        evidence=build_agent_starter_user_evidence(intake),
+        requirements=derive_agent_starter_requirements(intake),
+        hardware_profile=intake.hardware_profile,
+    )
