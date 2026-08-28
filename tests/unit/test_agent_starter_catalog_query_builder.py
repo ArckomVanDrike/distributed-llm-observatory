@@ -386,3 +386,110 @@ def test_catalog_query_builder_rejects_conflicting_rag_retrieval_evidence():
             goal=AgentStarterGoal.KNOWLEDGE_RAG,
             assessment=assessment,
         )
+
+
+def test_catalog_query_builder_maps_voice_pipeline_to_stt_and_tts_queries():
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The voice architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The voice architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Raw audio remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Transcripts remain inside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    queries = build_agent_starter_catalog_queries(
+        goal=AgentStarterGoal.VOICE,
+        assessment=assessment,
+    )
+
+    assert [
+        query.component_type
+        for query in queries
+    ] == [
+        AgentStarterCatalogComponentType.STT,
+        AgentStarterCatalogComponentType.TTS,
+    ]
+
+    for query in queries:
+        assert query.required_capabilities == []
+        assert query.required_deployment_modes == []
+        assert query.required_runtime is None
+        assert query.required_pricing_class is None
+
+
+def test_catalog_query_builder_does_not_infer_deployment_for_hybrid_voice():
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="hybrid-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The hybrid voice architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The hybrid voice architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Raw audio remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "Transcript processing may occur outside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    queries = build_agent_starter_catalog_queries(
+        goal=AgentStarterGoal.VOICE,
+        assessment=assessment,
+    )
+
+    assert [
+        query.component_type
+        for query in queries
+    ] == [
+        AgentStarterCatalogComponentType.STT,
+        AgentStarterCatalogComponentType.TTS,
+    ]
+
+    assert all(
+        query.required_deployment_modes == []
+        for query in queries
+    )

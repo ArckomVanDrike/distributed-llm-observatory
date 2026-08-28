@@ -78,6 +78,59 @@ def build_agent_starter_catalog_queries(
             )
         ]
 
+    if goal is AgentStarterGoal.VOICE:
+        raw_audio_remote_processing = [
+            evidence.value
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_raw_audio_remote_processing"
+        ]
+        transcript_remote_processing = [
+            evidence.value
+            for evidence in assessment.supporting_evidence
+            if evidence.key
+            == "candidate_transcript_remote_processing"
+        ]
+
+        if (
+            len(raw_audio_remote_processing) != 1
+            or not isinstance(
+                raw_audio_remote_processing[0],
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Voice catalog mapping requires exactly one "
+                "candidate_raw_audio_remote_processing "
+                "evidence value."
+            )
+
+        if (
+            len(transcript_remote_processing) != 1
+            or not isinstance(
+                transcript_remote_processing[0],
+                bool,
+            )
+        ):
+            raise ValueError(
+                "Voice catalog mapping requires exactly one "
+                "candidate_transcript_remote_processing "
+                "evidence value."
+            )
+
+        return [
+            AgentStarterCatalogQuery(
+                component_type=(
+                    AgentStarterCatalogComponentType.STT
+                ),
+            ),
+            AgentStarterCatalogQuery(
+                component_type=(
+                    AgentStarterCatalogComponentType.TTS
+                ),
+            ),
+        ]
+
     raise ValueError(
         "Catalog query mapping is not defined for "
         f"goal: {goal.value}"
