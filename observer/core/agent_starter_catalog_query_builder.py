@@ -27,6 +27,33 @@ def build_agent_starter_catalog_queries(
             )
         ]
 
+    if goal is AgentStarterGoal.AUTOMATION:
+        candidate_uses_llm = [
+            evidence.value
+            for evidence in assessment.supporting_evidence
+            if evidence.key == "candidate_uses_llm"
+        ]
+
+        if (
+            len(candidate_uses_llm) != 1
+            or not isinstance(candidate_uses_llm[0], bool)
+        ):
+            raise ValueError(
+                "Automation catalog mapping requires exactly one "
+                "candidate_uses_llm evidence value."
+            )
+
+        if candidate_uses_llm[0] is False:
+            return []
+
+        return [
+            AgentStarterCatalogQuery(
+                component_type=(
+                    AgentStarterCatalogComponentType.LLM
+                ),
+            )
+        ]
+
     raise ValueError(
         "Catalog query mapping is not defined for "
         f"goal: {goal.value}"
