@@ -1,6 +1,7 @@
 from observer.core.agent_starter_decision_engine import (
     assess_automation_candidate,
     assess_coding_candidate,
+    assess_personal_candidate,
     assess_rag_candidate,
     assess_voice_candidate,
     technical_feasibility_from_compatibility,
@@ -2295,5 +2296,123 @@ def test_missing_realtime_latency_fit_does_not_assume_voice_suitability():
             "unknown" in reason.lower()
             or "insufficient" in reason.lower()
         )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _cross_session_memory_evidence(
+    *,
+    candidate_supports_persistent_memory: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_persistent_memory,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether memory persists across sessions."
+            ),
+        ),
+    ]
+
+
+def test_personal_assistant_with_required_persistent_memory_can_proceed():
+    result = assess_personal_candidate(
+        architecture_id="persistent_memory_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_cross_session_memory_evidence(
+            candidate_supports_persistent_memory=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_personal_assistant_without_required_persistent_memory_is_not_preferred():
+    result = assess_personal_candidate(
+        architecture_id="session_only_assistant",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_cross_session_memory_evidence(
+            candidate_supports_persistent_memory=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_persistent_memory_limits_cross_session_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_persistent_memory",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "memory persists across sessions."
+            ),
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_persistent_memory_does_not_assume_cross_session_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="cross_session_memory_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_personal_candidate(
+        architecture_id="personal_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "persistent" in reason.lower()
+        or "cross-session" in reason.lower()
         for reason in result.recommendation_reasons
     )

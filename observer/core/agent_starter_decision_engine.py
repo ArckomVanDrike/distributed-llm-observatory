@@ -1317,3 +1317,180 @@ def assess_voice_candidate(
         ],
         supporting_evidence=supporting_evidence,
     )
+
+
+def assess_personal_candidate(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not technically feasible."
+        )
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        technical_reason = (
+            "The candidate's technical feasibility is unknown."
+        )
+    else:
+        technical_reason = (
+            "The candidate is technically feasible."
+        )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.LIMITED:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Limited technical feasibility makes this "
+                "candidate a possible but currently "
+                "not recommended choice."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "technical feasibility for this candidate."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    cross_session_memory_required = any(
+        evidence.key == "cross_session_memory_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_supports_persistent_memory = any(
+        evidence.key == "candidate_supports_persistent_memory"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_persistent_memory = any(
+        evidence.key == "candidate_supports_persistent_memory"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    persistent_memory_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_persistent_memory"
+    ]
+
+    persistent_memory_unknown = (
+        cross_session_memory_required
+        and (
+            not persistent_memory_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in persistent_memory_evidence
+            )
+        )
+    )
+
+    if (
+        cross_session_memory_required
+        and candidate_explicitly_lacks_persistent_memory
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Cross-session memory is required, but the "
+                "candidate does not support persistent memory."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if persistent_memory_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Persistent memory support is unknown or "
+                "insufficiently established for the requested "
+                "cross-session workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        cross_session_memory_required
+        and candidate_supports_persistent_memory
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate supports persistent memory "
+                "for the requested cross-session workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "The available personal-assistant evidence does not "
+            "yet justify a stronger architecture recommendation."
+        ],
+        supporting_evidence=supporting_evidence,
+    )
