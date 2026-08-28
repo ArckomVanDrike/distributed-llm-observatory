@@ -222,6 +222,29 @@ def derive_agent_starter_capability_evidence(
 
         return derived
 
+    if intake.goal is AgentStarterGoal.AUTOMATION:
+        workflow_deterministic = bool(
+            _declared_true_evidence(
+                intake,
+                key="workflow_deterministic",
+            )
+        )
+
+        if not workflow_deterministic:
+            return []
+
+        return [
+            AgentStarterEvidence(
+                key="semantic_interpretation_required",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The user declared a deterministic workflow, "
+                    "so semantic interpretation is not required."
+                ),
+            )
+        ]
+
     if intake.goal is not AgentStarterGoal.CODING:
         return []
 

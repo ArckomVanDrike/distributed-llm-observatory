@@ -1070,3 +1070,92 @@ def test_observed_voice_behavior_does_not_derive_user_requirements():
     )
 
     assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_deterministic_automation_derives_no_semantic_interpretation():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[
+            AgentStarterEvidence(
+                key="workflow_deterministic",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    derived = derive_agent_starter_capability_evidence(intake)
+
+    assert [
+        evidence.key
+        for evidence in derived
+    ] == [
+        "semantic_interpretation_required",
+    ]
+
+    evidence = derived[0]
+
+    assert evidence.source is EvidenceSource.DERIVED
+    assert evidence.value is False
+    assert evidence.reason
+
+
+def test_non_deterministic_workflow_does_not_assume_semantic_interpretation():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[
+            AgentStarterEvidence(
+                key="workflow_deterministic",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_observed_deterministic_workflow_does_not_derive_user_intent():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[
+            AgentStarterEvidence(
+                key="workflow_deterministic",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_automation_deterministic_rule_does_not_leak_into_other_goals():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_capability_evidence,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.PERSONAL,
+        evidence=[
+            AgentStarterEvidence(
+                key="workflow_deterministic",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_capability_evidence(intake) == []
