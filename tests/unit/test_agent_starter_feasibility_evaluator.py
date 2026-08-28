@@ -241,3 +241,173 @@ def test_not_recommended_compatibility_never_becomes_not_feasible():
         assessment.technical_feasibility
         is not TechnicalFeasibility.NOT_FEASIBLE
     )
+
+
+def test_known_unsatisfied_requirement_makes_candidate_not_feasible():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    missing_capability = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The candidate does not provide filesystem write."
+        ),
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="filesystem_write",
+        status=TechnicalRequirementStatus.UNSATISFIED,
+        reasons=[
+            "Filesystem write is required but unavailable.",
+        ],
+        supporting_evidence=[missing_capability],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is otherwise adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.NOT_FEASIBLE
+    )
+    assert missing_capability in assessment.supporting_evidence
+    assert any(
+        "filesystem write" in reason.lower()
+        for reason in assessment.reasons
+    )
+
+
+def test_unknown_required_capability_prevents_feasible_default():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="shell_execution",
+        status=TechnicalRequirementStatus.UNKNOWN,
+        reasons=[
+            "Shell execution support has not been established.",
+        ],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )
+    assert (
+        assessment.technical_feasibility
+        is not TechnicalFeasibility.NOT_FEASIBLE
+    )
+
+
+def test_satisfied_requirements_allow_compatibility_mapping_to_proceed():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+    from schemas.compatibility import (
+        AssessmentBasis,
+        CompatibilityAssessment,
+        CompatibilityVerdict,
+    )
+
+    capability = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The candidate provides filesystem write."
+        ),
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="filesystem_write",
+        status=TechnicalRequirementStatus.SATISFIED,
+        reasons=[
+            "Filesystem write capability is available.",
+        ],
+        supporting_evidence=[capability],
+    )
+
+    compatibility = CompatibilityAssessment(
+        basis=AssessmentBasis.ESTIMATED,
+        verdict=CompatibilityVerdict.COMPATIBLE,
+        summary="Hardware compatibility is adequate.",
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        compatibility_assessment=compatibility,
+        technical_requirements=[requirement],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+    assert capability in assessment.supporting_evidence

@@ -1130,3 +1130,93 @@ def test_agent_starter_technical_feasibility_has_no_recommendation_state():
 
     assert not hasattr(assessment, "recommendation")
     assert not hasattr(assessment, "confidence")
+
+
+def test_technical_requirement_assessment_records_known_unsatisfied_requirement():
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+
+    evidence = AgentStarterEvidence(
+        key="candidate_supports_filesystem_write",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The candidate architecture does not provide "
+            "filesystem write capability."
+        ),
+    )
+
+    assessment = AgentStarterTechnicalRequirementAssessment(
+        key="filesystem_write",
+        status=TechnicalRequirementStatus.UNSATISFIED,
+        reasons=[
+            "Filesystem write is required but unavailable.",
+        ],
+        supporting_evidence=[evidence],
+    )
+
+    assert assessment.key == "filesystem_write"
+    assert assessment.status is TechnicalRequirementStatus.UNSATISFIED
+    assert assessment.reasons
+    assert assessment.supporting_evidence == [evidence]
+
+
+def test_technical_requirement_assessment_can_remain_unknown():
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+
+    assessment = AgentStarterTechnicalRequirementAssessment(
+        key="shell_execution",
+        status=TechnicalRequirementStatus.UNKNOWN,
+        reasons=[
+            "Shell execution support has not been established.",
+        ],
+    )
+
+    assert assessment.status is TechnicalRequirementStatus.UNKNOWN
+    assert assessment.supporting_evidence == []
+
+
+def test_known_unsatisfied_technical_requirement_requires_evidence():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Unsatisfied technical requirement must record evidence",
+    ):
+        AgentStarterTechnicalRequirementAssessment(
+            key="filesystem_write",
+            status=TechnicalRequirementStatus.UNSATISFIED,
+            reasons=[
+                "Filesystem write is unavailable.",
+            ],
+        )
+
+
+def test_technical_requirement_assessment_requires_explanation():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import (
+        AgentStarterTechnicalRequirementAssessment,
+        TechnicalRequirementStatus,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="Technical requirement assessment must explain",
+    ):
+        AgentStarterTechnicalRequirementAssessment(
+            key="shell_execution",
+            status=TechnicalRequirementStatus.UNKNOWN,
+        )

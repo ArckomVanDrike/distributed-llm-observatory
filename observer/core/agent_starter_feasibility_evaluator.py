@@ -8,8 +8,10 @@ from schemas.agent_starter import (
     AgentStarterEvidence,
     AgentStarterPreparedInput,
     AgentStarterTechnicalFeasibilityAssessment,
+    AgentStarterTechnicalRequirementAssessment,
     EvidenceSource,
     TechnicalFeasibility,
+    TechnicalRequirementStatus,
 )
 from schemas.compatibility import CompatibilityAssessment
 
@@ -19,11 +21,69 @@ def evaluate_agent_starter_technical_feasibility(
     prepared: AgentStarterPreparedInput,
     candidate: AgentStarterCandidateArchitecture,
     compatibility_assessment: CompatibilityAssessment | None = None,
+    technical_requirements: (
+        list[AgentStarterTechnicalRequirementAssessment] | None
+    ) = None,
 ) -> AgentStarterTechnicalFeasibilityAssessment:
     if candidate.goal is not prepared.goal:
         raise ValueError(
             "Candidate goal must match prepared input goal."
         )
+
+    requirement_assessments = technical_requirements or []
+
+    unsatisfied_requirements = [
+        requirement
+        for requirement in requirement_assessments
+        if requirement.status is TechnicalRequirementStatus.UNSATISFIED
+    ]
+
+    if unsatisfied_requirements:
+        return AgentStarterTechnicalFeasibilityAssessment(
+            architecture_id=candidate.architecture_id,
+            goal=candidate.goal,
+            technical_feasibility=TechnicalFeasibility.NOT_FEASIBLE,
+            reasons=[
+                reason
+                for requirement in unsatisfied_requirements
+                for reason in requirement.reasons
+            ],
+            supporting_evidence=[
+                evidence
+                for requirement in unsatisfied_requirements
+                for evidence in requirement.supporting_evidence
+            ],
+        )
+
+    unknown_requirements = [
+        requirement
+        for requirement in requirement_assessments
+        if requirement.status is TechnicalRequirementStatus.UNKNOWN
+    ]
+
+    if unknown_requirements:
+        return AgentStarterTechnicalFeasibilityAssessment(
+            architecture_id=candidate.architecture_id,
+            goal=candidate.goal,
+            technical_feasibility=TechnicalFeasibility.UNKNOWN,
+            reasons=[
+                reason
+                for requirement in unknown_requirements
+                for reason in requirement.reasons
+            ],
+            supporting_evidence=[
+                evidence
+                for requirement in unknown_requirements
+                for evidence in requirement.supporting_evidence
+            ],
+        )
+
+    satisfied_evidence = [
+        evidence
+        for requirement in requirement_assessments
+        if requirement.status is TechnicalRequirementStatus.SATISFIED
+        for evidence in requirement.supporting_evidence
+    ]
 
     if compatibility_assessment is None:
         return AgentStarterTechnicalFeasibilityAssessment(
@@ -37,6 +97,7 @@ def evaluate_agent_starter_technical_feasibility(
                     "or compatibility evidence."
                 ),
             ],
+            supporting_evidence=satisfied_evidence,
         )
 
     technical_feasibility = (
@@ -61,6 +122,7 @@ def evaluate_agent_starter_technical_feasibility(
             *compatibility_assessment.reasons,
         ],
         supporting_evidence=[
+            *satisfied_evidence,
             compatibility_evidence,
         ],
     )

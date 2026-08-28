@@ -35,6 +35,12 @@ class TechnicalFeasibility(str, Enum):
     UNKNOWN = "unknown"
 
 
+class TechnicalRequirementStatus(str, Enum):
+    SATISFIED = "satisfied"
+    UNSATISFIED = "unsatisfied"
+    UNKNOWN = "unknown"
+
+
 class RecommendationVerdict(str, Enum):
     RECOMMENDED = "recommended"
     POSSIBLE = "possible"
@@ -176,6 +182,37 @@ class AgentStarterCandidateArchitecture(BaseModel):
     evidence: list[AgentStarterEvidence] = Field(
         default_factory=list,
     )
+
+
+class AgentStarterTechnicalRequirementAssessment(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    key: str = Field(min_length=1)
+    status: TechnicalRequirementStatus
+    reasons: list[str] = Field(default_factory=list)
+    supporting_evidence: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_technical_requirement_assessment(
+        self,
+    ) -> AgentStarterTechnicalRequirementAssessment:
+        if not self.reasons:
+            raise ValueError(
+                "Technical requirement assessment must explain "
+                "its status."
+            )
+
+        if (
+            self.status is TechnicalRequirementStatus.UNSATISFIED
+            and not self.supporting_evidence
+        ):
+            raise ValueError(
+                "Unsatisfied technical requirement must record evidence."
+            )
+
+        return self
 
 
 class AgentStarterTechnicalFeasibilityAssessment(BaseModel):
