@@ -310,3 +310,12 @@ def derive_agent_starter_capability_evidence(
         )
 
     return derived
+
+
+def build_agent_starter_user_evidence(
+    intake: AgentStarterIntake,
+) -> list[AgentStarterEvidence]:
+    return [
+        *intake.evidence,
+        *derive_agent_starter_capability_evidence(intake),
+    ]

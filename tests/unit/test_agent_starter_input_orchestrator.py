@@ -1159,3 +1159,113 @@ def test_automation_deterministic_rule_does_not_leak_into_other_goals():
     )
 
     assert derive_agent_starter_capability_evidence(intake) == []
+
+
+def test_build_user_evidence_preserves_intake_and_appends_derived_evidence():
+    from observer.core.agent_starter_input_orchestrator import (
+        build_agent_starter_user_evidence,
+    )
+
+    workflow = AgentStarterEvidence(
+        key="workflow_deterministic",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+    availability = AgentStarterEvidence(
+        key="availability_24_7_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.AUTOMATION,
+        evidence=[
+            workflow,
+            availability,
+        ],
+    )
+
+    evidence = build_agent_starter_user_evidence(intake)
+
+    assert [
+        item.key
+        for item in evidence
+    ] == [
+        "workflow_deterministic",
+        "availability_24_7_required",
+        "semantic_interpretation_required",
+    ]
+
+    assert evidence[0] == workflow
+    assert evidence[1] == availability
+
+    assert evidence[2].source is EvidenceSource.DERIVED
+    assert evidence[2].value is False
+    assert evidence[2].reason
+
+
+def test_build_user_evidence_preserves_observed_and_unknown_provenance():
+    from observer.core.agent_starter_input_orchestrator import (
+        build_agent_starter_user_evidence,
+    )
+
+    observed = AgentStarterEvidence(
+        key="microphone_available",
+        source=EvidenceSource.OBSERVED,
+        value=True,
+    )
+    unknown = AgentStarterEvidence(
+        key="accelerator_details_available",
+        source=EvidenceSource.UNKNOWN,
+        value=None,
+        reason="The browser does not expose accelerator details.",
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            observed,
+            unknown,
+        ],
+    )
+
+    evidence = build_agent_starter_user_evidence(intake)
+
+    assert evidence == [
+        observed,
+        unknown,
+    ]
+    assert evidence[0].source is EvidenceSource.OBSERVED
+    assert evidence[1].source is EvidenceSource.UNKNOWN
+
+
+def test_build_user_evidence_does_not_mutate_intake():
+    from observer.core.agent_starter_input_orchestrator import (
+        build_agent_starter_user_evidence,
+    )
+
+    declared = AgentStarterEvidence(
+        key="modify_files",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[declared],
+    )
+
+    original = list(intake.evidence)
+
+    evidence = build_agent_starter_user_evidence(intake)
+
+    assert intake.evidence == original
+
+    assert [
+        item.key
+        for item in evidence
+    ] == [
+        "modify_files",
+        "filesystem_read",
+        "filesystem_write",
+    ]
