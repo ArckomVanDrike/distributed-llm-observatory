@@ -129,14 +129,13 @@ def test_coding_candidate_generation_does_not_add_assessment_state():
         assert not hasattr(candidate, "confidence")
 
 
-def test_coding_candidate_generation_does_not_leak_into_other_goals():
+def test_candidate_generation_returns_empty_for_unimplemented_goals():
     from observer.core.agent_starter_candidate_generator import (
         generate_agent_starter_candidates,
     )
 
     for goal in (
         AgentStarterGoal.PERSONAL,
-        AgentStarterGoal.KNOWLEDGE_RAG,
         AgentStarterGoal.AUTOMATION,
         AgentStarterGoal.VOICE,
     ):
@@ -145,3 +144,102 @@ def test_coding_candidate_generation_does_not_leak_into_other_goals():
         )
 
         assert generate_agent_starter_candidates(prepared) == []
+
+
+def test_generates_base_rag_candidates_in_deterministic_order():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "direct-context-knowledge-assistant",
+        "full-rag-pipeline",
+    ]
+
+    assert all(
+        candidate.goal is AgentStarterGoal.KNOWLEDGE_RAG
+        for candidate in candidates
+    )
+
+
+def test_rag_candidates_record_retrieval_architecture_evidence():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    direct_context, full_rag = candidates
+
+    assert [
+        evidence.key
+        for evidence in direct_context.evidence
+    ] == [
+        "candidate_uses_retrieval",
+    ]
+    assert direct_context.evidence[0].value is False
+
+    assert [
+        evidence.key
+        for evidence in full_rag.evidence
+    ] == [
+        "candidate_uses_retrieval",
+    ]
+    assert full_rag.evidence[0].value is True
+
+    assert all(
+        evidence.source is EvidenceSource.DERIVED
+        for candidate in candidates
+        for evidence in candidate.evidence
+    )
+
+    assert all(
+        evidence.reason
+        for candidate in candidates
+        for evidence in candidate.evidence
+    )
+
+
+def test_rag_candidate_generation_does_not_filter_unneeded_retrieval():
+    from observer.core.agent_starter_candidate_generator import (
+        generate_agent_starter_candidates,
+    )
+    from schemas.agent_starter import AgentStarterEvidence
+
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="retrieval_required",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The declared corpus is small enough "
+                    "for direct context."
+                ),
+            ),
+        ],
+    )
+
+    candidates = generate_agent_starter_candidates(prepared)
+
+    assert [
+        candidate.architecture_id
+        for candidate in candidates
+    ] == [
+        "direct-context-knowledge-assistant",
+        "full-rag-pipeline",
+    ]
