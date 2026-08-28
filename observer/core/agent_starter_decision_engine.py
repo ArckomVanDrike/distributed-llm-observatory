@@ -1444,20 +1444,6 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
-    if background_scheduling_unknown:
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=RecommendationVerdict.POSSIBLE,
-            confidence=RecommendationConfidence.LIMITED,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "Scheduled or background execution support is "
-                "unknown or insufficiently established for the "
-                "requested proactive workflow."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
 
     indefinite_all_conversation_retention_not_required = any(
         evidence.key == "indefinite_all_conversation_retention_required"
@@ -1509,20 +1495,6 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
-    if indefinite_retention_unknown:
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=RecommendationVerdict.POSSIBLE,
-            confidence=RecommendationConfidence.LIMITED,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "Conversation retention behavior is unknown or "
-                "insufficiently established where indefinite "
-                "retention is not required."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
 
     selective_memory_required = any(
         evidence.key == "selective_memory_required"
@@ -1574,20 +1546,6 @@ def assess_personal_candidate(
             supporting_evidence=supporting_evidence,
         )
 
-    if memory_controls_unknown:
-        return CandidateArchitectureAssessment(
-            architecture_id=architecture_id,
-            technical_feasibility=technical_feasibility,
-            recommendation=RecommendationVerdict.POSSIBLE,
-            confidence=RecommendationConfidence.LIMITED,
-            technical_reasons=[technical_reason],
-            recommendation_reasons=[
-                "Memory inspection, editing, and deletion support "
-                "is unknown or insufficiently established for the "
-                "requested selective memory workflow."
-            ],
-            supporting_evidence=supporting_evidence,
-        )
 
     cross_session_memory_required = any(
         evidence.key == "cross_session_memory_required"
@@ -1640,6 +1598,51 @@ def assess_personal_candidate(
             recommendation_reasons=[
                 "Cross-session memory is required, but the "
                 "candidate does not support persistent memory."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if background_scheduling_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Scheduled or background execution support is "
+                "unknown or insufficiently established for the "
+                "requested proactive workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if indefinite_retention_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Conversation retention behavior is unknown or "
+                "insufficiently established where indefinite "
+                "retention is not required."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if memory_controls_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Memory inspection, editing, and deletion support "
+                "is unknown or insufficiently established for the "
+                "requested selective memory workflow."
             ],
             supporting_evidence=supporting_evidence,
         )
