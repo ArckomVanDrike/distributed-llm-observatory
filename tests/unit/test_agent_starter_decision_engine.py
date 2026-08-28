@@ -1,6 +1,7 @@
 from observer.core.agent_starter_decision_engine import (
     assess_automation_candidate,
     assess_coding_candidate,
+    assess_rag_candidate,
     technical_feasibility_from_compatibility,
 )
 from schemas.agent_starter import (
@@ -636,3 +637,918 @@ def test_24_7_requirement_allows_always_available_traditional_automation():
 
     assert result.recommendation is RecommendationVerdict.RECOMMENDED
     assert result.confidence is RecommendationConfidence.HIGH
+
+
+def _small_direct_context_evidence(
+    *,
+    candidate_uses_retrieval: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason=(
+                "The corpus is small enough to fit the intended "
+                "direct-context workflow."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The requested workflow does not require "
+                "retrieval over a larger knowledge collection."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=candidate_uses_retrieval,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether a retrieval pipeline is used."
+            ),
+        ),
+    ]
+
+
+def test_small_corpus_recommends_direct_context():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "direct context" in reason.lower()
+        or "direct-context" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_small_corpus_does_not_recommend_unnecessary_full_rag():
+    result = assess_rag_candidate(
+        architecture_id="full_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=True,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "unnecessary" in reason.lower()
+        or "not required" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_retrieval_usage_limits_rag_recommendation_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The corpus fits the intended direct context.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="Retrieval is not required for the workflow.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "The candidate does not provide enough evidence "
+                "to establish whether retrieval is used."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="knowledge_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_retrieval_requirement_does_not_assume_rag_is_unnecessary():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The corpus fits the intended direct context.",
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="full_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _citation_rag_evidence(
+    *,
+    candidate_provides_source_provenance: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason=(
+                "The knowledge workflow is not treated as a "
+                "direct-context-only case."
+            ),
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="citations_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_provides_source_provenance",
+            source=EvidenceSource.DERIVED,
+            value=candidate_provides_source_provenance,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether retrieved evidence retains source provenance."
+            ),
+        ),
+    ]
+
+
+def test_rag_with_required_citations_and_source_provenance_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="provenance_aware_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_citation_rag_evidence(
+            candidate_provides_source_provenance=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_rag_without_source_provenance_is_not_recommended_when_citations_required():
+    result = assess_rag_candidate(
+        architecture_id="rag_without_provenance",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_citation_rag_evidence(
+            candidate_provides_source_provenance=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert (
+        result.recommendation
+        is RecommendationVerdict.NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "provenance" in reason.lower()
+        or "citation" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_source_provenance_limits_citation_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="citations_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_provides_source_provenance",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "retrieved content retains source provenance."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "provenance" in reason.lower()
+        and (
+            "insufficient" in reason.lower()
+            or "unknown" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_source_provenance_does_not_assume_citation_compliance():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="citations_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "provenance" in reason.lower()
+        and (
+            "insufficient" in reason.lower()
+            or "unknown" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _scanned_document_rag_evidence(
+    *,
+    candidate_supports_ocr: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="documents_include_scans",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_ocr",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_ocr,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether scanned documents can be processed with OCR."
+            ),
+        ),
+    ]
+
+
+def test_rag_with_scanned_documents_and_ocr_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="rag_with_ocr",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_scanned_document_rag_evidence(
+            candidate_supports_ocr=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_rag_without_ocr_is_not_recommended_for_scanned_documents():
+    result = assess_rag_candidate(
+        architecture_id="rag_without_ocr",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_scanned_document_rag_evidence(
+            candidate_supports_ocr=False,
+        ),
+    )
+
+    assert result.technical_feasibility is TechnicalFeasibility.FEASIBLE
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "ocr" in reason.lower()
+        or "scanned" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_ocr_support_limits_scanned_document_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="documents_include_scans",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_ocr",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports OCR."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "ocr" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_ocr_support_does_not_assume_scanned_document_compatibility():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="documents_include_scans",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "ocr" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def _frequently_updated_rag_evidence(
+    *,
+    candidate_supports_incremental_indexing: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_incremental_indexing",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_incremental_indexing,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether corpus updates can be indexed incrementally."
+            ),
+        ),
+    ]
+
+
+def test_frequently_updated_rag_with_incremental_indexing_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="incremental_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_frequently_updated_rag_evidence(
+            candidate_supports_incremental_indexing=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_frequently_updated_rag_without_incremental_indexing_is_not_preferred():
+    result = assess_rag_candidate(
+        architecture_id="static_reindex_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_frequently_updated_rag_evidence(
+            candidate_supports_incremental_indexing=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "incremental" in reason.lower()
+        or "frequent" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_incremental_indexing_limits_frequent_update_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_incremental_indexing",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports incremental indexing."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "incremental" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_incremental_indexing_does_not_assume_frequent_update_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="corpus_updates_frequent",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "incremental" in reason.lower()
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_not_feasible_cannot_be_recommended_by_architecture_fit():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.NOT_FEASIBLE,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "not technically feasible" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_limited_feasibility_cannot_be_strongly_recommended():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.LIMITED,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert any(
+        "limited" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_rag_unknown_feasibility_cannot_be_recommended_from_feature_fit():
+    result = assess_rag_candidate(
+        architecture_id="direct_context",
+        technical_feasibility=TechnicalFeasibility.UNKNOWN,
+        requirements=[],
+        candidate_evidence=_small_direct_context_evidence(
+            candidate_uses_retrieval=False,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        "insufficient" in reason.lower()
+        or "unknown" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def _exact_identifier_rag_evidence(
+    *,
+    candidate_supports_lexical_or_hybrid_retrieval: bool,
+) -> list[AgentStarterEvidence]:
+    return [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_lexical_or_hybrid_retrieval",
+            source=EvidenceSource.DERIVED,
+            value=candidate_supports_lexical_or_hybrid_retrieval,
+            reason=(
+                "The candidate architecture explicitly defines "
+                "whether exact-match-friendly lexical or hybrid "
+                "retrieval is available."
+            ),
+        ),
+    ]
+
+
+def test_exact_identifier_rag_with_lexical_or_hybrid_retrieval_can_proceed():
+    result = assess_rag_candidate(
+        architecture_id="hybrid_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_exact_identifier_rag_evidence(
+            candidate_supports_lexical_or_hybrid_retrieval=True,
+        ),
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_exact_identifier_rag_without_lexical_or_hybrid_retrieval_is_not_preferred():
+    result = assess_rag_candidate(
+        architecture_id="semantic_only_rag",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=_exact_identifier_rag_evidence(
+            candidate_supports_lexical_or_hybrid_retrieval=False,
+        ),
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert any(
+        "lexical" in reason.lower()
+        or "hybrid" in reason.lower()
+        or "exact" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_unknown_lexical_or_hybrid_support_limits_exact_identifier_rag_confidence():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_supports_lexical_or_hybrid_retrieval",
+            source=EvidenceSource.UNKNOWN,
+            value=None,
+            reason=(
+                "Available evidence does not establish whether "
+                "the candidate supports lexical or hybrid retrieval."
+            ),
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "lexical" in reason.lower()
+            or "hybrid" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_missing_lexical_or_hybrid_support_does_not_assume_exact_identifier_fit():
+    evidence = [
+        AgentStarterEvidence(
+            key="corpus_fits_direct_context",
+            source=EvidenceSource.DERIVED,
+            value=False,
+            reason="The corpus requires a retrieval workflow.",
+        ),
+        AgentStarterEvidence(
+            key="retrieval_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+        AgentStarterEvidence(
+            key="candidate_uses_retrieval_pipeline",
+            source=EvidenceSource.DERIVED,
+            value=True,
+            reason="The candidate uses a retrieval pipeline.",
+        ),
+        AgentStarterEvidence(
+            key="exact_identifier_lookup_required",
+            source=EvidenceSource.DECLARED,
+            value=True,
+        ),
+    ]
+
+    result = assess_rag_candidate(
+        architecture_id="rag_candidate",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=evidence,
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert any(
+        (
+            "lexical" in reason.lower()
+            or "hybrid" in reason.lower()
+        )
+        and (
+            "unknown" in reason.lower()
+            or "insufficient" in reason.lower()
+        )
+        for reason in result.recommendation_reasons
+    )

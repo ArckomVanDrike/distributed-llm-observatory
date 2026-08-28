@@ -381,3 +381,450 @@ def assess_automation_candidate(
         ],
         supporting_evidence=supporting_evidence,
     )
+
+
+def assess_rag_candidate(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    corpus_fits_direct_context = any(
+        evidence.key == "corpus_fits_direct_context"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    retrieval_explicitly_not_required = any(
+        evidence.key == "retrieval_required"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    candidate_uses_retrieval = any(
+        evidence.key == "candidate_uses_retrieval_pipeline"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_does_not_use_retrieval = any(
+        evidence.key == "candidate_uses_retrieval_pipeline"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    required_rag_decision_keys = {
+        "corpus_fits_direct_context",
+        "retrieval_required",
+        "candidate_uses_retrieval_pipeline",
+    }
+    rag_decision_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key in required_rag_decision_keys
+    ]
+    observed_rag_decision_keys = {
+        evidence.key
+        for evidence in rag_decision_evidence
+    }
+
+    rag_decision_evidence_incomplete = (
+        observed_rag_decision_keys != required_rag_decision_keys
+        or any(
+            evidence.source is EvidenceSource.UNKNOWN
+            or evidence.value is None
+            for evidence in rag_decision_evidence
+        )
+    )
+
+    citations_required = any(
+        evidence.key == "citations_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_source_provenance = any(
+        evidence.key == "candidate_provides_source_provenance"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    source_provenance_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_provides_source_provenance"
+    ]
+
+    source_provenance_unknown = (
+        citations_required
+        and (
+            not source_provenance_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in source_provenance_evidence
+            )
+        )
+    )
+
+    documents_include_scans = any(
+        evidence.key == "documents_include_scans"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_ocr = any(
+        evidence.key == "candidate_supports_ocr"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    ocr_support_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_ocr"
+    ]
+
+    ocr_support_unknown = (
+        documents_include_scans
+        and (
+            not ocr_support_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in ocr_support_evidence
+            )
+        )
+    )
+
+    corpus_updates_frequent = any(
+        evidence.key == "corpus_updates_frequent"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_incremental_indexing = any(
+        evidence.key == "candidate_supports_incremental_indexing"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    incremental_indexing_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_incremental_indexing"
+    ]
+
+    incremental_indexing_unknown = (
+        corpus_updates_frequent
+        and (
+            not incremental_indexing_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in incremental_indexing_evidence
+            )
+        )
+    )
+
+    exact_identifier_lookup_required = any(
+        evidence.key == "exact_identifier_lookup_required"
+        and evidence.value is True
+        for evidence in candidate_evidence
+    )
+
+    candidate_explicitly_lacks_lexical_or_hybrid_retrieval = any(
+        evidence.key == "candidate_supports_lexical_or_hybrid_retrieval"
+        and evidence.value is False
+        for evidence in candidate_evidence
+    )
+
+    lexical_or_hybrid_retrieval_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if (
+            evidence.key
+            == "candidate_supports_lexical_or_hybrid_retrieval"
+        )
+    ]
+
+    lexical_or_hybrid_retrieval_unknown = (
+        exact_identifier_lookup_required
+        and (
+            not lexical_or_hybrid_retrieval_evidence
+            or any(
+                evidence.source is EvidenceSource.UNKNOWN
+                or evidence.value is None
+                for evidence in lexical_or_hybrid_retrieval_evidence
+            )
+        )
+    )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not technically feasible."
+        )
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        technical_reason = (
+            "The candidate's technical feasibility is unknown."
+        )
+    else:
+        technical_reason = (
+            "The candidate is technically feasible."
+        )
+
+    if technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate is not technically feasible "
+                "under the evaluated constraints."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.LIMITED:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.MEDIUM,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Limited technical feasibility makes this "
+                "candidate a possible but currently "
+                "not recommended choice."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if technical_feasibility is TechnicalFeasibility.UNKNOWN:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "technical feasibility for this candidate."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        citations_required
+        and candidate_explicitly_lacks_source_provenance
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Citations are required, but the candidate does not "
+                "retain source provenance for retrieved evidence."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        documents_include_scans
+        and candidate_explicitly_lacks_ocr
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The document corpus includes scanned content, "
+                "but the candidate does not support OCR."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if ocr_support_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "OCR support is unknown or insufficiently "
+                "established for the scanned document corpus."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if source_provenance_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Source provenance is unknown or insufficiently "
+                "established for the requested citations."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        corpus_updates_frequent
+        and candidate_explicitly_lacks_incremental_indexing
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The corpus changes frequently, but the candidate "
+                "does not support incremental indexing, making it "
+                "a poor operational fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if incremental_indexing_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Incremental indexing support is unknown or "
+                "insufficiently established for the frequently "
+                "updated corpus."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        exact_identifier_lookup_required
+        and candidate_explicitly_lacks_lexical_or_hybrid_retrieval
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Exact identifier lookup is required, but the "
+                "candidate lacks lexical or hybrid retrieval, "
+                "making it a poor retrieval fit."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if lexical_or_hybrid_retrieval_unknown:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Lexical or hybrid retrieval support is unknown "
+                "or insufficiently established for the requested "
+                "exact identifier lookup."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        corpus_fits_direct_context
+        and retrieval_explicitly_not_required
+        and candidate_explicitly_does_not_use_retrieval
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The corpus fits direct context and retrieval is "
+                "not required, so a direct-context architecture "
+                "is recommended."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if (
+        corpus_fits_direct_context
+        and retrieval_explicitly_not_required
+        and candidate_uses_retrieval
+    ):
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=(
+                RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+            ),
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "A retrieval pipeline is unnecessary for this "
+                "small direct-context corpus."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    if rag_decision_evidence_incomplete:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.POSSIBLE,
+            confidence=RecommendationConfidence.LIMITED,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "Available evidence is insufficient to establish "
+                "whether retrieval is necessary for this knowledge "
+                "workflow."
+            ],
+            supporting_evidence=supporting_evidence,
+        )
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.POSSIBLE,
+        confidence=RecommendationConfidence.MEDIUM,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "The available RAG evidence does not yet justify "
+            "a stronger architecture recommendation."
+        ],
+        supporting_evidence=supporting_evidence,
+    )
