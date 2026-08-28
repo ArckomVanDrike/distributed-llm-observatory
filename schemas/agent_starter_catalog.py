@@ -142,3 +142,44 @@ class AgentStarterCatalogQueryMatch(BaseModel):
             )
 
         return self
+
+
+class AgentStarterCatalogArchitectureResult(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    architecture_id: str = Field(min_length=1)
+    catalog_snapshot_id: str = Field(min_length=1)
+    query_matches: list[AgentStarterCatalogQueryMatch] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_query_match_architectures(
+        self,
+    ) -> AgentStarterCatalogArchitectureResult:
+        if any(
+            match.architecture_id != self.architecture_id
+            for match in self.query_matches
+        ):
+            raise ValueError(
+                "Catalog architecture result may contain only "
+                "query matches for the same architecture."
+            )
+
+        return self
+
+
+    @model_validator(mode="after")
+    def validate_query_match_snapshots(
+        self,
+    ) -> AgentStarterCatalogArchitectureResult:
+        if any(
+            match.catalog_snapshot_id != self.catalog_snapshot_id
+            for match in self.query_matches
+        ):
+            raise ValueError(
+                "Catalog architecture result may contain only "
+                "query matches from the same catalog snapshot."
+            )
+
+        return self

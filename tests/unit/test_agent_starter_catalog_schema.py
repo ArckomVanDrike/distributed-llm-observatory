@@ -416,3 +416,90 @@ def test_catalog_query_match_allows_zero_matched_entries():
     )
 
     assert match.matched_entries == []
+
+
+def test_catalog_architecture_result_allows_zero_query_matches():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogArchitectureResult,
+    )
+
+    result = AgentStarterCatalogArchitectureResult(
+        architecture_id="traditional-deterministic-automation",
+        catalog_snapshot_id="catalog-2026-08-28",
+        query_matches=[],
+    )
+
+    assert (
+        result.architecture_id
+        == "traditional-deterministic-automation"
+    )
+    assert result.catalog_snapshot_id == "catalog-2026-08-28"
+    assert result.query_matches == []
+
+
+def test_catalog_architecture_result_rejects_query_match_for_other_architecture():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogArchitectureResult,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    query_match = AgentStarterCatalogQueryMatch(
+        architecture_id="remote-coding-agent",
+        catalog_snapshot_id="catalog-2026-08-28",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Catalog architecture result may contain only "
+            "query matches for the same architecture"
+        ),
+    ):
+        AgentStarterCatalogArchitectureResult(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-2026-08-28",
+            query_matches=[query_match],
+        )
+
+
+def test_catalog_architecture_result_rejects_query_match_from_other_snapshot():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogArchitectureResult,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    query_match = AgentStarterCatalogQueryMatch(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-old",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Catalog architecture result may contain only "
+            "query matches from the same catalog snapshot"
+        ),
+    ):
+        AgentStarterCatalogArchitectureResult(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-current",
+            query_matches=[query_match],
+        )
