@@ -137,3 +137,131 @@ def test_catalog_entry_requires_sources_field():
                 tzinfo=timezone.utc,
             ),
         )
+
+
+def test_catalog_snapshot_records_entries_and_generation_time():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogSnapshot,
+    )
+
+    entry = AgentStarterCatalogEntry(
+        identifier="example-runtime",
+        component_type=AgentStarterCatalogComponentType.RUNTIME,
+        vendor="Example Vendor",
+        family="Example Runtime",
+        version="1.0",
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/runtime",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="catalog-2026-08-28",
+        generated_at=datetime(
+            2026,
+            8,
+            28,
+            15,
+            30,
+            tzinfo=timezone.utc,
+        ),
+        entries=[entry],
+    )
+
+    assert snapshot.snapshot_id == "catalog-2026-08-28"
+    assert snapshot.entries == [entry]
+    assert snapshot.generated_at.tzinfo is not None
+
+
+def test_catalog_snapshot_requires_timezone_aware_generated_at():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogSnapshot,
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogSnapshot(
+            snapshot_id="catalog-2026-08-28",
+            generated_at=datetime(
+                2026,
+                8,
+                28,
+                15,
+                30,
+            ),
+            entries=[],
+        )
+
+
+def test_catalog_snapshot_rejects_duplicate_entry_identifiers():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogSnapshot,
+    )
+
+    first = AgentStarterCatalogEntry(
+        identifier="duplicate-entry",
+        component_type=AgentStarterCatalogComponentType.RUNTIME,
+        vendor="Example Vendor",
+        family="Runtime A",
+        version="1.0",
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/runtime-a",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    second = AgentStarterCatalogEntry(
+        identifier="duplicate-entry",
+        component_type=AgentStarterCatalogComponentType.RUNTIME,
+        vendor="Example Vendor",
+        family="Runtime B",
+        version="2.0",
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/runtime-b",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogSnapshot(
+            snapshot_id="catalog-2026-08-28",
+            generated_at=datetime(
+                2026,
+                8,
+                28,
+                15,
+                30,
+                tzinfo=timezone.utc,
+            ),
+            entries=[
+                first,
+                second,
+            ],
+        )

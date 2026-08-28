@@ -4,7 +4,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from schemas.model_profile import ModelProfile
 
@@ -57,3 +62,43 @@ class AgentStarterCatalogEntry(BaseModel):
             )
 
         return value
+
+
+class AgentStarterCatalogSnapshot(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    snapshot_id: str = Field(min_length=1)
+    generated_at: datetime
+    entries: list[AgentStarterCatalogEntry] = Field(
+        default_factory=list,
+    )
+
+    @field_validator("generated_at")
+    @classmethod
+    def validate_generated_at_timezone(
+        cls,
+        value: datetime,
+    ) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError(
+                "generated_at must be timezone-aware."
+            )
+
+        return value
+
+    @model_validator(mode="after")
+    def validate_unique_entry_identifiers(
+        self,
+    ) -> AgentStarterCatalogSnapshot:
+        identifiers = [
+            entry.identifier
+            for entry in self.entries
+        ]
+
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError(
+                "Catalog snapshot entry identifiers "
+                "must be unique."
+            )
+
+        return self
