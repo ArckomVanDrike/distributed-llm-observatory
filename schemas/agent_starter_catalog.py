@@ -39,6 +39,17 @@ class AgentStarterCatalogEntry(BaseModel):
     deployment_modes: list[str] = Field(default_factory=list)
     supported_runtimes: list[str] = Field(default_factory=list)
 
+    resource_profile: dict[
+        str,
+        str | int | float | bool | list[str],
+    ] = Field(default_factory=dict)
+    context_characteristics: dict[
+        str,
+        str | int | float | bool | list[str],
+    ] = Field(default_factory=dict)
+    language_support: list[str] = Field(default_factory=list)
+    streaming_support: bool | None = None
+
     license: str = Field(min_length=1)
     pricing_class: str = Field(min_length=1)
     privacy_implications: list[str] = Field(

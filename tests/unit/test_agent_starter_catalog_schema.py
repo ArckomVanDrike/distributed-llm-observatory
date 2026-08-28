@@ -503,3 +503,54 @@ def test_catalog_architecture_result_rejects_query_match_from_other_snapshot():
             catalog_snapshot_id="catalog-current",
             query_matches=[query_match],
         )
+
+
+def test_catalog_entry_retains_extended_recommendation_metadata():
+    from datetime import datetime, timezone
+
+    entry = AgentStarterCatalogEntry(
+        identifier="example-model",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Example",
+        version="1.0",
+        capabilities=["coding"],
+        resource_profile={
+            "memory_band": "medium",
+            "accelerators": ["cpu", "cuda"],
+        },
+        context_characteristics={
+            "context_window_tokens": 32768,
+        },
+        language_support=[
+            "en",
+            "es",
+            "it",
+        ],
+        streaming_support=True,
+        license="example-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/model",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            28,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert entry.resource_profile == {
+        "memory_band": "medium",
+        "accelerators": ["cpu", "cuda"],
+    }
+    assert entry.context_characteristics == {
+        "context_window_tokens": 32768,
+    }
+    assert entry.language_support == [
+        "en",
+        "es",
+        "it",
+    ]
+    assert entry.streaming_support is True
