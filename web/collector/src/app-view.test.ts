@@ -70,6 +70,9 @@ describe('renderAppView', () => {
     expect(html).toContain('Agent Starter')
     expect(html).toContain('Core v1 complete')
     expect(html).toContain(
+      'What do you want to build?',
+    )
+    expect(html).not.toContain(
       'Public interface in development',
     )
 

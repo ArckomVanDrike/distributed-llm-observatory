@@ -3,6 +3,10 @@ import {
 } from './agent-lab-page'
 
 import {
+  renderAgentStarterPage,
+} from './agent-starter-page'
+
+import {
   renderAgentTestPage,
 } from './agent-test-page'
 
@@ -33,41 +37,6 @@ import type {
 export interface AppViewOptions {
   agentTest?: AgentTestPageOptions
   observatory?: ObservatoryPageOptions
-}
-
-function renderAgentStarterPage(): string {
-  return `
-    <main class="agent-starter-page">
-      <section class="hero">
-        <p class="hero-label">Agent Lab</p>
-
-        <h1>Agent Starter</h1>
-
-        <p class="section-label">
-          Core v1 complete
-        </p>
-
-        <p class="hero-copy">
-          Turn goals, constraints, observed environment
-          evidence, and explicit preferences into
-          reproducible agent architecture and
-          stack recommendations.
-        </p>
-
-        <p>
-          Public interface in development.
-        </p>
-
-        <ul>
-          <li>Coding</li>
-          <li>Knowledge / RAG</li>
-          <li>Automation</li>
-          <li>Voice</li>
-          <li>Personal Assistant</li>
-        </ul>
-      </section>
-    </main>
-  `
 }
 
 export function renderAppView(
