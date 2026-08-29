@@ -69,6 +69,12 @@ def build_agent_starter_concrete_stack(
             )
 
         matched_entries = list(query_match.matched_entries)
+        indeterminate_entries = list(
+            query_match.indeterminate_entries
+        )
+        constraint_excluded_entries = list(
+            query_match.constraint_excluded_entries
+        )
 
         selected_entry = (
             matched_entries[0]
@@ -80,6 +86,10 @@ def build_agent_starter_concrete_stack(
             AgentStarterConcreteStackComponent(
                 requirement=requirement,
                 matched_entries=matched_entries,
+                indeterminate_entries=indeterminate_entries,
+                constraint_excluded_entries=(
+                    constraint_excluded_entries
+                ),
                 selected_entry=selected_entry,
             )
         )

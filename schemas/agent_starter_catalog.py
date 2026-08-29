@@ -202,21 +202,67 @@ class AgentStarterCatalogQueryMatch(BaseModel):
     architecture_id: str = Field(min_length=1)
     catalog_snapshot_id: str = Field(min_length=1)
     query: AgentStarterCatalogQuery
+
     matched_entries: list[AgentStarterCatalogEntry] = Field(
+        default_factory=list,
+    )
+    indeterminate_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    constraint_excluded_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
         default_factory=list,
     )
 
     @model_validator(mode="after")
-    def validate_matched_component_types(
+    def validate_result_component_types(
         self,
     ) -> AgentStarterCatalogQueryMatch:
+        result_entries = [
+            *self.matched_entries,
+            *self.indeterminate_entries,
+            *self.constraint_excluded_entries,
+        ]
+
         if any(
             entry.component_type is not self.query.component_type
-            for entry in self.matched_entries
+            for entry in result_entries
         ):
             raise ValueError(
-                "Matched catalog entries must have the "
+                "Catalog query result entries must have the "
                 "component type requested by the query."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_result_class_exclusivity(
+        self,
+    ) -> AgentStarterCatalogQueryMatch:
+        matched_ids = {
+            entry.identifier
+            for entry in self.matched_entries
+        }
+        indeterminate_ids = {
+            entry.identifier
+            for entry in self.indeterminate_entries
+        }
+        excluded_ids = {
+            entry.identifier
+            for entry in self.constraint_excluded_entries
+        }
+
+        if (
+            matched_ids & indeterminate_ids
+            or matched_ids & excluded_ids
+            or indeterminate_ids & excluded_ids
+        ):
+            raise ValueError(
+                "A catalog entry may appear in only one "
+                "query result class."
             )
 
         return self

@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from schemas.agent_starter_catalog import (
     AgentStarterCatalogComponentType,
     AgentStarterCatalogEntry,
@@ -383,7 +385,7 @@ def test_catalog_query_match_rejects_entries_of_different_component_type():
     with pytest.raises(
         ValidationError,
         match=(
-            "Matched catalog entries must have the "
+            "Catalog query result entries must have the "
             "component type requested by the query"
         ),
     ):
@@ -860,3 +862,104 @@ def test_catalog_v0_1_defaults_to_no_structured_access_options():
 
     assert entry.schema_version == "0.1"
     assert entry.access_options == []
+
+
+def test_catalog_query_match_preserves_indeterminate_entries():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="unknown-cost-service",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "unknown",
+                },
+            ],
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="remote-coding-agent",
+        catalog_snapshot_id="catalog-v0-2-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+        indeterminate_entries=[entry],
+    )
+
+    assert match.matched_entries == []
+    assert match.indeterminate_entries == [entry]
+    assert match.constraint_excluded_entries == []
+
+
+def test_catalog_query_match_preserves_constraint_excluded_entries():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="paid-service",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="remote-coding-agent",
+        catalog_snapshot_id="catalog-v0-2-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+        constraint_excluded_entries=[entry],
+    )
+
+    assert match.matched_entries == []
+    assert match.indeterminate_entries == []
+    assert match.constraint_excluded_entries == [entry]
+
+
+def test_catalog_query_match_rejects_entry_in_multiple_result_classes():
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="duplicate-result-entry",
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogQueryMatch(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-test",
+            query=AgentStarterCatalogQuery(
+                component_type=AgentStarterCatalogComponentType.LLM,
+            ),
+            matched_entries=[entry],
+            indeterminate_entries=[entry],
+        )
