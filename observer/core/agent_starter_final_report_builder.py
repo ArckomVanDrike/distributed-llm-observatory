@@ -20,6 +20,25 @@ def build_agent_starter_final_report(
     prepared_evidence = list(context.prepared.evidence)
     requirements = list(context.prepared.requirements)
 
+    classification = context.classification
+
+    stacks_by_id = {
+        stack.architecture_id: stack
+        for stack in classification.resolution.stacks
+    }
+
+    recommended_stacks = [
+        stacks_by_id[architecture_id]
+        for architecture_id
+        in classification.recommended_architecture_ids
+    ]
+
+    alternative_stacks = [
+        stacks_by_id[architecture_id]
+        for architecture_id
+        in classification.possible_architecture_ids
+    ]
+
     blockers: list[AgentStarterRequirement] = []
 
     for assessment in (
@@ -71,6 +90,21 @@ def build_agent_starter_final_report(
             for requirement in requirements
             if requirement.strength is ConstraintStrength.SOFT
         ],
+        recommended_architecture_ids=list(
+            classification.recommended_architecture_ids
+        ),
+        recommended_stacks=recommended_stacks,
+        alternative_architecture_ids=list(
+            classification.possible_architecture_ids
+        ),
+        alternative_stacks=alternative_stacks,
+        possible_but_not_recommended_architecture_ids=list(
+            classification
+            .possible_but_not_recommended_architecture_ids
+        ),
+        not_recommended_architecture_ids=list(
+            classification.not_recommended_architecture_ids
+        ),
         blockers=blockers,
         upgrade_paths=[],
     )

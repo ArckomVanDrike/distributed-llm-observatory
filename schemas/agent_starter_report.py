@@ -158,6 +158,27 @@ class AgentStarterFinalReport(BaseModel):
         default_factory=list,
     )
 
+    recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    recommended_stacks: list[AgentStarterConcreteStack] = Field(
+        default_factory=list,
+    )
+
+    alternative_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    alternative_stacks: list[AgentStarterConcreteStack] = Field(
+        default_factory=list,
+    )
+
+    possible_but_not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+
     blockers: list[AgentStarterRequirement] = Field(
         default_factory=list,
     )
@@ -271,6 +292,62 @@ class AgentStarterFinalReport(BaseModel):
                     "correspond exactly to the assessed architecture "
                     "and concrete stack in plan order."
                 )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_recommendation_surface(
+        self,
+    ) -> AgentStarterFinalReport:
+        classification = self.context.classification
+
+        if (
+            self.recommended_architecture_ids
+            != classification.recommended_architecture_ids
+            or self.alternative_architecture_ids
+            != classification.possible_architecture_ids
+            or (
+                self.possible_but_not_recommended_architecture_ids
+                != classification
+                .possible_but_not_recommended_architecture_ids
+            )
+            or (
+                self.not_recommended_architecture_ids
+                != classification.not_recommended_architecture_ids
+            )
+        ):
+            raise ValueError(
+                "Final report recommendation groups must be "
+                "an exact projection of concrete stack classification."
+            )
+
+        stacks_by_id = {
+            stack.architecture_id: stack
+            for stack in classification.resolution.stacks
+        }
+
+        expected_recommended_stacks = [
+            stacks_by_id[architecture_id]
+            for architecture_id
+            in classification.recommended_architecture_ids
+        ]
+        expected_alternative_stacks = [
+            stacks_by_id[architecture_id]
+            for architecture_id
+            in classification.possible_architecture_ids
+        ]
+
+        if self.recommended_stacks != expected_recommended_stacks:
+            raise ValueError(
+                "Final report recommended stacks must be "
+                "an exact projection of recommended architectures."
+            )
+
+        if self.alternative_stacks != expected_alternative_stacks:
+            raise ValueError(
+                "Final report alternative stacks must be "
+                "an exact projection of possible architectures."
+            )
 
         return self
 

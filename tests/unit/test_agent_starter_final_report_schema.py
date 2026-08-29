@@ -192,6 +192,16 @@ def test_final_report_accepts_exact_source_projections():
         unknown_evidence=[fixture["unknown"]],
         hard_constraints=[fixture["hard"]],
         soft_preferences=[fixture["soft"]],
+        recommended_architecture_ids=[
+            "local-coding-agent",
+        ],
+        recommended_stacks=[
+            fixture["stack"],
+        ],
+        alternative_architecture_ids=[],
+        alternative_stacks=[],
+        possible_but_not_recommended_architecture_ids=[],
+        not_recommended_architecture_ids=[],
         blockers=[],
         upgrade_paths=[],
     )
@@ -250,6 +260,16 @@ def test_final_report_rejects_invented_evidence():
             unknown_evidence=[fixture["unknown"]],
             hard_constraints=[fixture["hard"]],
             soft_preferences=[fixture["soft"]],
+            recommended_architecture_ids=[
+                "local-coding-agent",
+            ],
+            recommended_stacks=[
+                fixture["stack"],
+            ],
+            alternative_architecture_ids=[],
+            alternative_stacks=[],
+            possible_but_not_recommended_architecture_ids=[],
+            not_recommended_architecture_ids=[],
             blockers=[],
             upgrade_paths=[],
         )
@@ -282,6 +302,16 @@ def test_final_report_rejects_missing_candidate_explanation():
             unknown_evidence=[fixture["unknown"]],
             hard_constraints=[fixture["hard"]],
             soft_preferences=[fixture["soft"]],
+            recommended_architecture_ids=[
+                "local-coding-agent",
+            ],
+            recommended_stacks=[
+                fixture["stack"],
+            ],
+            alternative_architecture_ids=[],
+            alternative_stacks=[],
+            possible_but_not_recommended_architecture_ids=[],
+            not_recommended_architecture_ids=[],
             blockers=[],
             upgrade_paths=[],
         )
@@ -322,6 +352,16 @@ def test_final_report_rejects_invented_upgrade_path():
             unknown_evidence=[fixture["unknown"]],
             hard_constraints=[fixture["hard"]],
             soft_preferences=[fixture["soft"]],
+            recommended_architecture_ids=[
+                "local-coding-agent",
+            ],
+            recommended_stacks=[
+                fixture["stack"],
+            ],
+            alternative_architecture_ids=[],
+            alternative_stacks=[],
+            possible_but_not_recommended_architecture_ids=[],
+            not_recommended_architecture_ids=[],
             blockers=[],
             upgrade_paths=[
                 "Buy a larger GPU.",
