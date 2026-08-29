@@ -20,7 +20,6 @@ _HARD_REQUIREMENT_KEYS = (
 
 _SOFT_PREFERENCE_KEYS = (
     "prefer_local_execution",
-    "prefer_low_complexity",
 )
 
 

@@ -1600,10 +1600,6 @@ def test_derives_cross_cutting_offline_and_soft_preference_requirements():
             "prefer_local_execution",
             ConstraintStrength.SOFT,
         ),
-        (
-            "prefer_low_complexity",
-            ConstraintStrength.SOFT,
-        ),
     ]
 
     assert all(
@@ -1640,6 +1636,32 @@ def test_requirement_derivation_does_not_promote_observed_or_false_preferences()
             AgentStarterEvidence(
                 key="prefer_low_complexity",
                 source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_requirements(intake) == []
+
+
+
+def test_does_not_derive_non_decision_active_complexity_preference():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.KNOWLEDGE_RAG,
+        evidence=[
+            AgentStarterEvidence(
+                key="prefer_low_complexity",
+                source=EvidenceSource.DECLARED,
                 value=True,
             ),
         ],
