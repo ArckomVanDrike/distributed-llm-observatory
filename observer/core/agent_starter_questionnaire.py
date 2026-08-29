@@ -270,6 +270,24 @@ _AUTOMATION_QUESTIONS = (
 )
 
 
+def _cross_cutting_questions(
+    goal: AgentStarterGoal,
+) -> tuple[AgentStarterQuestion, ...]:
+    return (
+        AgentStarterQuestion(
+            key="offline_required",
+            goal=goal,
+            prompt="Must the agent be able to operate offline?",
+            kind=AgentStarterQuestionKind.BOOLEAN,
+            reason=(
+                "Offline operation is a cross-cutting hard "
+                "constraint that can exclude architectures "
+                "requiring network connectivity."
+            ),
+        ),
+    )
+
+
 _QUESTIONS_BY_GOAL = {
     AgentStarterGoal.CODING: _CODING_QUESTIONS,
     AgentStarterGoal.KNOWLEDGE_RAG: _KNOWLEDGE_QUESTIONS,
@@ -311,9 +329,12 @@ def _has_declared_false(
 def build_agent_starter_question_set(
     intake: AgentStarterIntake,
 ) -> AgentStarterQuestionSet:
-    goal_questions = _QUESTIONS_BY_GOAL.get(
-        intake.goal,
-        (),
+    goal_questions = (
+        *_cross_cutting_questions(intake.goal),
+        *_QUESTIONS_BY_GOAL.get(
+            intake.goal,
+            (),
+        ),
     )
 
     questions = [

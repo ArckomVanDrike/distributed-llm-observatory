@@ -25,6 +25,7 @@ def test_automation_questionnaire_asks_only_decision_relevant_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "workflow_deterministic",
         "destructive_or_high_impact_actions",
         "human_approval_required",
@@ -63,6 +64,7 @@ def test_questionnaire_omits_declared_and_explicitly_unknown_answers():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "destructive_or_high_impact_actions",
         "human_approval_required",
     ]
@@ -106,6 +108,7 @@ def test_automation_omits_approval_when_high_impact_actions_are_false():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "workflow_deterministic",
         "availability_24_7_required",
     ]
@@ -129,6 +132,7 @@ def test_observed_low_impact_does_not_suppress_user_questions():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "workflow_deterministic",
         "destructive_or_high_impact_actions",
         "human_approval_required",
@@ -148,6 +152,7 @@ def test_coding_questionnaire_asks_decision_relevant_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "source_code_must_stay_local",
         "modify_files",
         "run_tests",
@@ -180,6 +185,7 @@ def test_coding_questionnaire_omits_answered_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "run_tests",
     ]
 
@@ -216,6 +222,7 @@ def test_knowledge_questionnaire_asks_decision_relevant_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "knowledge_data_must_stay_local",
         "corpus_is_very_small",
         "document_input_includes_scanned_pages",
@@ -256,6 +263,7 @@ def test_knowledge_questionnaire_omits_answered_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "document_input_includes_scanned_pages",
         "knowledge_changes_frequently",
         "exact_identifier_search_needed",
@@ -294,6 +302,7 @@ def test_voice_questionnaire_asks_decision_relevant_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "raw_audio_must_stay_local",
         "transcript_must_stay_local",
         "voice_realtime_interaction_requested",
@@ -327,6 +336,7 @@ def test_voice_questionnaire_omits_answered_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "transcript_must_stay_local",
         "voice_interruptions_requested",
     ]
@@ -364,6 +374,7 @@ def test_personal_questionnaire_asks_decision_relevant_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "cross_session_memory_required",
         "proactive_behavior_required",
         "selective_memory_required",
@@ -397,6 +408,7 @@ def test_personal_questionnaire_omits_answered_inputs():
         question.key
         for question in question_set.questions
     ] == [
+        "offline_required",
         "proactive_behavior_required",
         "indefinite_all_conversation_retention_required",
     ]
@@ -417,6 +429,86 @@ def test_observed_personal_behavior_does_not_replace_user_intent():
     question_set = build_agent_starter_question_set(intake)
 
     assert "cross_session_memory_required" in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_offline_question_is_cross_cutting_for_all_goals():
+    for goal in AgentStarterGoal:
+        intake = AgentStarterIntake(
+            goal=goal,
+        )
+
+        question_set = build_agent_starter_question_set(
+            intake
+        )
+
+        assert "offline_required" in {
+            question.key
+            for question in question_set.questions
+        }
+
+
+def test_declared_offline_answer_is_not_asked_again():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="offline_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "offline_required" not in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_explicitly_unknown_offline_answer_is_not_asked_again():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="offline_required",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "The user has not established whether "
+                    "offline operation is required."
+                ),
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "offline_required" not in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_observed_offline_state_does_not_replace_user_intent():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="offline_required",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "offline_required" in {
         question.key
         for question in question_set.questions
     }
