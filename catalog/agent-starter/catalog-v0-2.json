@@ -1,0 +1,1242 @@
+{
+  "schema_version": "0.2",
+  "snapshot_id": "agent-starter-catalog-v0-2",
+  "generated_at": "2026-08-29T21:23:00+00:00",
+  "entries": [
+    {
+      "schema_version": "0.2",
+      "identifier": "gemma-3-270m-it",
+      "component_type": "llm",
+      "vendor": "Google",
+      "family": "Gemma 3",
+      "version": "270M IT",
+      "capabilities": [
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 0.27,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 32768
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "gemma",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "google/gemma-3-270m-it",
+            "parameter_count": 270000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 32768
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/google/gemma-3-270m-it"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00",
+      "pricing_notes": "Model access requires acceptance of Google Gemma usage terms."
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "qwen3-0.6b",
+      "component_type": "llm",
+      "vendor": "Qwen",
+      "family": "Qwen3",
+      "version": "0.6B",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "tool_use",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 0.6,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 32768
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "Qwen/Qwen3-0.6B",
+            "parameter_count": 600000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 32768
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen3-0.6B"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "gemma-3-1b-it",
+      "component_type": "llm",
+      "vendor": "Google",
+      "family": "Gemma 3",
+      "version": "1B IT",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 1.0,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 32768
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "gemma",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "google/gemma-3-1b-it",
+            "parameter_count": 1000000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 32768
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/google/gemma-3-1b-it"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00",
+      "pricing_notes": "Model access requires acceptance of Google Gemma usage terms."
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "llama-3.2-1b-instruct",
+      "component_type": "llm",
+      "vendor": "Meta",
+      "family": "Llama 3.2",
+      "version": "1B Instruct",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 1.23,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "pt",
+        "hi",
+        "es",
+        "th"
+      ],
+      "streaming_support": null,
+      "license": "llama3.2",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+            "parameter_count": 1230000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 131072
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00",
+      "pricing_notes": "Model access is governed by the Llama 3.2 Community License."
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "qwen3-1.7b",
+      "component_type": "llm",
+      "vendor": "Qwen",
+      "family": "Qwen3",
+      "version": "1.7B",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "tool_use",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 1.7,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 32768
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "Qwen/Qwen3-1.7B",
+            "parameter_count": 1700000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 32768
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen3-1.7B"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "granite-3.3-2b-instruct",
+      "component_type": "llm",
+      "vendor": "IBM",
+      "family": "Granite 3.3",
+      "version": "2B Instruct",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 2.0,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [
+        "en",
+        "de",
+        "es",
+        "fr",
+        "ja",
+        "pt",
+        "ar",
+        "cs",
+        "it",
+        "ko",
+        "nl",
+        "zh"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "ibm-granite/granite-3.3-2b-instruct",
+            "parameter_count": 2000000000,
+            "quantization": "bf16",
+            "runtime": "transformers",
+            "execution_location": "on_device",
+            "context_window_tokens": 131072
+          }
+        }
+      ],
+      "privacy_implications": [
+        "Can run on-device without requiring prompt data to leave the device."
+      ],
+      "sources": [
+        "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "qwen3-coder-30b-a3b-instruct",
+      "component_type": "llm",
+      "vendor": "Qwen",
+      "family": "Qwen3-Coder",
+      "version": "30B-A3B-Instruct",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "tool_use"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers",
+        "vllm",
+        "sglang",
+        "llama.cpp",
+        "ollama",
+        "lm-studio"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 30.5,
+        "active_parameter_count_billion": 3.3,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 262144
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+            "execution_location": "on_device",
+            "parameter_count": 30500000000,
+            "quantization": "bf16",
+            "context_window_tokens": 262144,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "gemma-4-e4b-it",
+      "component_type": "llm",
+      "vendor": "Google",
+      "family": "Gemma 4",
+      "version": "E4B-it",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "vision",
+        "audio_input",
+        "tool_use"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "effective_parameter_count_billion": 4.5,
+        "parameter_count_with_embeddings_billion": 8.0,
+        "checkpoint_size_gb": 16.0
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "google/gemma-4-E4B-it",
+            "execution_location": "on_device",
+            "parameter_count": 8000000000,
+            "context_window_tokens": 131072,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/google/gemma-4-E4B-it"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "ministral-3-8b-instruct-2512",
+      "component_type": "llm",
+      "vendor": "Mistral AI",
+      "family": "Ministral 3",
+      "version": "8B-Instruct-2512",
+      "capabilities": [
+        "text_generation",
+        "instruction_following",
+        "vision",
+        "tool_use",
+        "structured_output"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "vllm",
+        "transformers",
+        "mistral-common"
+      ],
+      "resource_profile": {
+        "language_model_parameter_count_billion": 8.4,
+        "vision_encoder_parameter_count_billion": 0.4,
+        "weights_precision": "FP8",
+        "reported_vram_gb": 12
+      },
+      "context_characteristics": {
+        "max_context_tokens": 262144
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "mistralai/Ministral-3-8B-Instruct-2512",
+            "execution_location": "on_device",
+            "parameter_count": 8800000000,
+            "quantization": "fp8",
+            "context_window_tokens": 262144,
+            "runtime": "vllm"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "gpt-oss-20b",
+      "component_type": "llm",
+      "vendor": "OpenAI",
+      "family": "gpt-oss",
+      "version": "20b",
+      "capabilities": [
+        "text_generation",
+        "reasoning",
+        "instruction_following",
+        "tool_use",
+        "structured_output",
+        "coding"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers",
+        "vllm",
+        "ollama",
+        "lm-studio"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 21.0,
+        "active_parameter_count_billion": 3.6,
+        "weights_precision": "MXFP4",
+        "reported_memory_gb": 16
+      },
+      "context_characteristics": {},
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "openai/gpt-oss-20b",
+            "execution_location": "on_device",
+            "parameter_count": 21000000000,
+            "quantization": "mxfp4",
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/openai/gpt-oss-20b"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "phi-4-mini-instruct",
+      "component_type": "llm",
+      "vendor": "Microsoft",
+      "family": "Phi-4",
+      "version": "mini-instruct",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "tool_use"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 3.8,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "MIT",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "microsoft/Phi-4-mini-instruct",
+            "execution_location": "on_device",
+            "parameter_count": 3800000000,
+            "quantization": "bf16",
+            "context_window_tokens": 131072,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/microsoft/Phi-4-mini-instruct"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "granite-4.0-h-micro",
+      "component_type": "llm",
+      "vendor": "IBM",
+      "family": "Granite 4.0",
+      "version": "H-Micro",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "rag",
+        "tool_use",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 3.0,
+        "active_parameter_count_billion": 3.0,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [
+        "en",
+        "de",
+        "es",
+        "fr",
+        "ja",
+        "pt",
+        "ar",
+        "cs",
+        "it",
+        "ko",
+        "nl",
+        "zh"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "ibm-granite/granite-4.0-h-micro",
+            "execution_location": "on_device",
+            "parameter_count": 3000000000,
+            "quantization": "bf16",
+            "context_window_tokens": 131072,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/ibm-granite/granite-4.0-h-micro"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "nvidia-nemotron-nano-9b-v2",
+      "component_type": "llm",
+      "vendor": "NVIDIA",
+      "family": "Nemotron Nano",
+      "version": "9B-v2",
+      "capabilities": [
+        "coding",
+        "text_generation",
+        "instruction_following",
+        "reasoning",
+        "tool_use",
+        "rag"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers",
+        "vllm",
+        "sglang",
+        "tensorrt-llm"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 9.0,
+        "weights_precision": "BF16"
+      },
+      "context_characteristics": {
+        "max_context_tokens": 131072
+      },
+      "language_support": [
+        "en",
+        "de",
+        "es",
+        "fr",
+        "it",
+        "ja"
+      ],
+      "streaming_support": null,
+      "license": "nvidia-open-model-license",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "nvidia/NVIDIA-Nemotron-Nano-9B-v2",
+            "execution_location": "on_device",
+            "parameter_count": 9000000000,
+            "quantization": "bf16",
+            "context_window_tokens": 131072,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2",
+        "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "qwen3-embedding-0.6b",
+      "component_type": "embedding_model",
+      "vendor": "Qwen",
+      "family": "Qwen3 Embedding",
+      "version": "0.6B",
+      "capabilities": [
+        "embeddings",
+        "multilingual",
+        "instruction_aware",
+        "variable_embedding_dimensions"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "sentence-transformers",
+        "transformers"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 0.6,
+        "embedding_dimension": 1024
+      },
+      "context_characteristics": {
+        "max_context_tokens": 32768
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "Qwen/Qwen3-Embedding-0.6B",
+            "execution_location": "on_device",
+            "parameter_count": 600000000,
+            "context_window_tokens": 32768,
+            "runtime": "sentence-transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "bge-m3",
+      "component_type": "embedding_model",
+      "vendor": "BAAI",
+      "family": "BGE",
+      "version": "M3",
+      "capabilities": [
+        "embeddings",
+        "dense_retrieval",
+        "sparse_retrieval",
+        "multi_vector_retrieval",
+        "multilingual"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "sentence-transformers",
+        "transformers",
+        "onnx"
+      ],
+      "resource_profile": {
+        "embedding_dimension": 1024
+      },
+      "context_characteristics": {
+        "max_context_tokens": 8192
+      },
+      "language_support": [],
+      "streaming_support": null,
+      "license": "MIT",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "BAAI/bge-m3",
+            "execution_location": "on_device",
+            "context_window_tokens": 8192,
+            "runtime": "sentence-transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/BAAI/bge-m3"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "parakeet-tdt-0.6b-v3",
+      "component_type": "stt",
+      "vendor": "NVIDIA",
+      "family": "Parakeet TDT",
+      "version": "0.6B-v3",
+      "capabilities": [
+        "speech_to_text",
+        "multilingual",
+        "automatic_language_detection",
+        "timestamps"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "transformers",
+        "nemo"
+      ],
+      "resource_profile": {
+        "parameter_count_billion": 0.6
+      },
+      "context_characteristics": {},
+      "language_support": [
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "et",
+        "fi",
+        "fr",
+        "de",
+        "el",
+        "hu",
+        "it",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "es",
+        "sv",
+        "ru",
+        "uk"
+      ],
+      "streaming_support": null,
+      "license": "cc-by-4.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "nvidia/parakeet-tdt-0.6b-v3",
+            "execution_location": "on_device",
+            "parameter_count": 600000000,
+            "runtime": "transformers"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "voxtral-mini-3b-2507",
+      "component_type": "stt",
+      "vendor": "Mistral AI",
+      "family": "Voxtral Mini",
+      "version": "3B-2507",
+      "capabilities": [
+        "speech_to_text",
+        "audio_understanding",
+        "audio_translation",
+        "text_generation"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [
+        "mistral-common",
+        "vllm",
+        "transformers"
+      ],
+      "resource_profile": {},
+      "context_characteristics": {},
+      "language_support": [
+        "en",
+        "fr",
+        "de",
+        "es",
+        "it",
+        "pt",
+        "nl",
+        "hi"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "mistralai/Voxtral-Mini-3B-2507",
+            "execution_location": "on_device",
+            "runtime": "vllm"
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/mistralai/Voxtral-Mini-3B-2507"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "whisper.cpp-v1.9.2",
+      "component_type": "stt",
+      "vendor": "ggml-org",
+      "family": "whisper.cpp",
+      "version": "1.9.2",
+      "capabilities": [
+        "speech_to_text",
+        "offline",
+        "realtime"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {},
+      "context_characteristics": {},
+      "language_support": [],
+      "streaming_support": true,
+      "license": "MIT",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free"
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.2",
+        "https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "kokoro-82m-v1.0",
+      "component_type": "tts",
+      "vendor": "hexgrad",
+      "family": "Kokoro-82M",
+      "version": "1.0",
+      "capabilities": [
+        "text_to_speech"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {
+        "parameter_count_million": 82
+      },
+      "context_characteristics": {},
+      "language_support": [
+        "en"
+      ],
+      "streaming_support": null,
+      "license": "apache-2.0",
+      "pricing_class": "free",
+      "release_status": "stable",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free",
+          "model_profile": {
+            "schema_version": "0.1",
+            "model_id": "hexgrad/Kokoro-82M",
+            "execution_location": "on_device",
+            "parameter_count": 82000000
+          }
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://huggingface.co/hexgrad/Kokoro-82M"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    },
+    {
+      "schema_version": "0.2",
+      "identifier": "llama.cpp-b10516",
+      "component_type": "runtime",
+      "vendor": "ggml-org",
+      "family": "llama.cpp",
+      "version": "b10516",
+      "capabilities": [
+        "model_runtime",
+        "local_api",
+        "gguf"
+      ],
+      "deployment_modes": [
+        "on_device"
+      ],
+      "supported_runtimes": [],
+      "resource_profile": {},
+      "context_characteristics": {},
+      "language_support": [],
+      "streaming_support": null,
+      "license": "MIT",
+      "pricing_class": "free",
+      "release_status": "unknown",
+      "license_cost": "free",
+      "access_pricing": [
+        "free"
+      ],
+      "access_options": [
+        {
+          "schema_version": "0.2",
+          "deployment_mode": "on_device",
+          "access_kind": "self_hosted",
+          "pricing": "free"
+        }
+      ],
+      "privacy_implications": [],
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/releases/tag/b10516",
+        "https://github.com/ggml-org/llama.cpp/blob/master/LICENSE"
+      ],
+      "verified_at": "2026-08-29T21:23:00+00:00"
+    }
+  ]
+}

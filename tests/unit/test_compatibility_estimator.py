@@ -126,3 +126,72 @@ def test_unknown_quantization_does_not_guess():
     )
 
     assert result.verdict is CompatibilityVerdict.UNKNOWN
+
+
+def test_mobile_browser_missing_memory_remains_unknown():
+    hardware = HardwareProfile(
+        device_class=DeviceClass.PHONE,
+        source=HardwareProfileSource.BROWSER_LIMITED,
+        os_name="Android",
+        architecture="arm64",
+        total_memory_bytes=None,
+        limitations=[
+            "Total memory is unavailable from this browser.",
+        ],
+    )
+
+    result = estimate_local_compatibility(
+        hardware,
+        ModelProfile(
+            model_id="small-local-model",
+            parameter_count=600_000_000,
+            quantization="bf16",
+            execution_location=ExecutionLocation.ON_DEVICE,
+        ),
+    )
+
+    assert result.verdict is CompatibilityVerdict.UNKNOWN
+    assert result.confidence == 0.0
+    assert "memory" in result.summary.lower()
+
+
+def test_phone_with_known_memory_has_no_hidden_device_penalty():
+    phone = HardwareProfile(
+        device_class=DeviceClass.PHONE,
+        source=HardwareProfileSource.NATIVE,
+        os_name="Android",
+        architecture="arm64",
+        total_memory_bytes=2 * 1024**3,
+    )
+
+    desktop = HardwareProfile(
+        device_class=DeviceClass.DESKTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=2 * 1024**3,
+    )
+
+    model = ModelProfile(
+        model_id="example-600m",
+        parameter_count=600_000_000,
+        quantization="bf16",
+        execution_location=ExecutionLocation.ON_DEVICE,
+    )
+
+    phone_result = estimate_local_compatibility(
+        phone,
+        model,
+    )
+    desktop_result = estimate_local_compatibility(
+        desktop,
+        model,
+    )
+
+    assert (
+        phone_result.verdict
+        is CompatibilityVerdict.CONSTRAINED
+    )
+    assert phone_result.verdict is desktop_result.verdict
+    assert (
+        phone_result.estimated_required_memory_bytes
+        == desktop_result.estimated_required_memory_bytes
+    )
