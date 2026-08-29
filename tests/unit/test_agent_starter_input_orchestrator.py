@@ -1551,3 +1551,98 @@ def test_proactive_personal_behavior_derives_background_scheduling_requirement()
     )
     assert scheduling_required[0].value is True
     assert scheduling_required[0].reason
+
+
+def test_derives_cross_cutting_offline_and_soft_preference_requirements():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        ConstraintStrength,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="offline_required",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="prefer_local_execution",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="prefer_low_complexity",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    requirements = derive_agent_starter_requirements(intake)
+
+    assert [
+        (requirement.key, requirement.strength)
+        for requirement in requirements
+    ] == [
+        (
+            "offline_required",
+            ConstraintStrength.HARD,
+        ),
+        (
+            "prefer_local_execution",
+            ConstraintStrength.SOFT,
+        ),
+        (
+            "prefer_low_complexity",
+            ConstraintStrength.SOFT,
+        ),
+    ]
+
+    assert all(
+        requirement.evidence[0]
+        in intake.evidence
+        for requirement in requirements
+    )
+
+
+def test_requirement_derivation_does_not_promote_observed_or_false_preferences():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="offline_required",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="prefer_local_execution",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+            AgentStarterEvidence(
+                key="prefer_low_complexity",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    assert derive_agent_starter_requirements(intake) == []

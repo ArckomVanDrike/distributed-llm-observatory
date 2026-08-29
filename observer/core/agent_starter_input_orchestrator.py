@@ -10,11 +10,17 @@ from schemas.agent_starter import (
     EvidenceSource,
 )
 
-_HARD_LOCAL_ONLY_REQUIREMENT_KEYS = (
+_HARD_REQUIREMENT_KEYS = (
     "source_code_must_stay_local",
     "knowledge_data_must_stay_local",
     "raw_audio_must_stay_local",
     "transcript_must_stay_local",
+    "offline_required",
+)
+
+_SOFT_PREFERENCE_KEYS = (
+    "prefer_local_execution",
+    "prefer_low_complexity",
 )
 
 
@@ -39,7 +45,7 @@ def derive_agent_starter_requirements(
 ) -> list[AgentStarterRequirement]:
     requirements: list[AgentStarterRequirement] = []
 
-    for key in _HARD_LOCAL_ONLY_REQUIREMENT_KEYS:
+    for key in _HARD_REQUIREMENT_KEYS:
         supporting_evidence = _declared_true_evidence(
             intake,
             key=key,
@@ -53,6 +59,24 @@ def derive_agent_starter_requirements(
                 key=key,
                 value=True,
                 strength=ConstraintStrength.HARD,
+                evidence=supporting_evidence,
+            )
+        )
+
+    for key in _SOFT_PREFERENCE_KEYS:
+        supporting_evidence = _declared_true_evidence(
+            intake,
+            key=key,
+        )
+
+        if not supporting_evidence:
+            continue
+
+        requirements.append(
+            AgentStarterRequirement(
+                key=key,
+                value=True,
+                strength=ConstraintStrength.SOFT,
                 evidence=supporting_evidence,
             )
         )

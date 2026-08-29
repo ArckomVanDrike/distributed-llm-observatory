@@ -3281,3 +3281,189 @@ def test_rag_hard_privacy_unknown_beats_soft_exact_retrieval_failure():
         or "cannot be verified" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def _offline_requirement() -> AgentStarterRequirement:
+    evidence = AgentStarterEvidence(
+        key="offline_required",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    return AgentStarterRequirement(
+        key="offline_required",
+        value=True,
+        strength=ConstraintStrength.HARD,
+        evidence=[evidence],
+    )
+
+
+def test_offline_requirement_rejects_explicitly_online_candidate():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    requirement = _offline_requirement()
+
+    offline_support = AgentStarterEvidence(
+        key="candidate_supports_offline_operation",
+        source=EvidenceSource.DERIVED,
+        value=False,
+        reason=(
+            "The candidate architecture requires network "
+            "connectivity for operation."
+        ),
+    )
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.VOICE,
+        architecture_id="remote-voice",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[offline_support],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [requirement]
+
+
+def test_offline_requirement_remains_unverified_without_candidate_evidence():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    requirement = _offline_requirement()
+
+    # Deliberately called "local": architecture identity must not
+    # establish offline capability.
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[
+            AgentStarterEvidence(
+                key="source_code_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Source code remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "offline" in reason.lower()
+        and "cannot be verified" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_explicit_offline_support_allows_normal_goal_decision():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    requirement = _offline_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="offline-capable-coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_offline_operation",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The candidate architecture explicitly "
+                    "supports operation without network access."
+                ),
+            ),
+            AgentStarterEvidence(
+                key="source_code_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "Source code remains inside the "
+                    "user-controlled environment."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_offline_candidate_property_does_not_matter_without_requirement():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="online-coding",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[],
+        candidate_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_offline_operation",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason=(
+                    "The candidate requires network connectivity."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+
+
+def test_offline_requirement_treats_explicit_unknown_as_unverified():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    requirement = _offline_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[requirement],
+        candidate_evidence=[
+            AgentStarterEvidence(
+                key="candidate_supports_offline_operation",
+                source=EvidenceSource.UNKNOWN,
+                reason=(
+                    "Offline operation has not been verified "
+                    "for this candidate architecture."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "offline" in reason.lower()
+        and "cannot be verified" in reason.lower()
+        for reason in result.recommendation_reasons
+    )

@@ -1743,6 +1743,101 @@ def assess_personal_candidate(
     )
 
 
+def _offline_constraint_assessment(
+    *,
+    architecture_id: str,
+    technical_feasibility: TechnicalFeasibility,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment | None:
+    offline_requirements = [
+        requirement
+        for requirement in requirements
+        if (
+            requirement.key == "offline_required"
+            and requirement.value is True
+            and requirement.strength is ConstraintStrength.HARD
+        )
+    ]
+
+    if not offline_requirements:
+        return None
+
+    offline_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_supports_offline_operation"
+    ]
+
+    supporting_evidence = [
+        evidence
+        for requirement in requirements
+        for evidence in requirement.evidence
+    ]
+    supporting_evidence.extend(candidate_evidence)
+
+    if technical_feasibility is TechnicalFeasibility.FEASIBLE:
+        technical_reason = "The candidate is technically feasible."
+    elif technical_feasibility is TechnicalFeasibility.LIMITED:
+        technical_reason = (
+            "The candidate has limited technical feasibility."
+        )
+    elif technical_feasibility is TechnicalFeasibility.NOT_FEASIBLE:
+        technical_reason = (
+            "The candidate is not feasible under the evaluated "
+            "technical constraints."
+        )
+    else:
+        technical_reason = (
+            "Technical feasibility is unknown and has not "
+            "been established."
+        )
+
+    explicitly_unsupported = (
+        len(offline_evidence) == 1
+        and offline_evidence[0].source is not EvidenceSource.UNKNOWN
+        and offline_evidence[0].value is False
+    )
+
+    explicitly_supported = (
+        len(offline_evidence) == 1
+        and offline_evidence[0].source is not EvidenceSource.UNKNOWN
+        and offline_evidence[0].value is True
+    )
+
+    if explicitly_unsupported:
+        return CandidateArchitectureAssessment(
+            architecture_id=architecture_id,
+            technical_feasibility=technical_feasibility,
+            recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+            confidence=RecommendationConfidence.HIGH,
+            technical_reasons=[technical_reason],
+            recommendation_reasons=[
+                "The candidate violates the hard requirement "
+                "that operation must work offline."
+            ],
+            supporting_evidence=supporting_evidence,
+            blocking_requirements=offline_requirements,
+        )
+
+    if explicitly_supported:
+        return None
+
+    return CandidateArchitectureAssessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        recommendation=RecommendationVerdict.NOT_RECOMMENDED,
+        confidence=RecommendationConfidence.LIMITED,
+        technical_reasons=[technical_reason],
+        recommendation_reasons=[
+            "Compliance with the hard offline requirement "
+            "cannot be verified from the available evidence."
+        ],
+        supporting_evidence=supporting_evidence,
+        blocking_requirements=[],
+    )
+
+
 def assess_agent_starter_candidate(
     *,
     goal: AgentStarterGoal,
@@ -1751,6 +1846,16 @@ def assess_agent_starter_candidate(
     requirements: list[AgentStarterRequirement],
     candidate_evidence: list[AgentStarterEvidence],
 ) -> CandidateArchitectureAssessment:
+    offline_assessment = _offline_constraint_assessment(
+        architecture_id=architecture_id,
+        technical_feasibility=technical_feasibility,
+        requirements=requirements,
+        candidate_evidence=candidate_evidence,
+    )
+
+    if offline_assessment is not None:
+        return offline_assessment
+
     if goal is AgentStarterGoal.CODING:
         assessor = assess_coding_candidate
     elif goal is AgentStarterGoal.AUTOMATION:
