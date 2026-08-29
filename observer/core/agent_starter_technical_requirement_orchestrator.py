@@ -5,6 +5,7 @@ from observer.core.agent_starter_technical_requirement_matcher import (
 )
 from schemas.agent_starter import (
     AgentStarterCandidateArchitecture,
+    AgentStarterEvidence,
     AgentStarterPreparedInput,
     AgentStarterTechnicalRequirementAssessment,
     EvidenceSource,
@@ -31,6 +32,22 @@ _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT = {
 }
 
 
+def extract_agent_starter_requested_capabilities(
+    prepared: AgentStarterPreparedInput,
+) -> list[AgentStarterEvidence]:
+    return [
+        evidence
+        for evidence in prepared.evidence
+        if (
+            evidence.source is EvidenceSource.DERIVED
+            and evidence.value is True
+            and evidence.key
+            in _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT
+        )
+    ]
+
+
+
 def build_agent_starter_technical_requirement_assessments(
     *,
     prepared: AgentStarterPreparedInput,
@@ -40,13 +57,9 @@ def build_agent_starter_technical_requirement_assessments(
         AgentStarterTechnicalRequirementAssessment
     ] = []
 
-    for evidence in prepared.evidence:
-        if evidence.source is not EvidenceSource.DERIVED:
-            continue
-
-        if evidence.value is not True:
-            continue
-
+    for evidence in extract_agent_starter_requested_capabilities(
+        prepared
+    ):
         candidate_evidence_key = (
             _CANDIDATE_EVIDENCE_KEY_BY_REQUIREMENT.get(
                 evidence.key
