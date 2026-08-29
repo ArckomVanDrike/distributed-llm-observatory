@@ -789,3 +789,63 @@ def test_personal_candidates_explicitly_record_llm_usage():
         ]
 
         assert llm_usage == [True]
+
+
+def test_coding_candidates_explicitly_record_execution_mode():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    local_candidate, remote_candidate = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    def execution_mode(candidate):
+        return [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_execution_mode"
+        ]
+
+    assert execution_mode(local_candidate) == ["local"]
+    assert execution_mode(remote_candidate) == ["remote"]
+
+
+def test_voice_candidates_explicitly_record_execution_mode():
+    prepared = AgentStarterPreparedInput(
+        goal=AgentStarterGoal.VOICE,
+    )
+
+    local_voice, hybrid_voice, cloud_voice = (
+        generate_agent_starter_candidates(prepared)
+    )
+
+    def execution_mode(candidate):
+        return [
+            evidence.value
+            for evidence in candidate.evidence
+            if evidence.key == "candidate_execution_mode"
+        ]
+
+    assert execution_mode(local_voice) == ["local"]
+    assert execution_mode(hybrid_voice) == ["hybrid"]
+    assert execution_mode(cloud_voice) == ["remote"]
+
+
+def test_other_goal_candidates_do_not_invent_execution_mode():
+    for goal in (
+        AgentStarterGoal.KNOWLEDGE_RAG,
+        AgentStarterGoal.AUTOMATION,
+        AgentStarterGoal.PERSONAL,
+    ):
+        candidates = generate_agent_starter_candidates(
+            AgentStarterPreparedInput(goal=goal)
+        )
+
+        assert all(
+            not any(
+                evidence.key == "candidate_execution_mode"
+                for evidence in candidate.evidence
+            )
+            for candidate in candidates
+        )

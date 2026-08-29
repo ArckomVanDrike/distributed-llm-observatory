@@ -3467,3 +3467,205 @@ def test_offline_requirement_treats_explicit_unknown_as_unverified():
         and "cannot be verified" in reason.lower()
         for reason in result.recommendation_reasons
     )
+
+
+def _prefer_local_execution_requirement() -> AgentStarterRequirement:
+    evidence = AgentStarterEvidence(
+        key="prefer_local_execution",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    return AgentStarterRequirement(
+        key="prefer_local_execution",
+        value=True,
+        strength=ConstraintStrength.SOFT,
+        evidence=[evidence],
+    )
+
+
+def _execution_mode(value: str) -> AgentStarterEvidence:
+    return AgentStarterEvidence(
+        key="candidate_execution_mode",
+        source=EvidenceSource.DERIVED,
+        value=value,
+        reason=(
+            "The candidate template explicitly records its "
+            "execution mode."
+        ),
+    )
+
+
+def test_local_execution_preference_keeps_local_candidate_normal_verdict():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="candidate-a",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[preference],
+        candidate_evidence=[
+            _execution_mode("local"),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.MEDIUM
+    assert result.blocking_requirements == []
+
+
+def test_local_execution_preference_explicitly_penalizes_remote_candidate():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="candidate-b",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[preference],
+        candidate_evidence=[
+            _execution_mode("remote"),
+        ],
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.blocking_requirements == []
+    assert any(
+        "local execution" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_local_execution_preference_explicitly_penalizes_hybrid_candidate():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.VOICE,
+        architecture_id="candidate-c",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[preference],
+        candidate_evidence=[
+            _execution_mode("hybrid"),
+        ],
+    )
+
+    assert (
+        result.recommendation
+        is RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+    )
+    assert result.blocking_requirements == []
+
+
+def test_local_execution_preference_is_unverified_without_execution_mode():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="candidate-d",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[preference],
+        candidate_evidence=[],
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "local execution" in reason.lower()
+        and "cannot be verified" in reason.lower()
+        for reason in result.recommendation_reasons
+    )
+
+
+def test_soft_local_preference_does_not_override_hard_constraint_failure():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    hard = _local_only_requirement()
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="candidate-e",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[
+            hard,
+            preference,
+        ],
+        candidate_evidence=[
+            _execution_mode("remote"),
+            AgentStarterEvidence(
+                key="source_code_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The candidate sends source code to remote "
+                    "processing."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.NOT_RECOMMENDED
+    assert result.confidence is RecommendationConfidence.HIGH
+    assert result.blocking_requirements == [hard]
+
+
+def test_local_execution_preference_treats_unknown_mode_as_unverified():
+    from observer.core.agent_starter_decision_engine import (
+        assess_agent_starter_candidate,
+    )
+    from schemas.agent_starter import AgentStarterGoal
+
+    preference = _prefer_local_execution_requirement()
+
+    result = assess_agent_starter_candidate(
+        goal=AgentStarterGoal.CODING,
+        architecture_id="candidate-unknown-mode",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        requirements=[preference],
+        candidate_evidence=[
+            AgentStarterEvidence(
+                key="candidate_execution_mode",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "The candidate execution mode has not "
+                    "been established."
+                ),
+            ),
+        ],
+    )
+
+    assert result.recommendation is RecommendationVerdict.POSSIBLE
+    assert result.confidence is RecommendationConfidence.LIMITED
+    assert result.blocking_requirements == []
+    assert any(
+        "local execution" in reason.lower()
+        and "cannot be verified" in reason.lower()
+        for reason in result.recommendation_reasons
+    )

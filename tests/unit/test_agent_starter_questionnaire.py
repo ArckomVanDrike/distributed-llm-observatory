@@ -154,6 +154,7 @@ def test_coding_questionnaire_asks_decision_relevant_inputs():
     ] == [
         "offline_required",
         "source_code_must_stay_local",
+        "prefer_local_execution",
         "modify_files",
         "run_tests",
     ]
@@ -186,6 +187,7 @@ def test_coding_questionnaire_omits_answered_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "prefer_local_execution",
         "run_tests",
     ]
 
@@ -305,6 +307,7 @@ def test_voice_questionnaire_asks_decision_relevant_inputs():
         "offline_required",
         "raw_audio_must_stay_local",
         "transcript_must_stay_local",
+        "prefer_local_execution",
         "voice_realtime_interaction_requested",
         "voice_interruptions_requested",
     ]
@@ -338,6 +341,7 @@ def test_voice_questionnaire_omits_answered_inputs():
     ] == [
         "offline_required",
         "transcript_must_stay_local",
+        "prefer_local_execution",
         "voice_interruptions_requested",
     ]
 
@@ -509,6 +513,94 @@ def test_observed_offline_state_does_not_replace_user_intent():
     question_set = build_agent_starter_question_set(intake)
 
     assert "offline_required" in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_local_execution_preference_is_asked_only_when_decision_relevant():
+    expected_by_goal = {
+        AgentStarterGoal.CODING: True,
+        AgentStarterGoal.VOICE: True,
+        AgentStarterGoal.KNOWLEDGE_RAG: False,
+        AgentStarterGoal.AUTOMATION: False,
+        AgentStarterGoal.PERSONAL: False,
+    }
+
+    for goal, expected in expected_by_goal.items():
+        question_set = build_agent_starter_question_set(
+            AgentStarterIntake(goal=goal)
+        )
+
+        keys = {
+            question.key
+            for question in question_set.questions
+        }
+
+        assert (
+            "prefer_local_execution" in keys
+        ) is expected
+
+
+def test_declared_local_execution_preference_is_not_asked_again():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="prefer_local_execution",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "prefer_local_execution" not in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_unknown_local_execution_preference_is_not_asked_again():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.VOICE,
+        evidence=[
+            AgentStarterEvidence(
+                key="prefer_local_execution",
+                source=EvidenceSource.UNKNOWN,
+                value=None,
+                reason=(
+                    "The user has not established whether "
+                    "local execution is preferred."
+                ),
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "prefer_local_execution" not in {
+        question.key
+        for question in question_set.questions
+    }
+
+
+def test_observed_local_execution_does_not_replace_user_preference():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="prefer_local_execution",
+                source=EvidenceSource.OBSERVED,
+                value=True,
+            ),
+        ],
+    )
+
+    question_set = build_agent_starter_question_set(intake)
+
+    assert "prefer_local_execution" in {
         question.key
         for question in question_set.questions
     }

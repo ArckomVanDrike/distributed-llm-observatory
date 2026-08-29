@@ -26,6 +26,20 @@ _CODING_QUESTIONS = (
         ),
     ),
     AgentStarterQuestion(
+        key="prefer_local_execution",
+        goal=AgentStarterGoal.CODING,
+        prompt=(
+            "Would you prefer the agent to execute locally "
+            "when possible?"
+        ),
+        kind=AgentStarterQuestionKind.BOOLEAN,
+        reason=(
+            "A local-execution preference can change the "
+            "recommendation between otherwise feasible local "
+            "and remote coding templates."
+        ),
+    ),
+    AgentStarterQuestion(
         key="modify_files",
         goal=AgentStarterGoal.CODING,
         prompt="May the coding agent modify repository files?",
@@ -142,6 +156,20 @@ _VOICE_QUESTIONS = (
         reason=(
             "Transcript locality can exclude architectures "
             "that process text remotely."
+        ),
+    ),
+    AgentStarterQuestion(
+        key="prefer_local_execution",
+        goal=AgentStarterGoal.VOICE,
+        prompt=(
+            "Would you prefer the agent to execute locally "
+            "when possible?"
+        ),
+        kind=AgentStarterQuestionKind.BOOLEAN,
+        reason=(
+            "A local-execution preference can change the "
+            "recommendation between otherwise feasible local, "
+            "hybrid, and remote voice templates."
         ),
     ),
     AgentStarterQuestion(

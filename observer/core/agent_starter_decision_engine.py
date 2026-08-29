@@ -1838,6 +1838,90 @@ def _offline_constraint_assessment(
     )
 
 
+def _apply_soft_preferences(
+    *,
+    assessment: CandidateArchitectureAssessment,
+    requirements: list[AgentStarterRequirement],
+    candidate_evidence: list[AgentStarterEvidence],
+) -> CandidateArchitectureAssessment:
+    prefer_local_execution = any(
+        requirement.key == "prefer_local_execution"
+        and requirement.value is True
+        and requirement.strength is ConstraintStrength.SOFT
+        for requirement in requirements
+    )
+
+    if not prefer_local_execution:
+        return assessment
+
+    # Hard or stronger negative decisions always take precedence over
+    # soft preferences.
+    if assessment.recommendation is RecommendationVerdict.NOT_RECOMMENDED:
+        return assessment
+
+    execution_mode_evidence = [
+        evidence
+        for evidence in candidate_evidence
+        if evidence.key == "candidate_execution_mode"
+    ]
+
+    execution_mode_unknown = (
+        len(execution_mode_evidence) != 1
+        or execution_mode_evidence[0].source is EvidenceSource.UNKNOWN
+        or execution_mode_evidence[0].value is None
+    )
+
+    if execution_mode_unknown:
+        return assessment.model_copy(
+            update={
+                "confidence": RecommendationConfidence.LIMITED,
+                "recommendation_reasons": [
+                    *assessment.recommendation_reasons,
+                    (
+                        "Compliance with the preference for local "
+                        "execution cannot be verified from the "
+                        "available candidate evidence."
+                    ),
+                ],
+            }
+        )
+
+    execution_mode = execution_mode_evidence[0].value
+
+    if execution_mode == "local":
+        return assessment
+
+    if execution_mode in {"remote", "hybrid"}:
+        return assessment.model_copy(
+            update={
+                "recommendation": (
+                    RecommendationVerdict.POSSIBLE_BUT_NOT_RECOMMENDED
+                ),
+                "recommendation_reasons": [
+                    *assessment.recommendation_reasons,
+                    (
+                        "The candidate does not satisfy the user's "
+                        "soft preference for local execution."
+                    ),
+                ],
+            }
+        )
+
+    return assessment.model_copy(
+        update={
+            "confidence": RecommendationConfidence.LIMITED,
+            "recommendation_reasons": [
+                *assessment.recommendation_reasons,
+                (
+                    "Compliance with the preference for local "
+                    "execution cannot be verified from the "
+                    "available candidate evidence."
+                ),
+            ],
+        }
+    )
+
+
 def assess_agent_starter_candidate(
     *,
     goal: AgentStarterGoal,
@@ -1871,9 +1955,15 @@ def assess_agent_starter_candidate(
             f"Unsupported Agent Starter goal: {goal!r}"
         )
 
-    return assessor(
+    assessment = assessor(
         architecture_id=architecture_id,
         technical_feasibility=technical_feasibility,
+        requirements=requirements,
+        candidate_evidence=candidate_evidence,
+    )
+
+    return _apply_soft_preferences(
+        assessment=assessment,
         requirements=requirements,
         candidate_evidence=candidate_evidence,
     )
