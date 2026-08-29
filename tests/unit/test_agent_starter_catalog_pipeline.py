@@ -227,3 +227,134 @@ def test_catalog_pipeline_preserves_coding_query_with_zero_matches():
         "coding",
     ]
     assert query_match.matched_entries == []
+
+
+def test_catalog_pipeline_applies_free_only_plan_requirement():
+    from schemas.agent_starter import (
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The coding architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The coding architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding architecture requires "
+                    "a language model."
+                ),
+            ),
+        ],
+    )
+
+    free_evidence = AgentStarterEvidence(
+        key="free_components_only",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    plan = AgentStarterPlan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            AgentStarterRequirement(
+                key="free_components_only",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[
+                    free_evidence,
+                ],
+            ),
+        ],
+        candidate_assessments=[
+            assessment,
+        ],
+    )
+
+    free_model = AgentStarterCatalogEntry(
+        identifier="free-coding-model",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Free Example",
+        version="1.0",
+        capabilities=[
+            "coding",
+        ],
+        license="example-free-license",
+        pricing_class="free",
+        sources=[
+            "https://example.invalid/free-coding-model",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            29,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    paid_model = AgentStarterCatalogEntry(
+        identifier="paid-coding-model",
+        component_type=AgentStarterCatalogComponentType.LLM,
+        vendor="Example Vendor",
+        family="Paid Example",
+        version="1.0",
+        capabilities=[
+            "coding",
+        ],
+        license="example-paid-license",
+        pricing_class="paid",
+        sources=[
+            "https://example.invalid/paid-coding-model",
+        ],
+        verified_at=datetime(
+            2026,
+            8,
+            29,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="catalog-free-only-test",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            tzinfo=timezone.utc,
+        ),
+        entries=[
+            paid_model,
+            free_model,
+        ],
+    )
+
+    result = run_agent_starter_catalog_matching(
+        plan=plan,
+        snapshot=snapshot,
+    )
+
+    query_match = (
+        result.architecture_results[0]
+        .query_matches[0]
+    )
+
+    assert query_match.query.required_pricing_class == "free"
+
+    assert [
+        entry.identifier
+        for entry in query_match.matched_entries
+    ] == [
+        "free-coding-model",
+    ]

@@ -22,6 +22,7 @@ def run_agent_starter_catalog_matching(
             goal=plan.goal,
             assessments=list(plan.candidate_assessments),
             snapshot=snapshot,
+            plan_requirements=list(plan.requirements),
         )
     )
 

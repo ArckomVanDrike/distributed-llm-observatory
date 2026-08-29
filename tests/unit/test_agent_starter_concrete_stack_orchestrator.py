@@ -169,3 +169,89 @@ def test_concrete_stack_orchestrator_preserves_all_architectures_in_order():
         == "agent-starter-catalog-v0-1"
         for stack in resolution.stacks
     )
+
+
+def test_concrete_stack_preserves_free_only_plan_requirement():
+    from observer.core.agent_starter_concrete_stack_orchestrator import (
+        build_agent_starter_concrete_stacks,
+    )
+    from schemas.agent_starter import (
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    assessment = _assessment(
+        "local-coding-agent",
+    )
+
+    free_evidence = AgentStarterEvidence(
+        key="free_components_only",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    plan = AgentStarterPlan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            AgentStarterRequirement(
+                key="free_components_only",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[
+                    free_evidence,
+                ],
+            ),
+        ],
+        candidate_assessments=[
+            assessment,
+        ],
+    )
+
+    free_entry = _entry(
+        "free-coding-model",
+    )
+
+    architecture_result = AgentStarterCatalogArchitectureResult(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="agent-starter-catalog-v0-1",
+        query_matches=[
+            AgentStarterCatalogQueryMatch(
+                architecture_id="local-coding-agent",
+                catalog_snapshot_id=(
+                    "agent-starter-catalog-v0-1"
+                ),
+                query=AgentStarterCatalogQuery(
+                    component_type=(
+                        AgentStarterCatalogComponentType.LLM
+                    ),
+                    required_capabilities=[
+                        "coding",
+                    ],
+                    required_pricing_class="free",
+                ),
+                matched_entries=[
+                    free_entry,
+                ],
+            ),
+        ],
+    )
+
+    catalog_result = AgentStarterCatalogMatchingResult(
+        plan=plan,
+        catalog_snapshot_id="agent-starter-catalog-v0-1",
+        architecture_results=[
+            architecture_result,
+        ],
+    )
+
+    resolution = build_agent_starter_concrete_stacks(
+        catalog_result
+    )
+
+    component = resolution.stacks[0].components[0]
+
+    assert (
+        component.requirement.required_pricing_class
+        == "free"
+    )
+    assert component.selected_entry == free_entry

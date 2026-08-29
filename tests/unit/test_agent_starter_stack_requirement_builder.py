@@ -734,3 +734,143 @@ def test_stack_requirement_builder_rejects_personal_without_memory_characterizat
             goal=AgentStarterGoal.PERSONAL,
             assessment=assessment,
         )
+
+
+def test_stack_requirement_builder_applies_free_only_constraint():
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterRequirement,
+        ConstraintStrength,
+        EvidenceSource,
+    )
+
+    llm_evidence = AgentStarterEvidence(
+        key="candidate_uses_llm",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The coding-agent architecture uses an LLM "
+            "for coding assistance."
+        ),
+    )
+
+    free_only_evidence = AgentStarterEvidence(
+        key="free_components_only",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The coding architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The coding architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            llm_evidence,
+        ],
+    )
+
+    requirements = build_agent_starter_stack_requirements(
+        goal=AgentStarterGoal.CODING,
+        assessment=assessment,
+        plan_requirements=[
+            AgentStarterRequirement(
+                key="free_components_only",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[
+                    free_only_evidence,
+                ],
+            ),
+        ],
+    )
+
+    assert len(requirements) == 1
+    assert requirements[0].required_pricing_class == "free"
+
+
+def test_stack_requirement_builder_applies_free_only_to_voice_components():
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterRequirement,
+        ConstraintStrength,
+        EvidenceSource,
+    )
+
+    stt_evidence = AgentStarterEvidence(
+        key="candidate_uses_stt",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="The architecture uses speech-to-text.",
+    )
+
+    tts_evidence = AgentStarterEvidence(
+        key="candidate_uses_tts",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="The architecture uses text-to-speech.",
+    )
+
+    free_only_evidence = AgentStarterEvidence(
+        key="free_components_only",
+        source=EvidenceSource.DECLARED,
+        value=True,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-voice-pipeline",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The voice architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The voice architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            stt_evidence,
+            tts_evidence,
+            AgentStarterEvidence(
+                key="candidate_raw_audio_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Raw audio remains local.",
+            ),
+            AgentStarterEvidence(
+                key="candidate_transcript_remote_processing",
+                source=EvidenceSource.DERIVED,
+                value=False,
+                reason="Transcripts remain local.",
+            ),
+        ],
+    )
+
+    requirements = build_agent_starter_stack_requirements(
+        goal=AgentStarterGoal.VOICE,
+        assessment=assessment,
+        plan_requirements=[
+            AgentStarterRequirement(
+                key="free_components_only",
+                value=True,
+                strength=ConstraintStrength.HARD,
+                evidence=[
+                    free_only_evidence,
+                ],
+            ),
+        ],
+    )
+
+    assert [
+        requirement.required_pricing_class
+        for requirement in requirements
+    ] == [
+        "free",
+        "free",
+    ]

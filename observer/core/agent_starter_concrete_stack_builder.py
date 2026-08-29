@@ -8,6 +8,7 @@ from observer.core.agent_starter_stack_requirement_builder import (
 )
 from schemas.agent_starter import (
     AgentStarterGoal,
+    AgentStarterRequirement,
     CandidateArchitectureAssessment,
 )
 from schemas.agent_starter_catalog import (
@@ -24,6 +25,9 @@ def build_agent_starter_concrete_stack(
     goal: AgentStarterGoal,
     assessment: CandidateArchitectureAssessment,
     architecture_result: AgentStarterCatalogArchitectureResult,
+    plan_requirements: list[
+        AgentStarterRequirement
+    ] | None = None,
 ) -> AgentStarterConcreteStack:
     if architecture_result.architecture_id != assessment.architecture_id:
         raise ValueError(
@@ -34,6 +38,7 @@ def build_agent_starter_concrete_stack(
     requirements = build_agent_starter_stack_requirements(
         goal=goal,
         assessment=assessment,
+        plan_requirements=plan_requirements,
     )
 
     query_matches = list(architecture_result.query_matches)
