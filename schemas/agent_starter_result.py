@@ -8,6 +8,9 @@ from schemas.agent_starter import AgentStarterPlan
 from schemas.agent_starter_catalog import (
     AgentStarterCatalogArchitectureResult,
 )
+from schemas.agent_starter_stack import (
+    AgentStarterConcreteStack,
+)
 
 
 class AgentStarterCatalogMatchingResult(BaseModel):
@@ -52,6 +55,100 @@ class AgentStarterCatalogMatchingResult(BaseModel):
             raise ValueError(
                 "Catalog architecture results must come from "
                 "the declared catalog snapshot."
+            )
+
+        return self
+
+
+
+class AgentStarterConcreteStackResolution(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    catalog_result: AgentStarterCatalogMatchingResult
+    stacks: list[AgentStarterConcreteStack] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_stack_architectures(
+        self,
+    ) -> AgentStarterConcreteStackResolution:
+        expected_ids = [
+            result.architecture_id
+            for result in self.catalog_result.architecture_results
+        ]
+        actual_ids = [
+            stack.architecture_id
+            for stack in self.stacks
+        ]
+
+        if actual_ids != expected_ids:
+            raise ValueError(
+                "Concrete stacks must correspond exactly "
+                "and in order to catalog architecture results."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_stack_catalog_snapshot(
+        self,
+    ) -> AgentStarterConcreteStackResolution:
+        if any(
+            stack.catalog_snapshot_id
+            != self.catalog_result.catalog_snapshot_id
+            for stack in self.stacks
+        ):
+            raise ValueError(
+                "Concrete stacks must use the same catalog snapshot "
+                "as the catalog matching result."
+            )
+
+        return self
+
+
+class AgentStarterConcreteStackClassification(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    resolution: AgentStarterConcreteStackResolution
+
+    recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    possible_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    possible_but_not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_architecture_membership(
+        self,
+    ) -> AgentStarterConcreteStackClassification:
+        expected_ids = [
+            stack.architecture_id
+            for stack in self.resolution.stacks
+        ]
+
+        classified_ids = [
+            *self.recommended_architecture_ids,
+            *self.possible_architecture_ids,
+            *self.possible_but_not_recommended_architecture_ids,
+            *self.not_recommended_architecture_ids,
+        ]
+
+        if (
+            len(classified_ids) != len(expected_ids)
+            or set(classified_ids) != set(expected_ids)
+            or len(classified_ids) != len(set(classified_ids))
+        ):
+            raise ValueError(
+                "Every concrete stack architecture must be "
+                "classified exactly once."
             )
 
         return self
