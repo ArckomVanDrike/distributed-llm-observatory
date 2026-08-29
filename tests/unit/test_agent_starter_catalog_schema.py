@@ -963,3 +963,69 @@ def test_catalog_query_match_rejects_entry_in_multiple_result_classes():
             matched_entries=[entry],
             indeterminate_entries=[entry],
         )
+
+
+def test_catalog_v0_2_access_options_preserve_path_specific_model_profiles():
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                    "model_profile": {
+                        "model_id": "example-7b-q4",
+                        "parameter_count": 7_000_000_000,
+                        "quantization": "q4",
+                        "runtime": "llama.cpp",
+                        "execution_location": "on_device",
+                    },
+                },
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                    "model_profile": {
+                        "model_id": "example-remote",
+                        "execution_location": "remote",
+                    },
+                },
+            ],
+        )
+    )
+
+    local, remote = entry.access_options
+
+    assert local.model_profile is not None
+    assert local.model_profile.model_id == "example-7b-q4"
+    assert local.model_profile.parameter_count == 7_000_000_000
+    assert local.model_profile.quantization == "q4"
+    assert (
+        local.model_profile.execution_location
+        is ExecutionLocation.ON_DEVICE
+    )
+
+    assert remote.model_profile is not None
+    assert remote.model_profile.model_id == "example-remote"
+    assert (
+        remote.model_profile.execution_location
+        is ExecutionLocation.REMOTE
+    )
+
+
+def test_catalog_v0_2_access_option_allows_unknown_model_profile():
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+            ],
+        )
+    )
+
+    assert entry.access_options[0].model_profile is None

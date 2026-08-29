@@ -61,6 +61,7 @@ class AgentStarterCatalogAccessOption(BaseModel):
     deployment_mode: str = Field(min_length=1)
     access_kind: AgentStarterCatalogAccessKind
     pricing: AgentStarterCatalogAccessPricing
+    model_profile: ModelProfile | None = None
     notes: str | None = Field(
         default=None,
         min_length=1,
