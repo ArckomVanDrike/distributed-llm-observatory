@@ -3585,3 +3585,202 @@ body:has(.agent-starter-page) {
     min-height: 0;
   }
 }
+
+
+/* Agent Starter adaptive wizard -------------------------------------------- */
+
+.agent-starter-wizard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(3rem, 7vw, 5rem) 0 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-starter-wizard-header h1 {
+  margin: 0.55rem 0 0;
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.agent-starter-wizard-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.agent-starter-wizard-meta span {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agent-starter-wizard-meta small {
+  color: var(--muted);
+}
+
+.agent-starter-question-panel {
+  max-width: 880px;
+  margin: clamp(2.5rem, 7vw, 5.5rem) auto;
+  padding: clamp(1.6rem, 4vw, 2.7rem);
+  border: 1px solid var(--border);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(144, 224, 192, 0.065),
+      rgba(8, 14, 18, 0.96) 42%,
+      rgba(5, 10, 14, 0.98)
+    );
+  box-shadow:
+    0 1.5rem 5rem rgba(0, 0, 0, 0.22);
+}
+
+.agent-starter-question-panel h2 {
+  max-width: 760px;
+  margin: 0.6rem 0 1.5rem;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.agent-starter-question-panel > p:not(
+  .section-label
+) {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.agent-starter-question-reason {
+  margin: 1.8rem 0;
+  padding: 1rem 1.1rem;
+  border-left: 2px solid var(--accent);
+  background:
+    rgba(144, 224, 192, 0.04);
+}
+
+.agent-starter-question-reason strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--accent);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.agent-starter-question-reason p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.agent-starter-answer-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.8rem;
+}
+
+.agent-starter-answer-grid button {
+  min-height: 8rem;
+  padding: 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background:
+    rgba(8, 15, 19, 0.8);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.agent-starter-answer-grid button:hover {
+  border-color:
+    rgba(144, 224, 192, 0.48);
+  background:
+    rgba(144, 224, 192, 0.07);
+  transform: translateY(-2px);
+}
+
+.agent-starter-answer-grid button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.agent-starter-answer-grid strong,
+.agent-starter-answer-grid span {
+  display: block;
+}
+
+.agent-starter-answer-grid strong {
+  margin-bottom: 0.5rem;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.agent-starter-answer-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.agent-starter-question-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.agent-starter-question-footer p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.agent-starter-error {
+  border-color:
+    rgba(255, 120, 120, 0.3);
+}
+
+.agent-starter-requirements-complete {
+  border-color:
+    rgba(144, 224, 192, 0.34);
+}
+
+@media (max-width: 760px) {
+  .agent-starter-wizard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agent-starter-wizard-meta {
+    align-items: flex-start;
+  }
+
+  .agent-starter-answer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-starter-answer-grid button {
+    min-height: 0;
+  }
+
+  .agent-starter-question-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

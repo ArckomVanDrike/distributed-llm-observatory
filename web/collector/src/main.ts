@@ -5,6 +5,21 @@ import {
 } from './app-view'
 
 import {
+  fetchAgentStarterQuestions,
+  isAgentStarterGoal,
+} from './agent-starter-bridge'
+
+import type {
+  AgentStarterEvidenceInput,
+  AgentStarterGoal,
+  AgentStarterQuestionSet,
+} from './agent-starter-bridge'
+
+import type {
+  AgentStarterPageState,
+} from './agent-starter-page'
+
+import {
   executeAgentTest,
 } from './agent-test-flow'
 
@@ -115,6 +130,20 @@ let agentTestResult:
   AgentTestBridgeResponse | null = null
 
 let agentTestError: string | null = null
+
+let agentStarterState: AgentStarterPageState =
+  'landing'
+
+let agentStarterGoal: AgentStarterGoal | null =
+  null
+
+let agentStarterEvidence:
+  AgentStarterEvidenceInput[] = []
+
+let agentStarterQuestionSet:
+  AgentStarterQuestionSet | null = null
+
+let agentStarterError: string | null = null
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
@@ -553,6 +582,13 @@ function render(): void {
           observatoryGeographicMaxSkewInput,
         error: observatoryError,
       },
+      agentStarter: {
+        state: agentStarterState,
+        goal: agentStarterGoal,
+        evidence: agentStarterEvidence,
+        questionSet: agentStarterQuestionSet,
+        error: agentStarterError,
+      },
       agentTest: {
         state: agentTestState,
         baseUrl: agentBaseUrl,
@@ -575,6 +611,10 @@ function render(): void {
 
   if (route === 'agent-lab-test') {
     bindAgentTestEvents()
+  }
+
+  if (route === 'agent-lab-starter') {
+    bindAgentStarterEvents()
   }
 
   if (route === 'observatory') {
@@ -730,6 +770,169 @@ async function refreshAgentTestHistory(): Promise<void> {
   }
 
   render()
+}
+
+
+async function refreshAgentStarterQuestions(): Promise<void> {
+  if (agentStarterGoal === null) {
+    return
+  }
+
+  const goal = agentStarterGoal
+
+  agentStarterState = 'loading'
+  agentStarterQuestionSet = null
+  agentStarterError = null
+
+  render()
+
+  try {
+    const questionSet =
+      await fetchAgentStarterQuestions(
+        (
+          request,
+          init,
+        ) => fetch(request, init),
+        {
+          goal,
+          evidence: agentStarterEvidence,
+          hardware_profile: null,
+          execution_environment: null,
+        },
+      )
+
+    agentStarterQuestionSet = questionSet
+
+    agentStarterState =
+      questionSet.questions.length === 0
+        ? 'complete'
+        : 'question'
+  } catch (error) {
+    agentStarterQuestionSet = null
+    agentStarterState = 'error'
+    agentStarterError =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load Agent Starter questions.'
+  }
+
+  render()
+}
+
+
+function resetAgentStarter(): void {
+  agentStarterState = 'landing'
+  agentStarterGoal = null
+  agentStarterEvidence = []
+  agentStarterQuestionSet = null
+  agentStarterError = null
+
+  render()
+}
+
+
+function bindAgentStarterEvents(): void {
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-goal]',
+    )
+    .forEach((goalButton) => {
+      goalButton.addEventListener(
+        'click',
+        () => {
+          const goal =
+            goalButton.dataset.agentStarterGoal
+
+          if (
+            goal === undefined
+            || !isAgentStarterGoal(goal)
+          ) {
+            return
+          }
+
+          agentStarterGoal = goal
+          agentStarterEvidence = []
+          agentStarterQuestionSet = null
+          agentStarterError = null
+
+          void refreshAgentStarterQuestions()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-answer]',
+    )
+    .forEach((answerButton) => {
+      answerButton.addEventListener(
+        'click',
+        () => {
+          const answer =
+            answerButton.dataset.agentStarterAnswer
+
+          const key =
+            answerButton.dataset.agentStarterQuestionKey
+
+          const currentQuestion =
+            agentStarterQuestionSet
+              ?.questions[0]
+
+          if (
+            key === undefined
+            || currentQuestion === undefined
+            || key !== currentQuestion.key
+          ) {
+            return
+          }
+
+          let evidence:
+            AgentStarterEvidenceInput
+
+          if (answer === 'unknown') {
+            evidence = {
+              key,
+              source: 'unknown',
+              value: null,
+              reason:
+                'User indicated that this information is unknown.',
+            }
+          } else if (
+            answer === 'true'
+            || answer === 'false'
+          ) {
+            evidence = {
+              key,
+              source: 'declared',
+              value: answer === 'true',
+            }
+          } else {
+            return
+          }
+
+          agentStarterEvidence = [
+            ...agentStarterEvidence,
+            evidence,
+          ]
+
+          agentStarterQuestionSet = null
+          agentStarterError = null
+
+          void refreshAgentStarterQuestions()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-change-goal]',
+    )
+    .forEach((button) => {
+      button.addEventListener(
+        'click',
+        resetAgentStarter,
+      )
+    })
 }
 
 

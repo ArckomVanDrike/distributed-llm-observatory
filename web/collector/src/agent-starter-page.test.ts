@@ -36,7 +36,7 @@ describe('renderAgentStarterPage', () => {
       'data-agent-starter-goal="coding"',
     )
     expect(html).toContain(
-      'data-agent-starter-goal="knowledge-rag"',
+      'data-agent-starter-goal="knowledge_rag"',
     )
     expect(html).toContain(
       'data-agent-starter-goal="automation"',
@@ -56,7 +56,6 @@ describe('renderAgentStarterPage', () => {
     expect(html).toContain('Constraints')
     expect(html).toContain('Environment')
     expect(html).toContain('Recommendation')
-
     expect(html).toContain('Explicit evidence')
     expect(html).toContain('Hard constraints')
     expect(html).toContain(
@@ -64,12 +63,77 @@ describe('renderAgentStarterPage', () => {
     )
   })
 
-  it('exposes the goal selection as step one', () => {
-    const html = renderAgentStarterPage()
+  it('renders an adaptive question', () => {
+    const html = renderAgentStarterPage({
+      state: 'question',
+      goal: 'coding',
+      evidence: [],
+      error: null,
+      questionSet: {
+        schema_version: '0.1',
+        goal: 'coding',
+        questions: [
+          {
+            schema_version: '0.1',
+            key: 'offline_required',
+            goal: 'coding',
+            prompt:
+              'Must the agent be able to operate offline?',
+            kind: 'boolean',
+            reason:
+              'Offline operation can exclude architectures requiring network connectivity.',
+          },
+        ],
+      },
+    })
 
-    expect(html).toContain('Step 1 · Goal')
     expect(html).toContain(
-      'What do you want to build?',
+      'Must the agent be able to operate offline?',
+    )
+    expect(html).toContain(
+      'Why DLLO asks this',
+    )
+    expect(html).toContain(
+      'data-agent-starter-answer="true"',
+    )
+    expect(html).toContain(
+      'data-agent-starter-answer="false"',
+    )
+    expect(html).toContain(
+      'data-agent-starter-answer="unknown"',
+    )
+    expect(html).toContain(
+      'Unknown answers are not treated as false.',
+    )
+  })
+
+  it('renders questionnaire completion separately from final recommendation', () => {
+    const html = renderAgentStarterPage({
+      state: 'complete',
+      goal: 'coding',
+      evidence: [
+        {
+          key: 'offline_required',
+          source: 'declared',
+          value: true,
+        },
+      ],
+      questionSet: {
+        schema_version: '0.1',
+        goal: 'coding',
+        questions: [],
+      },
+      error: null,
+    })
+
+    expect(html).toContain(
+      'The adaptive questionnaire is complete.',
+    )
+    expect(html).toContain(
+      'next wizard stage',
+    )
+    expect(html).not.toContain(
+      'Recommended architecture',
     )
   })
 })

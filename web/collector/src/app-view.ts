@@ -6,6 +6,10 @@ import {
   renderAgentStarterPage,
 } from './agent-starter-page'
 
+import type {
+  AgentStarterPageOptions,
+} from './agent-starter-page'
+
 import {
   renderAgentTestPage,
 } from './agent-test-page'
@@ -36,6 +40,7 @@ import type {
 
 export interface AppViewOptions {
   agentTest?: AgentTestPageOptions
+  agentStarter?: AgentStarterPageOptions
   observatory?: ObservatoryPageOptions
 }
 
@@ -72,7 +77,9 @@ export function renderAppView(
   if (route === 'agent-lab-starter') {
     return renderAppShell(
       route,
-      renderAgentStarterPage(),
+      renderAgentStarterPage(
+        options.agentStarter,
+      ),
     )
   }
 
