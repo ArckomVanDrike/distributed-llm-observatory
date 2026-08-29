@@ -755,3 +755,108 @@ def test_catalog_snapshot_accepts_v0_2_entries():
     assert snapshot.entries == [
         entry,
     ]
+
+
+def test_catalog_v0_2_pairs_deployment_and_access_pricing():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+        )
+    )
+
+    assert len(entry.access_options) == 2
+
+    local, hosted = entry.access_options
+
+    assert local.deployment_mode == "on_device"
+    assert local.access_kind.value == "self_hosted"
+    assert local.pricing.value == "free"
+
+    assert hosted.deployment_mode == "remote"
+    assert hosted.access_kind.value == "external_service"
+    assert hosted.pricing.value == "usage_based"
+
+
+def test_catalog_v0_2_represents_remote_self_hosting_separately():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+            ],
+        )
+    )
+
+    option = entry.access_options[0]
+
+    assert option.deployment_mode == "remote"
+    assert option.access_kind.value == "self_hosted"
+    assert option.pricing.value == "free"
+
+
+def test_catalog_v0_2_preserves_provider_dependent_service_access():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "provider_dependent",
+                    "notes": (
+                        "Cost depends on the selected "
+                        "external provider."
+                    ),
+                },
+            ],
+        )
+    )
+
+    option = entry.access_options[0]
+
+    assert option.access_kind.value == "external_service"
+    assert option.pricing.value == "provider_dependent"
+    assert option.notes == (
+        "Cost depends on the selected external provider."
+    )
+
+
+def test_catalog_v0_1_defaults_to_no_structured_access_options():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload()
+    )
+
+    assert entry.schema_version == "0.1"
+    assert entry.access_options == []

@@ -50,6 +50,23 @@ class AgentStarterCatalogAccessPricing(str, Enum):
     UNKNOWN = "unknown"
 
 
+class AgentStarterCatalogAccessKind(str, Enum):
+    SELF_HOSTED = "self_hosted"
+    EXTERNAL_SERVICE = "external_service"
+
+
+class AgentStarterCatalogAccessOption(BaseModel):
+    schema_version: Literal["0.2"] = "0.2"
+
+    deployment_mode: str = Field(min_length=1)
+    access_kind: AgentStarterCatalogAccessKind
+    pricing: AgentStarterCatalogAccessPricing
+    notes: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+
 class AgentStarterCatalogEntry(BaseModel):
     schema_version: Literal["0.1", "0.2"] = "0.1"
 
@@ -94,6 +111,12 @@ class AgentStarterCatalogEntry(BaseModel):
     pricing_notes: str | None = Field(
         default=None,
         min_length=1,
+    )
+
+    access_options: list[
+        AgentStarterCatalogAccessOption
+    ] = Field(
+        default_factory=list,
     )
 
     privacy_implications: list[str] = Field(
