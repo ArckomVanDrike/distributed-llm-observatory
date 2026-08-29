@@ -61,14 +61,23 @@ describe('renderAppView', () => {
     )
   })
 
-  it('renders Agent Starter as in development', () => {
+  it('renders Agent Starter core status and supported goals', () => {
     const html = renderAppView(
       'agent-lab-starter',
       '',
     )
 
     expect(html).toContain('Agent Starter')
-    expect(html).toContain('In development')
+    expect(html).toContain('Core v1 complete')
+    expect(html).toContain(
+      'Public interface in development',
+    )
+
+    expect(html).toContain('Coding')
+    expect(html).toContain('Knowledge / RAG')
+    expect(html).toContain('Automation')
+    expect(html).toContain('Voice')
+    expect(html).toContain('Personal Assistant')
   })
 })
 

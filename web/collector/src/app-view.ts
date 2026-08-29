@@ -44,14 +44,27 @@ function renderAgentStarterPage(): string {
         <h1>Agent Starter</h1>
 
         <p class="section-label">
-          In development
+          Core v1 complete
         </p>
 
         <p class="hero-copy">
-          Profile device capabilities and receive
-          practical guidance for building a local
-          agent stack.
+          Turn goals, constraints, observed environment
+          evidence, and explicit preferences into
+          reproducible agent architecture and
+          stack recommendations.
         </p>
+
+        <p>
+          Public interface in development.
+        </p>
+
+        <ul>
+          <li>Coding</li>
+          <li>Knowledge / RAG</li>
+          <li>Automation</li>
+          <li>Voice</li>
+          <li>Personal Assistant</li>
+        </ul>
       </section>
     </main>
   `

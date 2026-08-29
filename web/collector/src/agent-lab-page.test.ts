@@ -44,14 +44,20 @@ describe('renderAgentLabPage', () => {
     )
   })
 
-  it('marks Agent Starter as in development', () => {
+  it('distinguishes the complete Agent Starter core from its public interface', () => {
     const html = renderAgentLabPage()
 
     expect(html).toContain(
       'Agent Starter',
     )
     expect(html).toContain(
-      'In development',
+      'Core v1 complete',
+    )
+    expect(html).toContain(
+      'Public interface in development',
+    )
+    expect(html).toContain(
+      'evidence-backed',
     )
   })
 })
