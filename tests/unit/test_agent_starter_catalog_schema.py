@@ -554,3 +554,204 @@ def test_catalog_entry_retains_extended_recommendation_metadata():
         "it",
     ]
     assert entry.streaming_support is True
+
+
+def _catalog_cost_metadata_payload(
+    **overrides,
+):
+    payload = {
+        "schema_version": "0.1",
+        "identifier": "example-model",
+        "component_type": "llm",
+        "vendor": "Example",
+        "family": "Example",
+        "version": "1.0",
+        "capabilities": [
+            "text_generation",
+        ],
+        "deployment_modes": [
+            "on_device",
+        ],
+        "supported_runtimes": [
+            "ollama",
+        ],
+        "resource_profile": {},
+        "context_characteristics": {},
+        "language_support": [
+            "en",
+        ],
+        "streaming_support": True,
+        "license": "example-license",
+        "pricing_class": "free",
+        "privacy_implications": [],
+        "sources": [
+            "https://example.com/model",
+        ],
+        "verified_at": (
+            "2026-08-29T20:00:00+00:00"
+        ),
+    }
+
+    payload.update(overrides)
+
+    return payload
+
+
+def test_catalog_cost_metadata_is_backward_compatible_with_v0_1():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload()
+    )
+
+    assert entry.schema_version == "0.1"
+    assert entry.release_status.value == "unknown"
+    assert entry.license_cost.value == "unknown"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "unknown",
+    ]
+
+    assert entry.pricing_notes is None
+
+
+def test_catalog_cost_metadata_represents_free_stable_component():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            release_status="stable",
+            license_cost="free",
+            access_pricing=[
+                "free",
+            ],
+            pricing_notes=(
+                "The component can be obtained without "
+                "a paid license or service subscription."
+            ),
+        )
+    )
+
+    assert entry.schema_version == "0.2"
+    assert entry.release_status.value == "stable"
+    assert entry.license_cost.value == "free"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "free",
+    ]
+
+
+def test_catalog_cost_metadata_represents_paid_service_access():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="provider-api-model",
+            deployment_modes=[
+                "remote",
+            ],
+            release_status="stable",
+            license="proprietary",
+            pricing_class="paid",
+            license_cost="paid",
+            access_pricing=[
+                "usage_based",
+            ],
+            pricing_notes=(
+                "Remote access is billed according "
+                "to provider usage."
+            ),
+        )
+    )
+
+    assert entry.license_cost.value == "paid"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "usage_based",
+    ]
+
+
+def test_catalog_cost_metadata_represents_experimental_preview():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="experimental-model",
+            release_status="experimental_preview",
+            license_cost="restricted",
+            access_pricing=[
+                "provider_dependent",
+            ],
+            pricing_notes=(
+                "Pricing depends on the selected "
+                "deployment or provider."
+            ),
+        )
+    )
+
+    assert (
+        entry.release_status.value
+        == "experimental_preview"
+    )
+    assert entry.license_cost.value == "restricted"
+
+
+def test_catalog_snapshot_accepts_v0_2_entries():
+    from datetime import datetime, timezone
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogSnapshot,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            release_status="stable",
+            license_cost="free",
+            access_pricing=[
+                "free",
+            ],
+        )
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        schema_version="0.2",
+        snapshot_id="agent-starter-catalog-v0-2",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            20,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        entries=[
+            entry,
+        ],
+    )
+
+    assert snapshot.schema_version == "0.2"
+    assert snapshot.entries == [
+        entry,
+    ]

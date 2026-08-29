@@ -25,8 +25,33 @@ class AgentStarterCatalogComponentType(str, Enum):
     SUPPORTING_TOOL = "supporting_tool"
 
 
+class AgentStarterCatalogReleaseStatus(str, Enum):
+    STABLE = "stable"
+    PREVIEW = "preview"
+    EXPERIMENTAL_PREVIEW = "experimental_preview"
+    DEPRECATED = "deprecated"
+    UNKNOWN = "unknown"
+
+
+class AgentStarterCatalogLicenseCost(str, Enum):
+    FREE = "free"
+    PAID = "paid"
+    RESTRICTED = "restricted"
+    UNKNOWN = "unknown"
+
+
+class AgentStarterCatalogAccessPricing(str, Enum):
+    FREE = "free"
+    FREEMIUM = "freemium"
+    USAGE_BASED = "usage_based"
+    SUBSCRIPTION = "subscription"
+    ENTERPRISE = "enterprise"
+    PROVIDER_DEPENDENT = "provider_dependent"
+    UNKNOWN = "unknown"
+
+
 class AgentStarterCatalogEntry(BaseModel):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.1"
 
     identifier: str = Field(min_length=1)
     component_type: AgentStarterCatalogComponentType
@@ -52,6 +77,25 @@ class AgentStarterCatalogEntry(BaseModel):
 
     license: str = Field(min_length=1)
     pricing_class: str = Field(min_length=1)
+
+    release_status: AgentStarterCatalogReleaseStatus = (
+        AgentStarterCatalogReleaseStatus.UNKNOWN
+    )
+    license_cost: AgentStarterCatalogLicenseCost = (
+        AgentStarterCatalogLicenseCost.UNKNOWN
+    )
+    access_pricing: list[
+        AgentStarterCatalogAccessPricing
+    ] = Field(
+        default_factory=lambda: [
+            AgentStarterCatalogAccessPricing.UNKNOWN
+        ],
+    )
+    pricing_notes: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
     privacy_implications: list[str] = Field(
         default_factory=list,
     )
@@ -76,7 +120,7 @@ class AgentStarterCatalogEntry(BaseModel):
 
 
 class AgentStarterCatalogSnapshot(BaseModel):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.1"
 
     snapshot_id: str = Field(min_length=1)
     generated_at: datetime
