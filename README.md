@@ -1,22 +1,180 @@
 # Distributed LLM Observatory
 
-**Distributed LLM Observatory (DLLO)** is an open-source framework for producing reproducible observations of LLMs, AI agents, and AI systems across time, regions, benchmark versions, and operating conditions.
+**Build agents. Test agents. Observe how AI systems change.**
 
-DLLO is designed around a simple rule:
+Distributed LLM Observatory (**DLLO**) is an open-source framework for building evidence-based agent configurations, testing real AI agents, and producing reproducible observations of LLMs and AI systems across time, regions, benchmark versions, and operating conditions.
 
-> **Measure what can be observed. Do not infer causes that the evidence cannot establish.**
+> **Observe first. Compare carefully. Explain only when the evidence allows it.**
 
-The project combines deterministic benchmark execution, observer-owned evidence, Agent Lab testing, local consumer telemetry, persistent run artifacts, and temporal/geographic comparison tools.
+DLLO is built around three complementary workflows:
+
+| Workflow | Question |
+| --- | --- |
+| **Agent Starter** | What kind of agent architecture and stack should I build? |
+| **Test Your Agent** | Does my agent actually behave correctly? |
+| **Observatory** | What changed between compatible observations? |
+
+---
+
+## What you can do with DLLO
+
+### Build your agent — Agent Starter
+
+**Agent Starter v1** helps turn user goals, constraints, observed capabilities, and explicit preferences into an evidence-backed agent architecture and concrete stack recommendation.
+
+Supported goals:
+
+- **Coding**
+- **Knowledge / RAG**
+- **Automation**
+- **Voice**
+- **Personal assistant**
+
+The decision flow is intentionally explicit:
+
+```text
+USER GOAL
+    ↓
+REQUIRED CAPABILITIES
+    ↓
+HARD CONSTRAINTS
+    ↓
+OBSERVED ENVIRONMENT
+    ↓
+TECHNICAL FEASIBILITY
+    ↓
+SOFT PREFERENCES
+    ↓
+OPERATIONAL FIT
+    ↓
+CATALOG MATCHING
+    ↓
+RECOMMENDATION
+```
+
+Agent Starter includes:
+
+- adaptive goal-specific questions;
+- evidence provenance;
+- hardware and compatibility input;
+- candidate architecture generation;
+- technical feasibility assessment;
+- hard-constraint enforcement;
+- decision-active soft preferences;
+- explicit catalog snapshots;
+- concrete stack resolution;
+- recommendation alternatives;
+- Why / Why Not explanations;
+- final structured technical report.
+
+Agent Starter does **not** silently choose a global winner.
+
+Multiple architectures may remain valid when the evidence does not justify a unique recommendation.
+
+#### Privacy and offline are different
+
+Agent Starter models privacy, locality, and connectivity separately.
+
+```text
+private != offline
+local execution != offline capability
+```
+
+For example, an architecture may keep source code local while still requiring network access for some runtime dependency.
+
+When offline operation is required, candidate offline support must be explicitly established.
+
+---
+
+### Test your agent — Agent Lab
+
+**Test Your Agent v1** connects an agent to DLLO and evaluates its behavior through a stable observer-controlled protocol.
+
+```text
+Agent
+  ↓
+Compatibility
+  ↓
+Agent Test Session
+  ↓
+Agent Protocol Core
+  ↓
+Observer-owned evidence
+  ↓
+Evaluation
+  ↓
+Technical Report
+  ↓
+Persistent Run Artifact
+  ↓
+History
+  ↓
+Observatory
+```
+
+The system under test performs the task.
+
+The observer collects the evidence.
+
+The evaluator evaluates that evidence.
+
+The system under test does **not** certify itself.
+
+Current protocol coverage includes:
+
+- exact output;
+- instruction following;
+- structured output;
+- tool selection;
+- ordered action sequences;
+- runtime data propagation;
+- failure handling and recovery;
+- conditional branching;
+- multi-branch decisions.
+
+**Agent Protocol Core 1.0 is stable.**
+
+---
+
+### Observe what changed — Observatory
+
+DLLO turns sufficiently qualified run artifacts into reproducible observations.
+
+The Observatory supports:
+
+- persistent history;
+- exact session resolution;
+- observation qualification;
+- temporal pair discovery;
+- geographic pair discovery;
+- temporal comparison;
+- geographic comparison;
+- human-readable output;
+- machine-readable JSON output.
+
+A comparison answers:
+
+> **What changed?**
+
+It does not automatically answer:
+
+> **Why did it change?**
 
 ---
 
 ## Why DLLO exists
 
-AI systems can change behavior over time.
+AI systems can change behavior across time and operating conditions.
 
-Latency may vary. Tool use may change. Failure rates may move. A model observed from one region may behave differently from the same model observed elsewhere.
+Latency may vary. Tool use may change. Failure rates may move. The same target observed at different times or from different regions may produce different results.
 
-Those differences are interesting, but observation and explanation are not the same thing.
+Those differences are worth measuring.
+
+But:
+
+```text
+observation != explanation
+```
 
 DLLO therefore records:
 
@@ -28,156 +186,56 @@ DLLO therefore records:
 - what evidence the observer collected;
 - what changed between comparable observations.
 
-DLLO deliberately avoids unsupported claims about datacenter location, provider routing, saturation, throttling, infrastructure causes, or other mechanisms that cannot be directly observed.
+DLLO deliberately avoids unsupported claims about:
+
+- provider routing;
+- datacenter location;
+- saturation;
+- throttling;
+- infrastructure causes;
+- undocumented model changes.
 
 For example:
 
 > **Observed from CL-Los-Lagos**
 
-does not mean:
+does **not** mean:
 
 > **Served from a datacenter in Chile.**
+
+Region represents **observation provenance**, not inferred serving location.
 
 ---
 
 ## Project status
 
-DLLO is under active development, but several core layers are now operational.
+The principal DLLO v1 building blocks are operational.
 
-### Stable
+| Component | Status |
+| --- | --- |
+| Agent Protocol Core 1.0 | **Stable** |
+| Test Your Agent v1 | **Complete** |
+| Agent Starter v1 | **Complete** |
+| Observatory Dashboard v1 | **Complete** |
+| Temporal comparison | **Operational** |
+| Geographic comparison | **Operational** |
+| Observation pair discovery | **Operational** |
+| Persistent Agent Lab history | **Operational** |
+| Consumer Probe foundations | **Operational / evolving** |
 
-- benchmark and task schemas;
-- deterministic evaluation infrastructure;
-- observer-owned evidence collection;
-- local SUT execution protocol;
-- **Agent Protocol Core 1.0**;
-- Agent Lab test sessions;
-- technical reports;
-- persistent Agent Lab run artifacts;
-- run history;
-- artifact integrity validation;
-- Observatory qualification;
-- temporal observation comparison;
-- geographic observation comparison;
-- observation pair discovery;
-- exact history/session resolution;
-- human-readable comparison output;
-- machine-readable JSON output.
+Current development is focused on public packaging, broader observation coverage, richer catalogs, user experience, and distributed observation workflows.
 
-### In active development
-
-- broader Agent Lab user experience;
-- Agent Starter hardware/capability guidance;
-- additional benchmark families;
-- larger distributed observation datasets;
-- Observatory visualization and analysis;
-- distributed observer coordination;
-- richer consumer-facing measurement workflows.
-
-A centralized global Observatory service and public dashboard are not yet the core production target of the current repository.
+See [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
-# Agent Lab
+## Core principles
 
-Agent Lab is the part of DLLO focused on testing AI agents.
-
-It is being developed around two complementary workflows.
-
-## Test Your Agent
-
-The currently implemented workflow allows an agent to be connected to DLLO and evaluated through a stable protocol.
-
-Conceptually:
-
-```text
-Agent
-  |
-  v
-Compatibility
-  |
-  v
-Agent Test Session
-  |
-  v
-Agent Protocol Core
-  |
-  v
-Observer-owned evidence
-  |
-  v
-Evaluation
-  |
-  v
-Technical Report
-  |
-  v
-AgentLabRunArtifact
-  |
-  v
-History
-  |
-  v
-Observatory qualification
-  |
-  v
-Temporal / Geographic comparison
-```
-
-The system under test performs the task.
-
-The observer collects evidence.
-
-The evaluator evaluates that evidence.
-
-The Observatory compares compatible observations.
-
-These responsibilities are intentionally separate.
-
-## Agent Starter
-
-Agent Starter is the complementary Agent Lab direction for helping users determine what kind of agent stack can reasonably run on their hardware.
-
-The foundations include hardware and capability profiling, while the complete user-facing workflow remains under development.
-
-The design also considers mobile devices, where browser/app access to hardware and operating-system information may be more restricted than on desktop systems.
-
----
-
-# Agent Protocol Core 1.0
-
-**Agent Protocol Core 1.0 is stable.**
-
-It is the behavioral freeze of the qualified `agent-protocol-core` benchmark sequence developed through versions 0.1-0.10.
-
-The protocol currently covers:
-
-- exact output evaluation;
-- instruction following;
-- structured output;
-- observed tool actions;
-- semantic tool selection;
-- ordered action sequences;
-- runtime data propagation between tools;
-- failure handling and recovery;
-- conditional runtime branching;
-- multi-branch runtime decisions.
-
-Version 1.0 introduces no new benchmark capability over 0.10. It freezes the qualified behavior into a stable protocol contract.
-
-See:
-
-[`docs/observer-protocol.md`](docs/observer-protocol.md)
-
----
-
-## Observer / SUT boundary
+### Observer / SUT separation
 
 DLLO does not allow the system under test to certify itself.
 
-The SUT receives only information required to execute the task.
-
-Observer-owned information is kept separate, including:
+Observer-owned information includes:
 
 - expected actions;
 - expected tool selection;
@@ -186,19 +244,17 @@ Observer-owned information is kept separate, including:
 - branch expectations;
 - criterion evidence;
 - verifier logic;
-- PASS/FAIL verdicts.
-
-Runtime information becomes visible to the SUT only through the execution mechanisms defined by the task.
+- PASS / FAIL verdicts.
 
 The intended chain is:
 
 ```text
 Task
-  ->
+  ↓
 SUT execution
-  ->
+  ↓
 Observer evidence collection
-  ->
+  ↓
 Evaluation
 ```
 
@@ -206,61 +262,51 @@ not:
 
 ```text
 SUT
-  ->
+  ↓
 self-declared success
 ```
 
----
+### No hidden selection
 
-# Local SUT Protocol
+DLLO does not silently select:
 
-Agents can be tested through a local HTTP protocol.
+- a global best model;
+- a global best agent;
+- the latest observation;
+- a baseline;
+- a candidate;
+- a comparison pair;
+- a geographic time threshold.
 
-The current protocol uses loopback-local communication and exposes a small public contract to the system under test.
+Selection remains explicit.
 
-The observer remains responsible for benchmark fixtures, evidence, expectations, and evaluation.
+### Unknown remains unknown
 
-This allows DLLO to test real agent behavior without exposing verifier-only information to the agent.
-
----
-
-# Observatory layer
-
-An Agent Lab run can become an Observatory observation when it carries sufficient provenance.
-
-Typical provenance includes:
+Missing evidence is not converted into a negative claim.
 
 ```text
-observer_id
-region_code
-started_at_utc
-target
-suite_id
-suite_version
-task coverage
+UNKNOWN != NOT_FEASIBLE
 ```
 
-DLLO distinguishes two concepts:
+### Hard constraints stay hard
 
-```text
-valid run artifact
-!=
-Observatory-eligible observation
-```
+A hard constraint must not be silently relaxed.
 
-A historical or legacy artifact can remain valid and useful even when it lacks sufficient provenance for Observatory-qualified comparisons.
+Soft preferences may influence recommendations, but they never become blockers and never override hard constraints.
 
-Qualification is derived from the artifact rather than stored as an independent claim.
+### Rejected comparisons remain visible
+
+Pair discovery preserves both accepted and rejected pairs together with their comparability reasons.
 
 ---
 
 ## Temporal comparisons
 
-A temporal Observatory comparison asks:
+A temporal comparison asks:
 
 > What changed when a compatible target was observed again later from the same observation context?
 
-Temporal comparison requires compatible observations, including:
+Compatibility includes:
 
 - same target;
 - same benchmark suite;
@@ -269,21 +315,19 @@ Temporal comparison requires compatible observations, including:
 - complete required provenance;
 - same observer identity;
 - same observation region;
-- candidate observation strictly after the baseline.
+- candidate observation strictly after baseline.
 
-The result describes observed change.
-
-It does not assign a cause.
+DLLO reports observed changes without assigning unsupported causes.
 
 ---
 
 ## Geographic comparisons
 
-A geographic Observatory comparison asks:
+A geographic comparison asks:
 
 > What differences were observed from different regions under compatible benchmark conditions?
 
-Geographic comparison requires:
+Compatibility includes:
 
 - same target;
 - same benchmark suite;
@@ -293,169 +337,51 @@ Geographic comparison requires:
 - different observation regions;
 - observations sufficiently close in time.
 
-The maximum accepted observation-time skew is always supplied explicitly by the caller.
+The caller must explicitly provide the maximum accepted observation-time skew.
 
-DLLO intentionally has no hidden geographic comparison threshold.
+DLLO has **no hidden geographic skew threshold**.
 
 ---
 
-# Observation pair discovery
+## Observation pair discovery
 
-As an observation history grows, manually finding comparable runs becomes difficult.
-
-DLLO can discover candidate temporal and geographic pairs.
+DLLO can discover candidate temporal and geographic observation pairs.
 
 Pair discovery:
 
 - uses deterministic ordering;
-- delegates comparability to the canonical comparison rules;
-- keeps rejected pairs visible;
-- records reasons when a pair is not comparable;
-- does not automatically select a baseline;
-- does not automatically select a candidate;
+- delegates comparability to canonical rules;
+- preserves rejected pairs;
+- records rejection reasons;
+- does not automatically choose a baseline;
+- does not automatically choose a candidate;
 - does not use a magic `latest` observation.
 
-The user remains responsible for choosing which comparable pair to inspect.
+Exact observation identifiers remain available for reproducible later comparison.
 
 ---
 
-# Agent Lab history
+## Consumer Probe
 
-Agent Lab run artifacts can be persisted and loaded as history.
+DLLO also contains a Consumer Probe subsystem for measurements made through consumer-facing AI interfaces.
 
-History supports exact session resolution using UUIDs.
-
-The design intentionally avoids:
-
-- fuzzy session matching;
-- UUID prefixes;
-- implicit latest-run selection;
-- silent baseline selection.
-
-This makes a discovered pair reproducible later using the exact observation identifiers.
-
----
-
-# Machine-readable Observatory
-
-DLLO supports JSON output for the principal history and comparison workflows.
-
-Current machine-readable commands include:
-
-```text
-agent-history --json
-
-agent-pairs-temporal --json
-
-agent-pairs-geographic --json
-
-agent-compare-temporal --json
-
-agent-compare-temporal-history --json
-
-agent-compare-geographic --json
-
-agent-compare-geographic-history --json
-```
-
-This creates a machine-readable flow such as:
-
-```text
-history
-  |
-  v
-pair discovery
-  |
-  v
-explicit pair selection
-  |
-  v
-canonical comparison
-  |
-  v
-JSON
-```
-
-Rejected pairs remain present in pair-discovery JSON.
-
-Missing provenance is represented as JSON `null`, rather than a human-display placeholder such as `"n/a"`.
-
-Geographic comparison output also preserves the explicit maximum observation skew used for the comparison.
-
----
-
-# Consumer Probe
-
-DLLO also contains a Consumer Probe subsystem for observations made through consumer-facing AI interfaces.
-
-Its design principles include:
+Its principles include:
 
 - human-in-the-loop interaction;
 - no automatic prompt submission;
 - no scraping of private interfaces;
-- no collection of browser session tokens or cookies;
-- no use of private provider endpoints;
+- no browser session-token or cookie collection;
+- no private provider endpoints;
 - no rate-limit bypass;
 - local-first telemetry and history.
 
-Consumer Probe can record local timing, outcome, schedule, and supported browser/OS telemetry while keeping the distinction between what the observer can measure and what the provider infrastructure actually does.
+Consumer Probe records only what the observer can actually measure and preserves the distinction between observed client-side behavior and unknown provider infrastructure.
 
 ---
 
-# Measurement principles
+## Target taxonomy
 
-## Neutral observation
-
-A measurement describes what was observed.
-
-For example, increased latency is evidence of increased latency.
-
-It is not by itself evidence of:
-
-- server saturation;
-- routing changes;
-- throttling;
-- capacity management;
-- model replacement;
-- infrastructure failure.
-
-Those may become hypotheses, but they require additional evidence.
-
-## Reproducibility
-
-An observation should contain enough provenance to reconstruct the conditions under which it was produced.
-
-## Comparable measurements
-
-Measurements should only be compared when their semantics are compatible.
-
-Benchmark versions, task coverage, observation provenance, and measurement methods must not be silently mixed.
-
-## No hidden selection
-
-The Observatory should not silently choose:
-
-- the best run;
-- the newest run;
-- a baseline;
-- a comparison pair;
-- a geographic time threshold.
-
-Selection remains explicit.
-
-## Privacy by design
-
-DLLO aims to collect only information required for measurement and reproducibility.
-
-See:
-
-[`docs/privacy.md`](docs/privacy.md)
-
----
-
-# Target taxonomy
-
-DLLO distinguishes between several kinds of systems under test:
+DLLO distinguishes:
 
 ```text
 FOUNDATION_MODEL
@@ -477,59 +403,35 @@ filesystem
 code_execution
 ```
 
-Compatibility is evaluated before executing workloads that require unavailable capabilities.
+Compatibility is evaluated before workloads requiring unavailable capabilities are executed.
 
 ---
 
-# Repository structure
+## Quickstart
 
-```text
-distributed-llm-observatory/
-|
-|-- analysis/          Analysis and statistical tooling
-|-- benchmark/         Prompts, tasks, suites, and benchmark assets
-|-- consumer_probe/    Consumer-interface observation subsystem
-|-- docs/              Architecture, methodology, privacy, protocols
-|-- judges/            Evaluation rubrics and validators
-|-- observer/          Core observer and Agent Lab implementation
-|-- pricing/           Pricing and economic measurement models
-|-- schemas/           Shared structured data models
-|-- server/            Service-side foundations
-|-- tests/             Unit and integration tests
-|-- web/collector/     Browser-side collection components
-|
-|-- README.md
-|-- CONTRIBUTING.md
-|-- LICENSE
-`-- pyproject.toml
+DLLO requires **Python 3.10+**.
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ArckomVanDrike/distributed-llm-observatory.git
+cd distributed-llm-observatory
 ```
 
-The architecture intentionally keeps execution, evidence, evaluation, storage, and interpretation as separate concerns.
-
-See:
-
-[`docs/architecture.md`](docs/architecture.md)
-
----
-
-# Development
-
-DLLO requires **Python 3.10 or newer**.
-
-Create a virtual environment:
+Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 ```
 
-Install the project and development dependencies:
+Install DLLO and development dependencies:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-Run the complete test suite:
+Run the test suite:
 
 ```bash
 pytest -q
@@ -541,106 +443,81 @@ Run Ruff:
 ruff check .
 ```
 
-The project uses automated tests extensively to protect benchmark compatibility, historical suite resolution, observer/SUT boundaries, evidence semantics, artifact integrity, and comparison behavior.
-
 ---
 
-# Documentation
-
-Key documentation currently includes:
-
-- [`docs/architecture.md`](docs/architecture.md) - system architecture
-- [`docs/methodology.md`](docs/methodology.md) - measurement methodology
-- [`docs/observer-protocol.md`](docs/observer-protocol.md) - Observer and Agent Protocol
-- [`docs/privacy.md`](docs/privacy.md) - privacy principles
-- [`docs/quality-rubric.md`](docs/quality-rubric.md) - response-quality evaluation
-- [`docs/roadmap.md`](docs/roadmap.md) - project roadmap
-- [`benchmark/README.md`](benchmark/README.md) - benchmark organization
-
----
-
-# Scientific scope
-
-DLLO is intended to support investigation of patterns such as:
-
-- temporal behavioral variation;
-- regional differences in observed behavior;
-- changes in task success;
-- changes in latency;
-- changes in retry behavior;
-- changes in human-intervention requirements;
-- elevated failure rates;
-- instability across repeated observations;
-- economic changes across comparable workloads.
-
-These observations can support hypotheses about underlying mechanisms.
-
-The Observatory should not claim those mechanisms as facts unless independent evidence supports them.
-
----
-
-# Current direction
-
-The current development direction is centered on completing the loop:
+## Repository structure
 
 ```text
-connect agent
-  ->
-check compatibility
-  ->
-run stable protocol
-  ->
-collect observer-owned evidence
-  ->
-generate technical report
-  ->
-persist observation
-  ->
-discover comparable history
-  ->
-compare selected runs
-  ->
-analyze changes over time and geography
+distributed-llm-observatory/
+|
+|-- analysis/          Analysis and statistical tooling
+|-- benchmark/         Prompts, tasks, suites, and benchmark assets
+|-- catalog/           Explicit Agent Starter catalog snapshots
+|-- consumer_probe/    Consumer-interface observation subsystem
+|-- docs/              Architecture, methodology, privacy, protocols
+|-- judges/            Evaluation rubrics and validators
+|-- observer/          Core observer and Agent Lab implementation
+|-- pricing/           Pricing and economic measurement models
+|-- schemas/           Shared structured data models
+|-- server/            Service-side foundations
+|-- tests/             Unit and integration tests
+|-- web/collector/     Browser-side collector and Observatory UI
+|
+|-- README.md
+|-- CONTRIBUTING.md
+|-- LICENSE
+`-- pyproject.toml
 ```
 
-The next stages focus increasingly on turning this infrastructure into a coherent Observatory experience and on collecting meaningful distributed observations.
+Execution, evidence, evaluation, storage, recommendation, and interpretation are intentionally separated.
 
 ---
 
-# What DLLO is not
+## Documentation
 
-DLLO is not intended to be:
+Key documentation:
 
-- a provider leaderboard based on a single global score;
-- a system that automatically declares one model or agent "best";
+- [`docs/agent-starter-v1.md`](docs/agent-starter-v1.md) — Agent Starter v1 specification
+- [`docs/architecture.md`](docs/architecture.md) — system architecture
+- [`docs/methodology.md`](docs/methodology.md) — measurement methodology
+- [`docs/observer-protocol.md`](docs/observer-protocol.md) — Observer and Agent Protocol
+- [`docs/privacy.md`](docs/privacy.md) — privacy principles
+- [`docs/quality-rubric.md`](docs/quality-rubric.md) — response-quality evaluation
+- [`docs/roadmap.md`](docs/roadmap.md) — project roadmap
+- [`benchmark/README.md`](benchmark/README.md) — benchmark organization
+
+---
+
+## What DLLO is not
+
+DLLO is not:
+
+- a provider leaderboard based on one global score;
+- a system that automatically declares one model or agent globally “best”;
 - a causal inference engine for undocumented provider infrastructure;
 - an agent self-certification framework;
-- a scraping system for private consumer interfaces;
+- a scraper for private consumer interfaces;
 - a mechanism for bypassing provider restrictions.
 
-The project is an observation and measurement framework.
+DLLO is an **observation, evaluation, and agent-engineering framework**.
 
 ---
 
-# Contributing
+## Contributing
 
-Contributions are welcome.
+Contributions, testing, criticism, new benchmark ideas, and external observations are welcome.
 
-Please read:
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting changes.
 
-[`CONTRIBUTING.md`](CONTRIBUTING.md)
-
-before submitting changes.
+If you find a reproducibility problem, incorrect assumption, benchmark weakness, or questionable comparison rule, opening an issue is particularly valuable.
 
 ---
 
-# License
+## License
 
 Distributed LLM Observatory is released under the **MIT License**.
 
-See:
-
-[`LICENSE`](LICENSE)
+See [`LICENSE`](LICENSE).
 
 ---
 
