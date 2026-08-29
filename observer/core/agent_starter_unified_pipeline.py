@@ -54,6 +54,7 @@ def run_agent_starter_unified_pipeline(
     catalog_result = run_agent_starter_catalog_matching(
         plan=plan,
         snapshot=catalog_snapshot,
+        hardware_profile=prepared.hardware_profile,
     )
 
     classification = (

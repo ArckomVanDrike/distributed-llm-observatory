@@ -720,3 +720,154 @@ def test_external_service_cost_missing_required_path_is_indeterminate():
     assert matched == []
     assert indeterminate == [entry]
     assert excluded == []
+
+
+def test_local_hardware_classification_preserves_compatibility_verdicts():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_local_hardware_compatibility,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=8 * 1024**3,
+    )
+
+    def entry(
+        identifier: str,
+        *,
+        deployment_mode: str,
+        parameter_count: int | None = None,
+        quantization: str | None = None,
+    ) -> AgentStarterCatalogEntry:
+        model_profile = None
+
+        if parameter_count is not None or quantization is not None:
+            model_profile = {
+                "model_id": identifier,
+                "parameter_count": parameter_count,
+                "quantization": quantization,
+                "execution_location": (
+                    "on_device"
+                    if deployment_mode == "on_device"
+                    else "remote"
+                ),
+            }
+
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": "0.2",
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": ["coding"],
+                "deployment_modes": [deployment_mode],
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": [
+                    {
+                        "deployment_mode": deployment_mode,
+                        "access_kind": (
+                            "self_hosted"
+                            if deployment_mode == "on_device"
+                            else "external_service"
+                        ),
+                        "pricing": "free",
+                        "model_profile": model_profile,
+                    },
+                ],
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": "2026-08-29T00:00:00+00:00",
+            }
+        )
+
+    compatible = entry(
+        "local-3b-q4",
+        deployment_mode="on_device",
+        parameter_count=3_000_000_000,
+        quantization="q4",
+    )
+    constrained = entry(
+        "local-7b-q4",
+        deployment_mode="on_device",
+        parameter_count=7_000_000_000,
+        quantization="q4",
+    )
+    not_recommended = entry(
+        "local-30b-q4",
+        deployment_mode="on_device",
+        parameter_count=30_000_000_000,
+        quantization="q4",
+    )
+    unknown = entry(
+        "local-unknown",
+        deployment_mode="on_device",
+    )
+    remote = entry(
+        "remote-model",
+        deployment_mode="remote",
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    (
+        matched,
+        constrained_entries,
+        indeterminate,
+        not_recommended_entries,
+    ) = _classify_local_hardware_compatibility(
+        [
+            compatible,
+            constrained,
+            not_recommended,
+            unknown,
+            remote,
+        ],
+        query=query,
+        hardware=hardware,
+    )
+
+    assert [
+        item.identifier
+        for item in matched
+    ] == [
+        "local-3b-q4",
+        "remote-model",
+    ]
+
+    assert [
+        item.identifier
+        for item in constrained_entries
+    ] == [
+        "local-7b-q4",
+    ]
+
+    assert [
+        item.identifier
+        for item in indeterminate
+    ] == [
+        "local-unknown",
+    ]
+
+    assert [
+        item.identifier
+        for item in not_recommended_entries
+    ] == [
+        "local-30b-q4",
+    ]
