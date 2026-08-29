@@ -35,6 +35,10 @@ from observer.core.agent_lab_run_history import (
 from observer.core.agent_lab_temporal_comparison import (
     compare_temporal_agent_observations,
 )
+from observer.core.agent_starter_questionnaire import (
+    build_agent_starter_question_set,
+)
+from schemas.agent_starter import AgentStarterIntake
 
 
 @dataclass(frozen=True)
@@ -114,6 +118,13 @@ def make_handler(
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
 
+            if (
+                parsed.path
+                == "/v1/agent-starter/questions"
+            ):
+                self._handle_agent_starter_questions()
+                return
+
             if parsed.path == "/v1/agent-tests":
                 self._handle_agent_test()
                 return
@@ -191,6 +202,41 @@ def make_handler(
                 )
 
             return payload
+
+        def _handle_agent_starter_questions(
+            self,
+        ) -> None:
+            try:
+                payload = self._read_json_body()
+
+                intake = (
+                    AgentStarterIntake.model_validate(
+                        payload
+                    )
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            question_set = (
+                build_agent_starter_question_set(
+                    intake
+                )
+            )
+
+            self._send_json(
+                200,
+                question_set.model_dump(
+                    mode="json",
+                ),
+            )
 
         def _handle_agent_test_history(
             self,
