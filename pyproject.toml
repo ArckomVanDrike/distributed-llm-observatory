@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "distributed-llm-observatory"
 version = "0.1.0"
-description = "Open-source distributed observatory for measuring LLM quality, performance, stability, and economic efficiency."
+description = "Open-source framework for building agent configurations, testing AI agents, and comparing reproducible AI-system observations."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
