@@ -148,6 +148,16 @@ def _generate_coding_candidates(
             goal=AgentStarterGoal.CODING,
             evidence=[
                 coding_llm_usage,
+                AgentStarterEvidence(
+                    key="candidate_execution_mode",
+                    source=EvidenceSource.DERIVED,
+                    value="local",
+                    reason=(
+                        "The local coding template executes the "
+                        "agent workload in the user-controlled "
+                        "local environment."
+                    ),
+                ),
                 local_evidence,
                 local_filesystem_read,
                 local_filesystem_write,
@@ -160,6 +170,16 @@ def _generate_coding_candidates(
             goal=AgentStarterGoal.CODING,
             evidence=[
                 coding_llm_usage,
+                AgentStarterEvidence(
+                    key="candidate_execution_mode",
+                    source=EvidenceSource.DERIVED,
+                    value="remote",
+                    reason=(
+                        "The remote coding template executes the "
+                        "agent workload through a remote "
+                        "execution environment."
+                    ),
+                ),
                 remote_evidence,
                 remote_filesystem_read,
                 remote_filesystem_write,
@@ -248,6 +268,16 @@ def _generate_voice_candidates(
         voice_stt_usage,
         voice_tts_usage,
         AgentStarterEvidence(
+            key="candidate_execution_mode",
+            source=EvidenceSource.DERIVED,
+            value="local",
+            reason=(
+                "The local voice template executes the voice "
+                "pipeline in the user-controlled local "
+                "environment."
+            ),
+        ),
+        AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
             value=False,
@@ -271,6 +301,15 @@ def _generate_voice_candidates(
         voice_stt_usage,
         voice_tts_usage,
         AgentStarterEvidence(
+            key="candidate_execution_mode",
+            source=EvidenceSource.DERIVED,
+            value="hybrid",
+            reason=(
+                "The hybrid voice template splits execution "
+                "across local and remote processing boundaries."
+            ),
+        ),
+        AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
             value=False,
@@ -293,6 +332,15 @@ def _generate_voice_candidates(
     cloud_evidence = [
         voice_stt_usage,
         voice_tts_usage,
+        AgentStarterEvidence(
+            key="candidate_execution_mode",
+            source=EvidenceSource.DERIVED,
+            value="remote",
+            reason=(
+                "The cloud voice template executes the voice "
+                "pipeline through a remote environment."
+            ),
+        ),
         AgentStarterEvidence(
             key="candidate_raw_audio_remote_processing",
             source=EvidenceSource.DERIVED,
