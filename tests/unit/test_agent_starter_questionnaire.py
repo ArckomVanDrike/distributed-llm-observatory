@@ -26,6 +26,8 @@ def test_automation_questionnaire_asks_only_decision_relevant_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "workflow_deterministic",
         "destructive_or_high_impact_actions",
         "human_approval_required",
@@ -65,6 +67,8 @@ def test_questionnaire_omits_declared_and_explicitly_unknown_answers():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "destructive_or_high_impact_actions",
         "human_approval_required",
     ]
@@ -109,6 +113,8 @@ def test_automation_omits_approval_when_high_impact_actions_are_false():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "workflow_deterministic",
         "availability_24_7_required",
     ]
@@ -133,6 +139,8 @@ def test_observed_low_impact_does_not_suppress_user_questions():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "workflow_deterministic",
         "destructive_or_high_impact_actions",
         "human_approval_required",
@@ -153,6 +161,8 @@ def test_coding_questionnaire_asks_decision_relevant_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "source_code_must_stay_local",
         "prefer_local_execution",
         "modify_files",
@@ -187,6 +197,8 @@ def test_coding_questionnaire_omits_answered_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "prefer_local_execution",
         "run_tests",
     ]
@@ -225,6 +237,8 @@ def test_knowledge_questionnaire_asks_decision_relevant_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "knowledge_data_must_stay_local",
         "corpus_is_very_small",
         "document_input_includes_scanned_pages",
@@ -266,6 +280,8 @@ def test_knowledge_questionnaire_omits_answered_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "document_input_includes_scanned_pages",
         "knowledge_changes_frequently",
         "exact_identifier_search_needed",
@@ -305,6 +321,8 @@ def test_voice_questionnaire_asks_decision_relevant_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "raw_audio_must_stay_local",
         "transcript_must_stay_local",
         "prefer_local_execution",
@@ -340,6 +358,8 @@ def test_voice_questionnaire_omits_answered_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "transcript_must_stay_local",
         "prefer_local_execution",
         "voice_interruptions_requested",
@@ -379,6 +399,8 @@ def test_personal_questionnaire_asks_decision_relevant_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "cross_session_memory_required",
         "proactive_behavior_required",
         "selective_memory_required",
@@ -413,6 +435,8 @@ def test_personal_questionnaire_omits_answered_inputs():
         for question in question_set.questions
     ] == [
         "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
         "proactive_behavior_required",
         "indefinite_all_conversation_retention_required",
     ]
@@ -604,3 +628,73 @@ def test_observed_local_execution_does_not_replace_user_preference():
         question.key
         for question in question_set.questions
     }
+
+
+def test_questionnaire_asks_cross_cutting_cost_constraints():
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+    )
+
+    question_set = build_agent_starter_question_set(
+        intake
+    )
+
+    keys = [
+        question.key
+        for question in question_set.questions
+    ]
+
+    assert keys[:3] == [
+        "offline_required",
+        "free_components_only",
+        "paid_external_services_allowed",
+    ]
+
+
+def test_free_only_suppresses_paid_service_permission_question():
+    unrestricted = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="free_components_only",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    unrestricted_keys = {
+        question.key
+        for question in build_agent_starter_question_set(
+            unrestricted
+        ).questions
+    }
+
+    assert (
+        "paid_external_services_allowed"
+        in unrestricted_keys
+    )
+
+    free_only = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="free_components_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    free_only_keys = {
+        question.key
+        for question in build_agent_starter_question_set(
+            free_only
+        ).questions
+    }
+
+    assert "free_components_only" not in free_only_keys
+    assert (
+        "paid_external_services_allowed"
+        not in free_only_keys
+    )

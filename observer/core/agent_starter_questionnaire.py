@@ -313,6 +313,32 @@ def _cross_cutting_questions(
                 "requiring network connectivity."
             ),
         ),
+        AgentStarterQuestion(
+            key="free_components_only",
+            goal=goal,
+            prompt=(
+                "Must every selected component be available "
+                "without requiring payment?"
+            ),
+            kind=AgentStarterQuestionKind.BOOLEAN,
+            reason=(
+                "A free-only requirement can exclude components "
+                "that require paid licenses or paid service access."
+            ),
+        ),
+        AgentStarterQuestion(
+            key="paid_external_services_allowed",
+            goal=goal,
+            prompt=(
+                "May the recommended stack depend on paid "
+                "external APIs or hosted services?"
+            ),
+            kind=AgentStarterQuestionKind.BOOLEAN,
+            reason=(
+                "Paid-service permission can change which "
+                "remote or provider-backed components are acceptable."
+            ),
+        ),
     )
 
 
@@ -337,6 +363,19 @@ def _has_user_answer(
             EvidenceSource.DECLARED,
             EvidenceSource.UNKNOWN,
         }
+        for evidence in intake.evidence
+    )
+
+
+def _has_declared_true(
+    intake: AgentStarterIntake,
+    *,
+    key: str,
+) -> bool:
+    return any(
+        evidence.key == key
+        and evidence.source is EvidenceSource.DECLARED
+        and evidence.value is True
         for evidence in intake.evidence
     )
 
@@ -373,10 +412,20 @@ def build_agent_starter_question_set(
             key=question.key,
         )
         and not (
-            question.key == "human_approval_required"
-            and _has_declared_false(
-                intake,
-                key="destructive_or_high_impact_actions",
+            (
+                question.key == "human_approval_required"
+                and _has_declared_false(
+                    intake,
+                    key="destructive_or_high_impact_actions",
+                )
+            )
+            or (
+                question.key
+                == "paid_external_services_allowed"
+                and _has_declared_true(
+                    intake,
+                    key="free_components_only",
+                )
             )
         )
     ]

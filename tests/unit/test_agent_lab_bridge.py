@@ -2085,6 +2085,8 @@ def test_agent_lab_bridge_returns_coding_starter_questions(
             for question in payload["questions"]
         ] == [
             "offline_required",
+            "free_components_only",
+            "paid_external_services_allowed",
             "source_code_must_stay_local",
             "prefer_local_execution",
             "modify_files",
@@ -2149,6 +2151,8 @@ def test_agent_lab_bridge_omits_answered_starter_question(
             question["key"]
             for question in payload["questions"]
         ] == [
+            "free_components_only",
+            "paid_external_services_allowed",
             "source_code_must_stay_local",
             "prefer_local_execution",
             "modify_files",
@@ -2211,6 +2215,8 @@ def test_agent_lab_bridge_suppresses_irrelevant_starter_question(
             for question in payload["questions"]
         ] == [
             "offline_required",
+            "free_components_only",
+            "paid_external_services_allowed",
             "workflow_deterministic",
             "availability_24_7_required",
         ]
