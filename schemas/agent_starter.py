@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from schemas.execution_environment import ExecutionEnvironment
 from schemas.hardware import HardwareProfile
 
 
@@ -108,6 +109,7 @@ class AgentStarterIntake(BaseModel):
         default_factory=list,
     )
     hardware_profile: HardwareProfile | None = None
+    execution_environment: ExecutionEnvironment | None = None
 
     @model_validator(mode="after")
     def validate_intake(
@@ -172,6 +174,7 @@ class AgentStarterPreparedInput(BaseModel):
         default_factory=list,
     )
     hardware_profile: HardwareProfile | None = None
+    execution_environment: ExecutionEnvironment | None = None
 
 
 class AgentStarterCandidateArchitecture(BaseModel):

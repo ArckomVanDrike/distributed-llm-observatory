@@ -25,6 +25,7 @@ from schemas.agent_starter_catalog import (
     AgentStarterCatalogSnapshot,
 )
 from schemas.compatibility import CompatibilityVerdict
+from schemas.execution_environment import ExecutionEnvironment
 from schemas.hardware import HardwareProfile
 
 
@@ -228,6 +229,250 @@ def _classify_local_hardware_compatibility(
     )
 
 
+
+def _classify_execution_environment_compatibility(
+    entries: list[AgentStarterCatalogEntry],
+    *,
+    query: AgentStarterCatalogQuery,
+    environment: ExecutionEnvironment,
+) -> tuple[
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+]:
+    matched_entries: list[AgentStarterCatalogEntry] = []
+    indeterminate_entries: list[
+        AgentStarterCatalogEntry
+    ] = []
+    not_recommended_entries: list[
+        AgentStarterCatalogEntry
+    ] = []
+
+    required_deployment_modes = set(
+        query.required_deployment_modes
+    )
+
+    for entry in entries:
+        eligible_access_options = [
+            option
+            for option in entry.access_options
+            if (
+                not required_deployment_modes
+                or option.deployment_mode
+                in required_deployment_modes
+            )
+        ]
+
+        if not eligible_access_options:
+            indeterminate_entries.append(entry)
+            continue
+
+        has_viable_path = False
+        has_unknown_path = False
+
+        for option in eligible_access_options:
+            if option.deployment_mode == "remote":
+                has_viable_path = True
+                break
+
+            if option.deployment_mode != "on_device":
+                has_unknown_path = True
+                continue
+
+            if environment.available_runtimes is None:
+                has_unknown_path = True
+                continue
+
+            if (
+                option.model_profile is None
+                or option.model_profile.runtime is None
+            ):
+                has_unknown_path = True
+                continue
+
+            if (
+                option.model_profile.runtime
+                in environment.available_runtimes
+            ):
+                has_viable_path = True
+                break
+
+        if has_viable_path:
+            matched_entries.append(entry)
+        elif has_unknown_path:
+            indeterminate_entries.append(entry)
+        else:
+            not_recommended_entries.append(entry)
+
+    return (
+        matched_entries,
+        indeterminate_entries,
+        not_recommended_entries,
+    )
+
+
+
+def _classify_catalog_entries_by_access_paths(
+    entries: list[AgentStarterCatalogEntry],
+    *,
+    query: AgentStarterCatalogQuery,
+    paid_external_services_disallowed: bool = False,
+    execution_environment: ExecutionEnvironment | None = None,
+    hardware_profile: HardwareProfile | None = None,
+) -> tuple[
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+    list[AgentStarterCatalogEntry],
+]:
+    matched_entries: list[AgentStarterCatalogEntry] = []
+    constrained_entries: list[AgentStarterCatalogEntry] = []
+    indeterminate_entries: list[AgentStarterCatalogEntry] = []
+    not_recommended_entries: list[AgentStarterCatalogEntry] = []
+    constraint_excluded_entries: list[
+        AgentStarterCatalogEntry
+    ] = []
+
+    indeterminate_pricing = {
+        AgentStarterCatalogAccessPricing.FREEMIUM,
+        AgentStarterCatalogAccessPricing.PROVIDER_DEPENDENT,
+        AgentStarterCatalogAccessPricing.UNKNOWN,
+    }
+    paid_external_pricing = {
+        AgentStarterCatalogAccessPricing.USAGE_BASED,
+        AgentStarterCatalogAccessPricing.SUBSCRIPTION,
+        AgentStarterCatalogAccessPricing.ENTERPRISE,
+    }
+
+    required_deployment_modes = set(
+        query.required_deployment_modes
+    )
+
+    for entry in entries:
+        eligible_access_options = [
+            option
+            for option in entry.access_options
+            if (
+                not required_deployment_modes
+                or option.deployment_mode
+                in required_deployment_modes
+            )
+        ]
+
+        if not eligible_access_options:
+            indeterminate_entries.append(entry)
+            continue
+
+        has_matched_path = False
+        has_constrained_path = False
+        has_indeterminate_path = False
+        has_not_recommended_path = False
+        excluded_path_count = 0
+
+        for option in eligible_access_options:
+            if paid_external_services_disallowed:
+                if (
+                    option.access_kind
+                    is AgentStarterCatalogAccessKind.EXTERNAL_SERVICE
+                ):
+                    if option.pricing in paid_external_pricing:
+                        excluded_path_count += 1
+                        continue
+
+                    if option.pricing in indeterminate_pricing:
+                        has_indeterminate_path = True
+                        continue
+
+            if execution_environment is not None:
+                if option.deployment_mode == "remote":
+                    pass
+                elif option.deployment_mode == "on_device":
+                    if (
+                        execution_environment.available_runtimes
+                        is None
+                    ):
+                        has_indeterminate_path = True
+                        continue
+
+                    if (
+                        option.model_profile is None
+                        or option.model_profile.runtime is None
+                    ):
+                        has_indeterminate_path = True
+                        continue
+
+                    if (
+                        option.model_profile.runtime
+                        not in execution_environment.available_runtimes
+                    ):
+                        has_not_recommended_path = True
+                        continue
+                else:
+                    has_indeterminate_path = True
+                    continue
+
+            if (
+                hardware_profile is not None
+                and option.deployment_mode == "on_device"
+            ):
+                if option.model_profile is None:
+                    has_indeterminate_path = True
+                    continue
+
+                assessment = estimate_local_compatibility(
+                    hardware_profile,
+                    option.model_profile,
+                )
+
+                if (
+                    assessment.verdict
+                    is CompatibilityVerdict.COMPATIBLE
+                ):
+                    has_matched_path = True
+                    continue
+
+                if (
+                    assessment.verdict
+                    is CompatibilityVerdict.CONSTRAINED
+                ):
+                    has_constrained_path = True
+                    continue
+
+                if (
+                    assessment.verdict
+                    is CompatibilityVerdict.UNKNOWN
+                ):
+                    has_indeterminate_path = True
+                    continue
+
+                has_not_recommended_path = True
+                continue
+
+            has_matched_path = True
+
+        if has_matched_path:
+            matched_entries.append(entry)
+        elif has_constrained_path:
+            constrained_entries.append(entry)
+        elif has_indeterminate_path:
+            indeterminate_entries.append(entry)
+        elif has_not_recommended_path:
+            not_recommended_entries.append(entry)
+        elif excluded_path_count == len(eligible_access_options):
+            constraint_excluded_entries.append(entry)
+        else:
+            indeterminate_entries.append(entry)
+
+    return (
+        matched_entries,
+        constrained_entries,
+        indeterminate_entries,
+        not_recommended_entries,
+        constraint_excluded_entries,
+    )
+
+
 def match_agent_starter_architecture_to_catalog(
     *,
     goal: AgentStarterGoal,
@@ -237,6 +482,7 @@ def match_agent_starter_architecture_to_catalog(
         AgentStarterRequirement
     ] | None = None,
     hardware_profile: HardwareProfile | None = None,
+    execution_environment: ExecutionEnvironment | None = None,
 ) -> AgentStarterCatalogArchitectureResult:
     queries = build_agent_starter_catalog_queries(
         goal=goal,
@@ -258,43 +504,32 @@ def match_agent_starter_architecture_to_catalog(
             query=query,
         )
 
-        if paid_external_services_disallowed:
-            (
-                matched_entries,
-                indeterminate_entries,
-                constraint_excluded_entries,
-            ) = _classify_external_service_cost_constraint(
-                technical_matches,
-                query=query,
-            )
-        else:
-            matched_entries = technical_matches
-            indeterminate_entries = []
-            constraint_excluded_entries = []
-
-        constrained_entries: list[
-            AgentStarterCatalogEntry
-        ] = []
-        not_recommended_entries: list[
-            AgentStarterCatalogEntry
-        ] = []
-
-        if hardware_profile is not None:
+        if (
+            paid_external_services_disallowed
+            or execution_environment is not None
+            or hardware_profile is not None
+        ):
             (
                 matched_entries,
                 constrained_entries,
-                hardware_indeterminate_entries,
+                indeterminate_entries,
                 not_recommended_entries,
-            ) = _classify_local_hardware_compatibility(
-                matched_entries,
+                constraint_excluded_entries,
+            ) = _classify_catalog_entries_by_access_paths(
+                technical_matches,
                 query=query,
-                hardware=hardware_profile,
+                paid_external_services_disallowed=(
+                    paid_external_services_disallowed
+                ),
+                execution_environment=execution_environment,
+                hardware_profile=hardware_profile,
             )
-
-            indeterminate_entries = [
-                *indeterminate_entries,
-                *hardware_indeterminate_entries,
-            ]
+        else:
+            matched_entries = technical_matches
+            constrained_entries = []
+            indeterminate_entries = []
+            not_recommended_entries = []
+            constraint_excluded_entries = []
 
         query_matches.append(
             AgentStarterCatalogQueryMatch(
@@ -329,6 +564,7 @@ def match_agent_starter_candidates_to_catalog(
         AgentStarterRequirement
     ] | None = None,
     hardware_profile: HardwareProfile | None = None,
+    execution_environment: ExecutionEnvironment | None = None,
 ) -> list[AgentStarterCatalogArchitectureResult]:
     return [
         match_agent_starter_architecture_to_catalog(
@@ -337,6 +573,7 @@ def match_agent_starter_candidates_to_catalog(
             snapshot=snapshot,
             plan_requirements=plan_requirements,
             hardware_profile=hardware_profile,
+            execution_environment=execution_environment,
         )
         for assessment in assessments
     ]

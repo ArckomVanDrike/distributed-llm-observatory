@@ -469,4 +469,5 @@ def prepare_agent_starter_input(
         evidence=build_agent_starter_user_evidence(intake),
         requirements=derive_agent_starter_requirements(intake),
         hardware_profile=intake.hardware_profile,
+        execution_environment=intake.execution_environment,
     )

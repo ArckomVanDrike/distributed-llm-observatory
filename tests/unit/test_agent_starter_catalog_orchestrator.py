@@ -871,3 +871,549 @@ def test_local_hardware_classification_preserves_compatibility_verdicts():
     ] == [
         "local-30b-q4",
     ]
+
+
+def test_execution_environment_classifies_runtime_inventory():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_execution_environment_compatibility,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+    from schemas.execution_environment import (
+        ExecutionEnvironment,
+        ExecutionInterface,
+        ExecutionPlatform,
+    )
+
+    def entry(
+        identifier: str,
+        *,
+        deployment_mode: str,
+        runtime: str | None,
+    ) -> AgentStarterCatalogEntry:
+        model_profile = None
+
+        if runtime is not None:
+            model_profile = {
+                "model_id": identifier,
+                "runtime": runtime,
+                "execution_location": (
+                    "on_device"
+                    if deployment_mode == "on_device"
+                    else "remote"
+                ),
+            }
+
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": "0.2",
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": ["coding"],
+                "deployment_modes": [deployment_mode],
+                "supported_runtimes": (
+                    [runtime]
+                    if runtime is not None
+                    else []
+                ),
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": [
+                    {
+                        "deployment_mode": deployment_mode,
+                        "access_kind": (
+                            "self_hosted"
+                            if deployment_mode == "on_device"
+                            else "external_service"
+                        ),
+                        "pricing": "free",
+                        "model_profile": model_profile,
+                    },
+                ],
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": "2026-08-29T00:00:00+00:00",
+            }
+        )
+
+    local_llama = entry(
+        "local-llama-runtime",
+        deployment_mode="on_device",
+        runtime="llama.cpp",
+    )
+    local_transformers = entry(
+        "local-transformers-runtime",
+        deployment_mode="on_device",
+        runtime="transformers",
+    )
+    local_unknown = entry(
+        "local-runtime-unknown",
+        deployment_mode="on_device",
+        runtime=None,
+    )
+    remote = entry(
+        "remote-provider-runtime",
+        deployment_mode="remote",
+        runtime="provider-runtime",
+    )
+
+    environment = ExecutionEnvironment(
+        platform=ExecutionPlatform.ANDROID,
+        interface=ExecutionInterface.NATIVE,
+        available_runtimes=[
+            "llama.cpp",
+        ],
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        not_recommended,
+    ) = _classify_execution_environment_compatibility(
+        [
+            local_llama,
+            local_transformers,
+            local_unknown,
+            remote,
+        ],
+        query=query,
+        environment=environment,
+    )
+
+    assert [
+        item.identifier
+        for item in matched
+    ] == [
+        "local-llama-runtime",
+        "remote-provider-runtime",
+    ]
+
+    assert [
+        item.identifier
+        for item in indeterminate
+    ] == [
+        "local-runtime-unknown",
+    ]
+
+    assert [
+        item.identifier
+        for item in not_recommended
+    ] == [
+        "local-transformers-runtime",
+    ]
+
+
+def test_unknown_runtime_inventory_preserves_indeterminate():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_execution_environment_compatibility,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+    from schemas.execution_environment import (
+        ExecutionEnvironment,
+        ExecutionInterface,
+        ExecutionPlatform,
+    )
+
+    local = AgentStarterCatalogEntry.model_validate(
+        {
+            "schema_version": "0.2",
+            "identifier": "local-llama-runtime",
+            "component_type": "llm",
+            "vendor": "Example Vendor",
+            "family": "Example",
+            "version": "1.0",
+            "capabilities": ["coding"],
+            "deployment_modes": ["on_device"],
+            "supported_runtimes": ["llama.cpp"],
+            "license": "example-license",
+            "pricing_class": "free",
+            "access_options": [
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                    "model_profile": {
+                        "model_id": "local-llama-runtime",
+                        "runtime": "llama.cpp",
+                        "execution_location": "on_device",
+                    },
+                },
+            ],
+            "sources": [
+                "https://example.invalid/local",
+            ],
+            "verified_at": "2026-08-29T00:00:00+00:00",
+        }
+    )
+
+    environment = ExecutionEnvironment(
+        platform=ExecutionPlatform.IOS,
+        interface=ExecutionInterface.BROWSER,
+        available_runtimes=None,
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        not_recommended,
+    ) = _classify_execution_environment_compatibility(
+        [local],
+        query=query,
+        environment=environment,
+    )
+
+    assert matched == []
+    assert indeterminate == [local]
+    assert not_recommended == []
+
+
+def test_access_path_classification_composes_cost_runtime_and_hardware():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_catalog_entries_by_access_paths,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+    from schemas.execution_environment import (
+        ExecutionEnvironment,
+        ExecutionInterface,
+        ExecutionPlatform,
+    )
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    def entry(
+        identifier: str,
+        *,
+        local_runtime: str | None = None,
+        include_local: bool = True,
+        include_paid_remote: bool = True,
+    ) -> AgentStarterCatalogEntry:
+        access_options = []
+        deployment_modes = []
+
+        if include_local:
+            deployment_modes.append("on_device")
+            access_options.append(
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                    "model_profile": (
+                        {
+                            "model_id": identifier,
+                            "parameter_count": 600_000_000,
+                            "quantization": "q4",
+                            "runtime": local_runtime,
+                            "execution_location": "on_device",
+                        }
+                        if local_runtime is not None
+                        else {
+                            "model_id": identifier,
+                            "parameter_count": 600_000_000,
+                            "quantization": "q4",
+                            "execution_location": "on_device",
+                        }
+                    ),
+                }
+            )
+
+        if include_paid_remote:
+            deployment_modes.append("remote")
+            access_options.append(
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                    "model_profile": {
+                        "model_id": identifier,
+                        "runtime": "provider-runtime",
+                        "execution_location": "remote",
+                    },
+                }
+            )
+
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": "0.2",
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": ["coding"],
+                "deployment_modes": deployment_modes,
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": access_options,
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": "2026-08-29T00:00:00+00:00",
+            }
+        )
+
+    local_llama = entry(
+        "local-llama-plus-paid-remote",
+        local_runtime="llama.cpp",
+    )
+    local_transformers = entry(
+        "local-transformers-plus-paid-remote",
+        local_runtime="transformers",
+    )
+    local_unknown = entry(
+        "local-unknown-plus-paid-remote",
+        local_runtime=None,
+    )
+    paid_remote_only = entry(
+        "paid-remote-only",
+        include_local=False,
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    environment = ExecutionEnvironment(
+        platform=ExecutionPlatform.ANDROID,
+        interface=ExecutionInterface.NATIVE,
+        available_runtimes=[
+            "llama.cpp",
+        ],
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.PHONE,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=4 * 1024**3,
+    )
+
+    (
+        matched,
+        constrained,
+        indeterminate,
+        not_recommended,
+        constraint_excluded,
+    ) = _classify_catalog_entries_by_access_paths(
+        [
+            local_llama,
+            local_transformers,
+            local_unknown,
+            paid_remote_only,
+        ],
+        query=query,
+        paid_external_services_disallowed=True,
+        execution_environment=environment,
+        hardware_profile=hardware,
+    )
+
+    assert [
+        item.identifier
+        for item in matched
+    ] == [
+        "local-llama-plus-paid-remote",
+    ]
+
+    assert constrained == []
+
+    assert [
+        item.identifier
+        for item in indeterminate
+    ] == [
+        "local-unknown-plus-paid-remote",
+    ]
+
+    assert [
+        item.identifier
+        for item in not_recommended
+    ] == [
+        "local-transformers-plus-paid-remote",
+    ]
+
+    assert [
+        item.identifier
+        for item in constraint_excluded
+    ] == [
+        "paid-remote-only",
+    ]
+
+
+def test_access_path_classifier_preserves_cost_hardware_behavior():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_catalog_entries_by_access_paths,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+    from schemas.hardware import (
+        DeviceClass,
+        HardwareProfile,
+        HardwareProfileSource,
+    )
+
+    def local(
+        identifier: str,
+        *,
+        parameter_count: int | None,
+        quantization: str | None,
+    ) -> AgentStarterCatalogEntry:
+        model_profile = None
+
+        if parameter_count is not None:
+            model_profile = {
+                "model_id": identifier,
+                "parameter_count": parameter_count,
+                "quantization": quantization,
+                "execution_location": "on_device",
+            }
+
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": "0.2",
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": ["coding"],
+                "deployment_modes": ["on_device"],
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": [
+                    {
+                        "deployment_mode": "on_device",
+                        "access_kind": "self_hosted",
+                        "pricing": "free",
+                        "model_profile": model_profile,
+                    },
+                ],
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": "2026-08-29T00:00:00+00:00",
+            }
+        )
+
+    compatible = local(
+        "compatible-local",
+        parameter_count=3_000_000_000,
+        quantization="q4",
+    )
+    constrained = local(
+        "constrained-local",
+        parameter_count=7_000_000_000,
+        quantization="q4",
+    )
+    unknown = local(
+        "unknown-local",
+        parameter_count=None,
+        quantization=None,
+    )
+    not_recommended = local(
+        "large-local",
+        parameter_count=30_000_000_000,
+        quantization="q4",
+    )
+
+    paid_remote = AgentStarterCatalogEntry.model_validate(
+        {
+            "schema_version": "0.2",
+            "identifier": "paid-remote",
+            "component_type": "llm",
+            "vendor": "Example Vendor",
+            "family": "Example",
+            "version": "1.0",
+            "capabilities": ["coding"],
+            "deployment_modes": ["remote"],
+            "license": "example-license",
+            "pricing_class": "free",
+            "access_options": [
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+            "sources": [
+                "https://example.invalid/paid-remote",
+            ],
+            "verified_at": "2026-08-29T00:00:00+00:00",
+        }
+    )
+
+    hardware = HardwareProfile(
+        device_class=DeviceClass.LAPTOP,
+        source=HardwareProfileSource.NATIVE,
+        total_memory_bytes=8 * 1024**3,
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    (
+        matched,
+        constrained_entries,
+        indeterminate,
+        not_recommended_entries,
+        excluded,
+    ) = _classify_catalog_entries_by_access_paths(
+        [
+            compatible,
+            constrained,
+            unknown,
+            not_recommended,
+            paid_remote,
+        ],
+        query=query,
+        paid_external_services_disallowed=True,
+        hardware_profile=hardware,
+    )
+
+    assert [item.identifier for item in matched] == [
+        "compatible-local",
+    ]
+    assert [
+        item.identifier
+        for item in constrained_entries
+    ] == [
+        "constrained-local",
+    ]
+    assert [item.identifier for item in indeterminate] == [
+        "unknown-local",
+    ]
+    assert [
+        item.identifier
+        for item in not_recommended_entries
+    ] == [
+        "large-local",
+    ]
+    assert [item.identifier for item in excluded] == [
+        "paid-remote",
+    ]

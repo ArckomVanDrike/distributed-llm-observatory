@@ -55,6 +55,7 @@ def run_agent_starter_unified_pipeline(
         plan=plan,
         snapshot=catalog_snapshot,
         hardware_profile=prepared.hardware_profile,
+        execution_environment=prepared.execution_environment,
     )
 
     classification = (

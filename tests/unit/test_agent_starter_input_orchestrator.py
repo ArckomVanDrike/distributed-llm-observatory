@@ -1777,3 +1777,39 @@ def test_allowing_paid_external_services_does_not_create_constraint():
         requirement.key
         for requirement in requirements
     }
+
+
+def test_prepare_agent_starter_input_preserves_execution_environment():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterGoal,
+        AgentStarterIntake,
+    )
+    from schemas.execution_environment import (
+        ExecutionAccessStatus,
+        ExecutionEnvironment,
+        ExecutionInterface,
+        ExecutionPlatform,
+    )
+
+    environment = ExecutionEnvironment(
+        platform=ExecutionPlatform.ANDROID,
+        interface=ExecutionInterface.NATIVE,
+        available_runtimes=[
+            "llama.cpp",
+        ],
+        accelerator_access=ExecutionAccessStatus.LIMITED,
+        filesystem_access=ExecutionAccessStatus.AVAILABLE,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        execution_environment=environment,
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    assert intake.execution_environment == environment
+    assert prepared.execution_environment == environment
