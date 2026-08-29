@@ -1029,3 +1029,70 @@ def test_catalog_v0_2_access_option_allows_unknown_model_profile():
     )
 
     assert entry.access_options[0].model_profile is None
+
+
+def test_catalog_query_match_preserves_hardware_compatibility_classes():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    constrained = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="constrained-model",
+        )
+    )
+    not_recommended = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="not-recommended-model",
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+        ),
+        constrained_entries=[constrained],
+        not_recommended_entries=[not_recommended],
+    )
+
+    assert match.matched_entries == []
+    assert match.constrained_entries == [constrained]
+    assert match.indeterminate_entries == []
+    assert match.not_recommended_entries == [
+        not_recommended,
+    ]
+    assert match.constraint_excluded_entries == []
+
+
+def test_catalog_query_match_rejects_new_result_class_overlap():
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="duplicate-hardware-result",
+        )
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="only one query result class",
+    ):
+        AgentStarterCatalogQueryMatch(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-test",
+            query=AgentStarterCatalogQuery(
+                component_type=AgentStarterCatalogComponentType.LLM,
+            ),
+            constrained_entries=[entry],
+            not_recommended_entries=[entry],
+        )

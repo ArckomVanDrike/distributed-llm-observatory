@@ -41,7 +41,17 @@ class AgentStarterConcreteStackComponent(BaseModel):
     matched_entries: list[AgentStarterCatalogEntry] = Field(
         default_factory=list,
     )
+    constrained_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
     indeterminate_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    not_recommended_entries: list[
         AgentStarterCatalogEntry
     ] = Field(
         default_factory=list,
@@ -57,28 +67,39 @@ class AgentStarterConcreteStackComponent(BaseModel):
     def validate_result_class_exclusivity(
         self,
     ) -> AgentStarterConcreteStackComponent:
-        matched_ids = {
-            entry.identifier
-            for entry in self.matched_entries
-        }
-        indeterminate_ids = {
-            entry.identifier
-            for entry in self.indeterminate_entries
-        }
-        excluded_ids = {
-            entry.identifier
-            for entry in self.constraint_excluded_entries
-        }
+        result_class_ids = [
+            {
+                entry.identifier
+                for entry in self.matched_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constrained_entries
+            },
+            {
+                entry.identifier
+                for entry in self.indeterminate_entries
+            },
+            {
+                entry.identifier
+                for entry in self.not_recommended_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constraint_excluded_entries
+            },
+        ]
 
-        if (
-            matched_ids & indeterminate_ids
-            or matched_ids & excluded_ids
-            or indeterminate_ids & excluded_ids
-        ):
-            raise ValueError(
-                "A catalog entry may appear in only one "
-                "concrete stack result class."
-            )
+        identifiers_seen: set[str] = set()
+
+        for result_ids in result_class_ids:
+            if identifiers_seen & result_ids:
+                raise ValueError(
+                    "A catalog entry may appear in only one "
+                    "concrete stack result class."
+                )
+
+            identifiers_seen.update(result_ids)
 
         return self
 

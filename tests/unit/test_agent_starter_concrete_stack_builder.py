@@ -436,8 +436,14 @@ def test_concrete_stack_builder_preserves_non_matching_result_classes():
             ),
         )
 
+    constrained = entry(
+        "constrained-model",
+    )
     indeterminate = entry(
         "unknown-cost-model",
+    )
+    not_recommended = entry(
+        "not-recommended-model",
     )
     excluded = entry(
         "paid-service-model",
@@ -459,8 +465,14 @@ def test_concrete_stack_builder_preserves_non_matching_result_classes():
                     ],
                 ),
                 matched_entries=[],
+                constrained_entries=[
+                    constrained,
+                ],
                 indeterminate_entries=[
                     indeterminate,
+                ],
+                not_recommended_entries=[
+                    not_recommended,
                 ],
                 constraint_excluded_entries=[
                     excluded,
@@ -476,6 +488,13 @@ def test_concrete_stack_builder_preserves_non_matching_result_classes():
     )
 
     component = stack.components[0]
+
+    assert component.constrained_entries == [
+        constrained,
+    ]
+    assert component.not_recommended_entries == [
+        not_recommended,
+    ]
 
     assert component.matched_entries == []
     assert component.indeterminate_entries == [
