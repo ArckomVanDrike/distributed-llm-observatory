@@ -105,3 +105,50 @@ class AgentStarterConcreteStackResolution(BaseModel):
             )
 
         return self
+
+
+class AgentStarterConcreteStackClassification(BaseModel):
+    schema_version: Literal["0.1"] = "0.1"
+
+    resolution: AgentStarterConcreteStackResolution
+
+    recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    possible_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    possible_but_not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+    not_recommended_architecture_ids: list[str] = Field(
+        default_factory=list,
+    )
+
+    @model_validator(mode="after")
+    def validate_architecture_membership(
+        self,
+    ) -> AgentStarterConcreteStackClassification:
+        expected_ids = [
+            stack.architecture_id
+            for stack in self.resolution.stacks
+        ]
+
+        classified_ids = [
+            *self.recommended_architecture_ids,
+            *self.possible_architecture_ids,
+            *self.possible_but_not_recommended_architecture_ids,
+            *self.not_recommended_architecture_ids,
+        ]
+
+        if (
+            len(classified_ids) != len(expected_ids)
+            or set(classified_ids) != set(expected_ids)
+            or len(classified_ids) != len(set(classified_ids))
+        ):
+            raise ValueError(
+                "Every concrete stack architecture must be "
+                "classified exactly once."
+            )
+
+        return self
