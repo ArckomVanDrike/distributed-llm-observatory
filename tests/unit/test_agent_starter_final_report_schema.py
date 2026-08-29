@@ -367,3 +367,67 @@ def test_final_report_rejects_invented_upgrade_path():
                 "Buy a larger GPU.",
             ],
         )
+
+
+def test_final_report_rejects_invented_requested_capability():
+    from pydantic import ValidationError
+
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        EvidenceSource,
+    )
+    from schemas.agent_starter_report import (
+        AgentStarterCandidateExplanation,
+        AgentStarterFinalReport,
+        AgentStarterFinalReportContext,
+    )
+
+    fixture = _fixture()
+
+    context = AgentStarterFinalReportContext(
+        prepared=fixture["prepared"],
+        classification=fixture["classification"],
+        catalog_snapshot=fixture["snapshot"],
+    )
+
+    explanation = AgentStarterCandidateExplanation(
+        assessment=fixture["assessment"],
+        concrete_stack=fixture["stack"],
+        why=fixture["assessment"].recommendation_reasons,
+        why_not=[],
+    )
+
+    invented = AgentStarterEvidence(
+        key="invented_capability",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason="This capability was not present in prepared input.",
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="requested capabilities",
+    ):
+        AgentStarterFinalReport(
+            context=context,
+            candidate_explanations=[explanation],
+            observed_evidence=[fixture["observed"]],
+            declared_evidence=[fixture["declared"]],
+            derived_evidence=[fixture["derived"]],
+            unknown_evidence=[fixture["unknown"]],
+            hard_constraints=[fixture["hard"]],
+            soft_preferences=[fixture["soft"]],
+            requested_capabilities=[invented],
+            recommended_architecture_ids=[
+                "local-coding-agent",
+            ],
+            recommended_stacks=[
+                fixture["stack"],
+            ],
+            alternative_architecture_ids=[],
+            alternative_stacks=[],
+            possible_but_not_recommended_architecture_ids=[],
+            not_recommended_architecture_ids=[],
+            blockers=[],
+            upgrade_paths=[],
+        )

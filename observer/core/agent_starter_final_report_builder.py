@@ -3,6 +3,9 @@ from __future__ import annotations
 from observer.core.agent_starter_candidate_explanation_orchestrator import (
     build_agent_starter_candidate_explanations,
 )
+from observer.core.agent_starter_technical_requirement_orchestrator import (
+    extract_agent_starter_requested_capabilities,
+)
 from schemas.agent_starter import (
     AgentStarterRequirement,
     ConstraintStrength,
@@ -90,6 +93,11 @@ def build_agent_starter_final_report(
             for requirement in requirements
             if requirement.strength is ConstraintStrength.SOFT
         ],
+        requested_capabilities=(
+            extract_agent_starter_requested_capabilities(
+                context.prepared
+            )
+        ),
         recommended_architecture_ids=list(
             classification.recommended_architecture_ids
         ),

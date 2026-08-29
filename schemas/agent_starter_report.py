@@ -158,6 +158,10 @@ class AgentStarterFinalReport(BaseModel):
         default_factory=list,
     )
 
+    requested_capabilities: list[AgentStarterEvidence] = Field(
+        default_factory=list,
+    )
+
     recommended_architecture_ids: list[str] = Field(
         default_factory=list,
     )
@@ -291,6 +295,23 @@ class AgentStarterFinalReport(BaseModel):
                     "Final report candidate explanation must "
                     "correspond exactly to the assessed architecture "
                     "and concrete stack in plan order."
+                )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_requested_capability_provenance(
+        self,
+    ) -> AgentStarterFinalReport:
+        for capability in self.requested_capabilities:
+            if (
+                capability not in self.context.prepared.evidence
+                or capability.source is not EvidenceSource.DERIVED
+                or capability.value is not True
+            ):
+                raise ValueError(
+                    "Final report requested capabilities must be "
+                    "derived true evidence recorded in prepared input."
                 )
 
         return self

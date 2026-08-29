@@ -97,3 +97,63 @@ def test_requested_capabilities_preserve_prepared_evidence_objects():
 
     for capability in capabilities:
         assert capability in prepared.evidence
+
+
+def test_final_report_exposes_exact_requested_capabilities():
+    from datetime import datetime, timezone
+
+    from observer.core.agent_starter_unified_pipeline import (
+        run_agent_starter_unified_pipeline,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogSnapshot,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="modify_files",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+            AgentStarterEvidence(
+                key="run_tests",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="requested-capabilities-test",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            16,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        entries=[],
+    )
+
+    report = run_agent_starter_unified_pipeline(
+        intake=intake,
+        catalog_snapshot=snapshot,
+    )
+
+    expected = extract_agent_starter_requested_capabilities(
+        report.context.prepared
+    )
+
+    assert report.requested_capabilities == expected
+    assert [
+        capability.key
+        for capability in report.requested_capabilities
+    ] == [
+        "filesystem_read",
+        "filesystem_write",
+        "shell_execution",
+        "test_execution",
+    ]
