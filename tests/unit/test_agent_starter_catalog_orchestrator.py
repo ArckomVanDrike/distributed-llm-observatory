@@ -343,3 +343,222 @@ def test_catalog_orchestrator_preserves_all_candidate_assessments_in_order():
     ] == [
         "automation-model",
     ]
+
+
+def test_catalog_orchestrator_classifies_paid_external_service_constraint():
+    from schemas.agent_starter import (
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+
+    constraint_evidence = AgentStarterEvidence(
+        key="paid_external_services_allowed",
+        source=EvidenceSource.DECLARED,
+        value=False,
+    )
+
+    paid_external_constraint = AgentStarterRequirement(
+        key="paid_external_services_allowed",
+        value=False,
+        strength=ConstraintStrength.HARD,
+        evidence=[
+            constraint_evidence,
+        ],
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The coding architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The coding architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding architecture requires "
+                    "a language model."
+                ),
+            ),
+        ],
+    )
+
+    def entry(
+        identifier: str,
+        *,
+        access_options: list[dict] | None = None,
+        schema_version: str = "0.2",
+    ) -> AgentStarterCatalogEntry:
+        options = list(access_options or [])
+
+        deployment_modes = list(
+            dict.fromkeys(
+                option["deployment_mode"]
+                for option in options
+            )
+        )
+
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": schema_version,
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": [
+                    "coding",
+                ],
+                "deployment_modes": deployment_modes,
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": options,
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": datetime(
+                    2026,
+                    8,
+                    29,
+                    tzinfo=timezone.utc,
+                ),
+            }
+        )
+
+    self_hosted_subscription = entry(
+        "self-hosted-subscription",
+        access_options=[
+            {
+                "deployment_mode": "on_device",
+                "access_kind": "self_hosted",
+                "pricing": "subscription",
+            },
+        ],
+    )
+
+    external_free = entry(
+        "external-free",
+        access_options=[
+            {
+                "deployment_mode": "remote",
+                "access_kind": "external_service",
+                "pricing": "free",
+            },
+        ],
+    )
+
+    external_paid = entry(
+        "external-paid",
+        access_options=[
+            {
+                "deployment_mode": "remote",
+                "access_kind": "external_service",
+                "pricing": "usage_based",
+            },
+        ],
+    )
+
+    external_unknown = entry(
+        "external-unknown",
+        access_options=[
+            {
+                "deployment_mode": "remote",
+                "access_kind": "external_service",
+                "pricing": "provider_dependent",
+            },
+        ],
+    )
+
+    external_freemium = entry(
+        "external-freemium",
+        access_options=[
+            {
+                "deployment_mode": "remote",
+                "access_kind": "external_service",
+                "pricing": "freemium",
+            },
+        ],
+    )
+
+    mixed_access = entry(
+        "mixed-access",
+        access_options=[
+            {
+                "deployment_mode": "remote",
+                "access_kind": "external_service",
+                "pricing": "usage_based",
+            },
+            {
+                "deployment_mode": "on_device",
+                "access_kind": "self_hosted",
+                "pricing": "free",
+            },
+        ],
+    )
+
+    legacy_entry = entry(
+        "legacy-entry",
+        schema_version="0.1",
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        snapshot_id="catalog-v0-2-cost-test",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            tzinfo=timezone.utc,
+        ),
+        entries=[
+            self_hosted_subscription,
+            external_free,
+            external_paid,
+            external_unknown,
+            external_freemium,
+            mixed_access,
+            legacy_entry,
+        ],
+    )
+
+    result = match_agent_starter_architecture_to_catalog(
+        goal=AgentStarterGoal.CODING,
+        assessment=assessment,
+        snapshot=snapshot,
+        plan_requirements=[
+            paid_external_constraint,
+        ],
+    )
+
+    query_match = result.query_matches[0]
+
+    assert [
+        item.identifier
+        for item in query_match.matched_entries
+    ] == [
+        "self-hosted-subscription",
+        "external-free",
+        "mixed-access",
+    ]
+
+    assert [
+        item.identifier
+        for item in query_match.indeterminate_entries
+    ] == [
+        "external-unknown",
+        "external-freemium",
+        "legacy-entry",
+    ]
+
+    assert [
+        item.identifier
+        for item in query_match.constraint_excluded_entries
+    ] == [
+        "external-paid",
+    ]
