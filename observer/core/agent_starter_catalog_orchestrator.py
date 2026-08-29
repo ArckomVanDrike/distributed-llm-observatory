@@ -17,6 +17,7 @@ from schemas.agent_starter_catalog import (
     AgentStarterCatalogAccessPricing,
     AgentStarterCatalogArchitectureResult,
     AgentStarterCatalogEntry,
+    AgentStarterCatalogQuery,
     AgentStarterCatalogQueryMatch,
     AgentStarterCatalogSnapshot,
 )
@@ -36,6 +37,8 @@ def _disallows_paid_external_services(
 
 def _classify_external_service_cost_constraint(
     entries: list[AgentStarterCatalogEntry],
+    *,
+    query: AgentStarterCatalogQuery,
 ) -> tuple[
     list[AgentStarterCatalogEntry],
     list[AgentStarterCatalogEntry],
@@ -58,15 +61,33 @@ def _classify_external_service_cost_constraint(
         AgentStarterCatalogAccessPricing.ENTERPRISE,
     }
 
+    required_deployment_modes = set(
+        query.required_deployment_modes
+    )
+
     for entry in entries:
         if not entry.access_options:
+            indeterminate_entries.append(entry)
+            continue
+
+        eligible_access_options = [
+            option
+            for option in entry.access_options
+            if (
+                not required_deployment_modes
+                or option.deployment_mode
+                in required_deployment_modes
+            )
+        ]
+
+        if not eligible_access_options:
             indeterminate_entries.append(entry)
             continue
 
         has_compliant_path = False
         has_indeterminate_path = False
 
-        for option in entry.access_options:
+        for option in eligible_access_options:
             if (
                 option.access_kind
                 is AgentStarterCatalogAccessKind.SELF_HOSTED
@@ -141,7 +162,8 @@ def match_agent_starter_architecture_to_catalog(
                 indeterminate_entries,
                 constraint_excluded_entries,
             ) = _classify_external_service_cost_constraint(
-                technical_matches
+                technical_matches,
+                query=query,
             )
         else:
             matched_entries = technical_matches

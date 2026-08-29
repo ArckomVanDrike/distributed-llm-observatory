@@ -562,3 +562,161 @@ def test_catalog_orchestrator_classifies_paid_external_service_constraint():
     ] == [
         "external-paid",
     ]
+
+
+def test_external_service_cost_classification_respects_query_deployment_mode():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_external_service_cost_constraint,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+
+    mixed = AgentStarterCatalogEntry.model_validate(
+        {
+            "schema_version": "0.2",
+            "identifier": "mixed-access-model",
+            "component_type": "llm",
+            "vendor": "Example Vendor",
+            "family": "Example",
+            "version": "1.0",
+            "capabilities": ["coding"],
+            "deployment_modes": [
+                "on_device",
+                "remote",
+            ],
+            "license": "example-license",
+            "pricing_class": "free",
+            "access_options": [
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+            "sources": [
+                "https://example.invalid/mixed-access-model",
+            ],
+            "verified_at": "2026-08-29T00:00:00+00:00",
+        }
+    )
+
+    remote_query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+        required_deployment_modes=["remote"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        excluded,
+    ) = _classify_external_service_cost_constraint(
+        [mixed],
+        query=remote_query,
+    )
+
+    assert matched == []
+    assert indeterminate == []
+    assert excluded == [mixed]
+
+    local_query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+        required_deployment_modes=["on_device"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        excluded,
+    ) = _classify_external_service_cost_constraint(
+        [mixed],
+        query=local_query,
+    )
+
+    assert matched == [mixed]
+    assert indeterminate == []
+    assert excluded == []
+
+    unrestricted_query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        excluded,
+    ) = _classify_external_service_cost_constraint(
+        [mixed],
+        query=unrestricted_query,
+    )
+
+    assert matched == [mixed]
+    assert indeterminate == []
+    assert excluded == []
+
+
+def test_external_service_cost_missing_required_path_is_indeterminate():
+    from observer.core.agent_starter_catalog_orchestrator import (
+        _classify_external_service_cost_constraint,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        {
+            "schema_version": "0.2",
+            "identifier": "incomplete-access-metadata",
+            "component_type": "llm",
+            "vendor": "Example Vendor",
+            "family": "Example",
+            "version": "1.0",
+            "capabilities": ["coding"],
+            "deployment_modes": [
+                "on_device",
+                "remote",
+            ],
+            "license": "example-license",
+            "pricing_class": "free",
+            "access_options": [
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+            ],
+            "sources": [
+                "https://example.invalid/incomplete-access-metadata",
+            ],
+            "verified_at": "2026-08-29T00:00:00+00:00",
+        }
+    )
+
+    query = AgentStarterCatalogQuery(
+        component_type="llm",
+        required_capabilities=["coding"],
+        required_deployment_modes=["remote"],
+    )
+
+    (
+        matched,
+        indeterminate,
+        excluded,
+    ) = _classify_external_service_cost_constraint(
+        [entry],
+        query=query,
+    )
+
+    assert matched == []
+    assert indeterminate == [entry]
+    assert excluded == []
