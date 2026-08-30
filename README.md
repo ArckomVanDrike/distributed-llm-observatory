@@ -557,11 +557,9 @@ If you find a reproducibility problem, incorrect assumption, benchmark weakness,
 
 ## License
 
-Distributed LLM Observatory is released under the **MIT License**.
+DLLO is licensed under the **Apache License 2.0**.
 
-See [`LICENSE`](LICENSE).
-
----
+See [`LICENSE`](LICENSE) for the full license text.
 
 ## Core principle
 
