@@ -13,7 +13,11 @@ from schemas.agent_starter import (
     AgentStarterPreparedInput,
     CandidateArchitectureAssessment,
 )
-from schemas.compatibility import CompatibilityAssessment
+from schemas.compatibility import (
+    AssessmentBasis,
+    CompatibilityAssessment,
+    CompatibilityVerdict,
+)
 
 
 def assess_agent_starter_candidates(
@@ -52,6 +56,17 @@ def assess_agent_starter_candidates(
                     candidate.architecture_id
                 )
             )
+
+            if compatibility_assessment is None:
+                compatibility_assessment = CompatibilityAssessment(
+                    basis=AssessmentBasis.ESTIMATED,
+                    verdict=CompatibilityVerdict.UNKNOWN,
+                    summary=(
+                        "No candidate-specific compatibility "
+                        "assessment was provided."
+                    ),
+                    confidence=0.0,
+                )
 
         feasibility = evaluate_agent_starter_technical_feasibility(
             prepared=prepared,

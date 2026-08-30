@@ -98,6 +98,13 @@ def make_handler(
                 )
                 return
 
+            if (
+                parsed.path
+                == "/v1/agent-starter/runtime-options"
+            ):
+                self._handle_agent_starter_runtime_options()
+                return
+
             if parsed.path == "/v1/agent-tests":
                 self._handle_agent_test_history()
                 return
@@ -253,6 +260,44 @@ def make_handler(
                 question_set.model_dump(
                     mode="json",
                 ),
+            )
+
+        def _handle_agent_starter_runtime_options(
+            self,
+        ) -> None:
+            try:
+                snapshot = AgentStarterCatalogBank(
+                    root=config.catalog_root,
+                ).load_snapshot(
+                    "catalog-v0-2.json",
+                )
+            except AgentStarterCatalogBankError as exc:
+                self._send_json(
+                    500,
+                    {
+                        "error": "catalog_unavailable",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            runtimes = sorted(
+                {
+                    runtime
+                    for entry in snapshot.entries
+                    for runtime in entry.supported_runtimes
+                }
+            )
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "catalog_snapshot_id": (
+                        snapshot.snapshot_id
+                    ),
+                    "runtimes": runtimes,
+                },
             )
 
         def _handle_agent_starter_recommendation(

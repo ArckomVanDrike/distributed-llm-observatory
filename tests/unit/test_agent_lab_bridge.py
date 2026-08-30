@@ -2387,3 +2387,45 @@ def test_agent_lab_bridge_returns_agent_starter_recommendation(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_returns_agent_starter_runtime_options(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/runtime-options"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert (
+            payload["catalog_snapshot_id"]
+            == "agent-starter-catalog-v0-2"
+        )
+
+        runtimes = payload["runtimes"]
+
+        assert runtimes == sorted(runtimes)
+        assert len(runtimes) == len(set(runtimes))
+
+        assert "llama.cpp" in runtimes
+        assert "ollama" in runtimes
+        assert "transformers" in runtimes
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

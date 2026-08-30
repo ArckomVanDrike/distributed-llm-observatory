@@ -576,3 +576,77 @@ export async function fetchAgentStarterRecommendation(
     await response.json(),
   )
 }
+
+
+export interface AgentStarterRuntimeOptions {
+  schema_version: '0.1'
+  catalogSnapshotId: string
+  runtimes: string[]
+}
+
+export type AgentStarterReadFetch = (
+  input: string,
+) => Promise<AgentStarterFetchResponse>
+
+export function parseAgentStarterRuntimeOptions(
+  value: unknown,
+): AgentStarterRuntimeOptions {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Starter runtime options response.',
+    )
+  }
+
+  if (
+    value.schema_version !== '0.1'
+    || typeof value.catalog_snapshot_id !== 'string'
+    || !Array.isArray(value.runtimes)
+    || value.runtimes.some(
+      (runtime) => (
+        typeof runtime !== 'string'
+        || runtime.length === 0
+      ),
+    )
+  ) {
+    throw new Error(
+      'Invalid Agent Starter runtime options response.',
+    )
+  }
+
+  const runtimes =
+    value.runtimes as string[]
+
+  if (
+    new Set(runtimes).size
+    !== runtimes.length
+  ) {
+    throw new Error(
+      'Agent Starter runtime options contain duplicates.',
+    )
+  }
+
+  return {
+    schema_version: '0.1',
+    catalogSnapshotId:
+      value.catalog_snapshot_id,
+    runtimes: [...runtimes],
+  }
+}
+
+export async function fetchAgentStarterRuntimeOptions(
+  fetchImpl: AgentStarterReadFetch,
+): Promise<AgentStarterRuntimeOptions> {
+  const response = await fetchImpl(
+    '/v1/agent-starter/runtime-options',
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Agent Starter runtime options request failed with HTTP ${response.status}.`,
+    )
+  }
+
+  return parseAgentStarterRuntimeOptions(
+    await response.json(),
+  )
+}

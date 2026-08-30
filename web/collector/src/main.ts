@@ -7,6 +7,7 @@ import {
 import {
   fetchAgentStarterQuestions,
   fetchAgentStarterRecommendation,
+  fetchAgentStarterRuntimeOptions,
   isAgentStarterGoal,
 } from './agent-starter-bridge'
 
@@ -158,6 +159,11 @@ let agentStarterEnvironment:
 
 let agentStarterRecommendation:
   AgentStarterRecommendation | null = null
+
+let agentStarterRuntimeOptions: string[] = []
+let agentStarterRuntimeOptionsError:
+  string | null = null
+let agentStarterRuntimeOptionsLoaded = false
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
@@ -604,6 +610,9 @@ function render(): void {
         error: agentStarterError,
         environment: agentStarterEnvironment,
         recommendation: agentStarterRecommendation,
+        runtimeOptions: agentStarterRuntimeOptions,
+        runtimeOptionsError:
+          agentStarterRuntimeOptionsError,
       },
       agentTest: {
         state: agentTestState,
@@ -789,6 +798,33 @@ async function refreshAgentTestHistory(): Promise<void> {
 }
 
 
+async function ensureAgentStarterRuntimeOptions():
+  Promise<void> {
+  if (agentStarterRuntimeOptionsLoaded) {
+    return
+  }
+
+  try {
+    const result =
+      await fetchAgentStarterRuntimeOptions(
+        (request) => fetch(request),
+      )
+
+    agentStarterRuntimeOptions =
+      result.runtimes
+
+    agentStarterRuntimeOptionsError = null
+    agentStarterRuntimeOptionsLoaded = true
+  } catch (error) {
+    agentStarterRuntimeOptions = []
+    agentStarterRuntimeOptionsError =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load runtime options.'
+  }
+}
+
+
 async function refreshAgentStarterQuestions(): Promise<void> {
   if (agentStarterGoal === null) {
     return
@@ -819,10 +855,12 @@ async function refreshAgentStarterQuestions(): Promise<void> {
 
     agentStarterQuestionSet = questionSet
 
-    agentStarterState =
-      questionSet.questions.length === 0
-        ? 'complete'
-        : 'question'
+    if (questionSet.questions.length === 0) {
+      agentStarterState = 'complete'
+      await ensureAgentStarterRuntimeOptions()
+    } else {
+      agentStarterState = 'question'
+    }
   } catch (error) {
     agentStarterQuestionSet = null
     agentStarterState = 'error'
@@ -888,27 +926,6 @@ function isAgentStarterInterface(
 }
 
 
-function parseAgentStarterRuntimes(
-  value: string,
-): string[] | null {
-  const runtimes =
-    value
-      .split(',')
-      .map((runtime) => runtime.trim())
-      .filter(
-        (runtime) => runtime.length > 0,
-      )
-
-  if (runtimes.length === 0) {
-    return null
-  }
-
-  return Array.from(
-    new Set(runtimes),
-  )
-}
-
-
 async function requestAgentStarterRecommendation():
   Promise<void> {
   if (agentStarterGoal === null) {
@@ -941,9 +958,7 @@ async function requestAgentStarterRecommendation():
   }
 
   const runtimes =
-    parseAgentStarterRuntimes(
-      agentStarterEnvironment.runtimes,
-    )
+    agentStarterEnvironment.runtimes
 
   const hardwareLimitations: string[] = []
 
@@ -1149,17 +1164,11 @@ function bindAgentStarterEvents(): void {
             '#agent-starter-memory-gib',
           )
 
-        const runtimes =
-          document.querySelector<HTMLInputElement>(
-            '#agent-starter-runtimes',
-          )
-
         if (
           deviceClass === null
           || platform === null
           || executionInterface === null
           || memory === null
-          || runtimes === null
         ) {
           return
         }
@@ -1188,12 +1197,94 @@ function bindAgentStarterEvents(): void {
           interface:
             executionInterface.value,
           memoryGiB: memory.value,
-          runtimes: runtimes.value,
+          runtimes:
+            agentStarterEnvironment.runtimes,
         }
 
         void requestAgentStarterRecommendation()
       },
     )
+
+  const runtimeButtons =
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-runtime]',
+    )
+
+  const refreshRuntimeButtons = (): void => {
+    runtimeButtons.forEach((button) => {
+      const runtime =
+        button.dataset.agentStarterRuntime
+
+      let selected = false
+
+      if (runtime === '__unknown__') {
+        selected =
+          agentStarterEnvironment.runtimes === null
+      } else if (runtime === '__none__') {
+        selected =
+          agentStarterEnvironment.runtimes !== null
+          && agentStarterEnvironment.runtimes.length === 0
+      } else if (runtime !== undefined) {
+        selected =
+          agentStarterEnvironment.runtimes
+            ?.includes(runtime)
+          ?? false
+      }
+
+      button.classList.toggle(
+        'is-selected',
+        selected,
+      )
+
+      button.setAttribute(
+        'aria-pressed',
+        String(selected),
+      )
+    })
+  }
+
+  runtimeButtons.forEach((button) => {
+    button.addEventListener(
+      'click',
+      () => {
+        const runtime =
+          button.dataset.agentStarterRuntime
+
+        if (runtime === undefined) {
+          return
+        }
+
+        if (runtime === '__unknown__') {
+          agentStarterEnvironment.runtimes = null
+        } else if (runtime === '__none__') {
+          agentStarterEnvironment.runtimes = []
+        } else {
+          const current =
+            agentStarterEnvironment.runtimes
+            ?? []
+
+          if (current.includes(runtime)) {
+            const next =
+              current.filter(
+                (item) => item !== runtime,
+              )
+
+            agentStarterEnvironment.runtimes =
+              next.length === 0
+                ? null
+                : next
+          } else {
+            agentStarterEnvironment.runtimes = [
+              ...current,
+              runtime,
+            ]
+          }
+        }
+
+        refreshRuntimeButtons()
+      },
+    )
+  })
 
   document
     .querySelectorAll<HTMLButtonElement>(

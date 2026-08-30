@@ -155,7 +155,7 @@ it('renders the execution environment step after requirements', () => {
       platform: 'linux',
       interface: 'native',
       memoryGiB: '16',
-      runtimes: 'llama.cpp',
+      runtimes: ['llama.cpp'],
     },
     recommendation: null,
   })
@@ -250,5 +250,44 @@ it('renders an evidence-backed final recommendation', () => {
   )
   expect(html).toContain(
     'agent-starter-catalog-v0-2',
+  )
+})
+
+
+it('renders catalog-backed runtime choices with explicit unknown semantics', () => {
+  const html = renderAgentStarterPage({
+    state: 'complete',
+    goal: 'coding',
+    evidence: [],
+    questionSet: {
+      schema_version: '0.1',
+      goal: 'coding',
+      questions: [],
+    },
+    error: null,
+    environment: {
+      deviceClass: 'laptop',
+      platform: 'linux',
+      interface: 'native',
+      memoryGiB: '16',
+      runtimes: null,
+    },
+    recommendation: null,
+    runtimeOptions: [
+      'llama.cpp',
+      'ollama',
+      'transformers',
+    ],
+    runtimeOptionsError: null,
+  })
+
+  expect(html).toContain('? Unknown')
+  expect(html).toContain('None installed')
+  expect(html).toContain('llama.cpp')
+  expect(html).toContain('ollama')
+  expect(html).toContain('transformers')
+
+  expect(html).not.toContain(
+    'id="agent-starter-runtimes"',
   )
 })

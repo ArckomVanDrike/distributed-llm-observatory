@@ -790,3 +790,98 @@ def test_proactive_behavior_without_background_scheduling_is_not_feasible():
     ] == [
         "candidate_supports_background_scheduling",
     ]
+
+
+def test_satisfied_requirements_establish_feasibility_without_compatibility():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterCandidateArchitecture,
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterPreparedInput,
+        AgentStarterTechnicalRequirementAssessment,
+        EvidenceSource,
+        TechnicalFeasibility,
+        TechnicalRequirementStatus,
+    )
+
+    evidence = AgentStarterEvidence(
+        key="candidate_supports_code_execution",
+        source=EvidenceSource.DERIVED,
+        value=True,
+        reason=(
+            "The candidate declares support for "
+            "the required code execution capability."
+        ),
+    )
+
+    requirement = AgentStarterTechnicalRequirementAssessment(
+        key="code_execution",
+        status=TechnicalRequirementStatus.SATISFIED,
+        reasons=[
+            "The candidate satisfies the requested capability.",
+        ],
+        supporting_evidence=[
+            evidence,
+        ],
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        technical_requirements=[
+            requirement,
+        ],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.FEASIBLE
+    )
+
+    assert assessment.supporting_evidence == [
+        evidence,
+    ]
+
+    assert assessment.reasons == [
+        (
+            "All candidate-specific technical "
+            "requirements are satisfied by the "
+            "available evidence."
+        ),
+    ]
+
+
+def test_no_requirements_and_no_compatibility_remains_unknown():
+    from observer.core.agent_starter_feasibility_evaluator import (
+        evaluate_agent_starter_technical_feasibility,
+    )
+    from schemas.agent_starter import (
+        AgentStarterCandidateArchitecture,
+        AgentStarterGoal,
+        AgentStarterPreparedInput,
+        TechnicalFeasibility,
+    )
+
+    assessment = evaluate_agent_starter_technical_feasibility(
+        prepared=AgentStarterPreparedInput(
+            goal=AgentStarterGoal.CODING,
+        ),
+        candidate=AgentStarterCandidateArchitecture(
+            architecture_id="local-coding-agent",
+            goal=AgentStarterGoal.CODING,
+        ),
+        technical_requirements=[],
+    )
+
+    assert (
+        assessment.technical_feasibility
+        is TechnicalFeasibility.UNKNOWN
+    )

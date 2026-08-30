@@ -7,8 +7,10 @@ import {
 import {
   fetchAgentStarterQuestions,
   fetchAgentStarterRecommendation,
+  fetchAgentStarterRuntimeOptions,
   parseAgentStarterQuestionSet,
   parseAgentStarterRecommendation,
+  parseAgentStarterRuntimeOptions,
 } from './agent-starter-bridge'
 
 describe('Agent Starter questionnaire bridge', () => {
@@ -296,5 +298,67 @@ it('posts environment evidence to the recommendation endpoint', async () => {
       .available_runtimes,
   ).toEqual([
     'llama.cpp',
+  ])
+})
+
+
+it('parses catalog-backed runtime options', () => {
+  const result =
+    parseAgentStarterRuntimeOptions({
+      schema_version: '0.1',
+      catalog_snapshot_id:
+        'agent-starter-catalog-v0-2',
+      runtimes: [
+        'llama.cpp',
+        'ollama',
+        'transformers',
+      ],
+    })
+
+  expect(result.catalogSnapshotId).toBe(
+    'agent-starter-catalog-v0-2',
+  )
+
+  expect(result.runtimes).toEqual([
+    'llama.cpp',
+    'ollama',
+    'transformers',
+  ])
+})
+
+
+it('loads runtime options from Agent Starter bridge', async () => {
+  let requestUrl = ''
+
+  const result =
+    await fetchAgentStarterRuntimeOptions(
+      async (input) => {
+        requestUrl = input
+
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              schema_version: '0.1',
+              catalog_snapshot_id:
+                'agent-starter-catalog-v0-2',
+              runtimes: [
+                'ollama',
+                'transformers',
+              ],
+            }
+          },
+        }
+      },
+    )
+
+  expect(requestUrl).toBe(
+    '/v1/agent-starter/runtime-options',
+  )
+
+  expect(result.runtimes).toEqual([
+    'ollama',
+    'transformers',
   ])
 })

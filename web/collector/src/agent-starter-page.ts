@@ -33,6 +33,8 @@ export interface AgentStarterPageOptions {
   error: string | null
   environment?: AgentStarterEnvironmentDraft
   recommendation?: AgentStarterRecommendation | null
+  runtimeOptions?: string[]
+  runtimeOptionsError?: string | null
 }
 
 export interface AgentStarterEnvironmentDraft {
@@ -40,7 +42,7 @@ export interface AgentStarterEnvironmentDraft {
   platform: AgentStarterExecutionPlatform
   interface: AgentStarterExecutionInterface
   memoryGiB: string
-  runtimes: string
+  runtimes: string[] | null
 }
 
 export function createAgentStarterEnvironmentDraft():
@@ -50,7 +52,7 @@ export function createAgentStarterEnvironmentDraft():
     platform: 'unknown',
     interface: 'unknown',
     memoryGiB: '',
-    runtimes: '',
+    runtimes: null,
   }
 }
 
@@ -683,21 +685,114 @@ function renderComplete(
           </small>
         </label>
 
-        <label class="agent-starter-runtime-field">
-          <span>Known local runtimes</span>
-          <input
-            id="agent-starter-runtimes"
-            type="text"
-            value="${escapeHtml(
-              environment.runtimes,
-            )}"
-            placeholder="e.g. llama.cpp, Ollama"
+        <div
+          class="
+            agent-starter-runtime-field
+            agent-starter-runtime-selector
+          "
+        >
+          <span class="agent-starter-field-label">
+            Known local runtimes
+          </span>
+
+          <p>
+            Select every runtime currently available
+            in this environment.
+          </p>
+
+          <div
+            class="agent-starter-runtime-options"
+            role="group"
+            aria-label="Known local runtimes"
           >
-          <small>
-            Optional. Separate multiple runtimes
-            with commas.
-          </small>
-        </label>
+            <button
+              type="button"
+              data-agent-starter-runtime="__unknown__"
+              aria-pressed="${
+                environment.runtimes === null
+                  ? 'true'
+                  : 'false'
+              }"
+              class="${
+                environment.runtimes === null
+                  ? 'is-selected'
+                  : ''
+              }"
+            >
+              ? Unknown
+            </button>
+
+            <button
+              type="button"
+              data-agent-starter-runtime="__none__"
+              aria-pressed="${
+                environment.runtimes !== null
+                && environment.runtimes.length === 0
+                  ? 'true'
+                  : 'false'
+              }"
+              class="${
+                environment.runtimes !== null
+                && environment.runtimes.length === 0
+                  ? 'is-selected'
+                  : ''
+              }"
+            >
+              None installed
+            </button>
+
+            ${(options.runtimeOptions ?? [])
+              .map((runtime) => {
+                const selected =
+                  environment.runtimes
+                    ?.includes(runtime)
+                  ?? false
+
+                return `
+                  <button
+                    type="button"
+                    data-agent-starter-runtime="${escapeHtml(
+                      runtime,
+                    )}"
+                    aria-pressed="${
+                      selected
+                        ? 'true'
+                        : 'false'
+                    }"
+                    class="${
+                      selected
+                        ? 'is-selected'
+                        : ''
+                    }"
+                  >
+                    ${escapeHtml(runtime)}
+                  </button>
+                `
+              })
+              .join('')}
+          </div>
+
+          ${
+            options.runtimeOptionsError
+              ? `
+                <small
+                  class="agent-starter-runtime-warning"
+                >
+                  ${escapeHtml(
+                    options.runtimeOptionsError,
+                  )}
+                  You can continue with Unknown.
+                </small>
+              `
+              : `
+                <small>
+                  Unknown means the inventory is not
+                  known. None installed means it is
+                  known that no local runtime exists.
+                </small>
+              `
+          }
+        </div>
       </div>
 
       <div class="agent-starter-environment-note">
@@ -776,6 +871,10 @@ function renderRecommending(
 function humanizeIdentifier(
   value: string,
 ): string {
+  if (value.toLowerCase() === 'llm') {
+    return 'LLM'
+  }
+
   return value
     .split(/[-_]+/)
     .filter(Boolean)
@@ -876,12 +975,6 @@ function renderEntryGroup(
 function renderCandidate(
   candidate: AgentStarterCandidateView,
 ): string {
-  const hasSelection =
-    candidate.components.some(
-      (component) =>
-        component.selectedEntry !== null,
-    )
-
   const reasons = candidate.why.length > 0
     ? `
       <section class="agent-starter-reason-list">
@@ -918,14 +1011,37 @@ function renderCandidate(
   const components =
     candidate.components
       .map((component) => {
+        let noSelectionMessage =
+          'No concrete entry was automatically selected.'
+
+        if (component.matchedEntries.length > 1) {
+          noSelectionMessage =
+            `${component.matchedEntries.length} catalog entries match. `
+            + 'DLLO does not choose between multiple valid matches '
+            + 'without an explicit ranking basis.'
+        } else if (
+          component.matchedEntries.length === 0
+          && component.indeterminateEntries.length > 0
+        ) {
+          noSelectionMessage =
+            'Available evidence is insufficient to select '
+            + 'a concrete catalog entry.'
+        } else if (
+          component.matchedEntries.length === 0
+          && component.notRecommendedEntries.length > 0
+        ) {
+          noSelectionMessage =
+            'No catalog entry is currently recommended '
+            + 'for the declared environment.'
+        }
+
         const selected =
           component.selectedEntry === null
             ? `
               <div
                 class="agent-starter-no-selection"
               >
-                No concrete entry was automatically
-                selected for this component.
+                ${escapeHtml(noSelectionMessage)}
               </div>
             `
             : `
@@ -1026,17 +1142,6 @@ function renderCandidate(
       ${reasons}
       ${reasonsAgainst}
 
-      ${
-        hasSelection
-          ? ''
-          : `
-            <p class="agent-starter-rigor-note">
-              No catalog entry was selected without
-              sufficient evidence.
-            </p>
-          `
-      }
-
       <div class="agent-starter-components">
         ${components}
       </div>
@@ -1062,6 +1167,15 @@ function renderResult(
   const hasRecommendedArchitecture =
     recommendation
       .recommendedArchitectureIds
+      .length > 0
+
+  const hasPossibleArchitecture =
+    recommendation.alternativeArchitectureIds
+      .length > 0
+
+  const hasLimitedArchitecture =
+    recommendation
+      .possibleButNotRecommendedArchitectureIds
       .length > 0
 
   const hasConcreteSelection =
@@ -1131,7 +1245,11 @@ function renderResult(
             ${
               hasRecommendedArchitecture
                 ? 'Recommendation ready.'
-                : 'No automatic architecture recommendation.'
+                : hasPossibleArchitecture
+                  ? 'A viable architecture was found.'
+                  : hasLimitedArchitecture
+                    ? 'A limited architecture was found.'
+                    : 'No automatic architecture recommendation.'
             }
           </h2>
 
