@@ -54,7 +54,7 @@ describe('renderAgentLabPage', () => {
       'Core v1 complete',
     )
     expect(html).toContain(
-      'Public interface in development',
+      'Public browser workflow available',
     )
     expect(html).toContain(
       'evidence-backed',

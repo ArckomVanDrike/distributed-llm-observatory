@@ -79,7 +79,7 @@ export function renderAgentLabPage(): string {
             </p>
 
             <p>
-              Public interface in development.
+              Public browser workflow available.
             </p>
 
             <ul>

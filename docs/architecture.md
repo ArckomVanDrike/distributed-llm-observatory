@@ -292,11 +292,11 @@ DLLO does not introduce an implicit global score or tie-break.
 
 ### Current interface boundary
 
-Agent Starter v1 is currently implemented as a Python core pipeline and schema layer.
+Agent Starter v1 is implemented as a Python decision pipeline and schema layer exposed through the local Agent Lab bridge and browser workflow.
 
-Its complete decision engine is part of the repository, but a dedicated public Agent Starter CLI or browser workflow is not yet exposed as a separate product interface.
+The browser workflow covers goal selection, adaptive questioning, explicit environment evidence, catalog-backed runtime selection, architecture assessment, concrete stack resolution, and the final evidence-backed recommendation report.
 
-This distinction is intentional in the current public-preview architecture.
+The public interface preserves the same evidence provenance, conservative UNKNOWN handling, and decision semantics as the core pipeline.
 
 ---
 
