@@ -8,6 +8,7 @@ from observer.core.agent_starter_stack_requirement_builder import (
 )
 from schemas.agent_starter import (
     AgentStarterGoal,
+    AgentStarterRequirement,
     CandidateArchitectureAssessment,
 )
 from schemas.agent_starter_catalog import (
@@ -24,6 +25,9 @@ def build_agent_starter_concrete_stack(
     goal: AgentStarterGoal,
     assessment: CandidateArchitectureAssessment,
     architecture_result: AgentStarterCatalogArchitectureResult,
+    plan_requirements: list[
+        AgentStarterRequirement
+    ] | None = None,
 ) -> AgentStarterConcreteStack:
     if architecture_result.architecture_id != assessment.architecture_id:
         raise ValueError(
@@ -34,6 +38,7 @@ def build_agent_starter_concrete_stack(
     requirements = build_agent_starter_stack_requirements(
         goal=goal,
         assessment=assessment,
+        plan_requirements=plan_requirements,
     )
 
     query_matches = list(architecture_result.query_matches)
@@ -64,6 +69,18 @@ def build_agent_starter_concrete_stack(
             )
 
         matched_entries = list(query_match.matched_entries)
+        constrained_entries = list(
+            query_match.constrained_entries
+        )
+        indeterminate_entries = list(
+            query_match.indeterminate_entries
+        )
+        not_recommended_entries = list(
+            query_match.not_recommended_entries
+        )
+        constraint_excluded_entries = list(
+            query_match.constraint_excluded_entries
+        )
 
         selected_entry = (
             matched_entries[0]
@@ -75,6 +92,14 @@ def build_agent_starter_concrete_stack(
             AgentStarterConcreteStackComponent(
                 requirement=requirement,
                 matched_entries=matched_entries,
+                constrained_entries=constrained_entries,
+                indeterminate_entries=indeterminate_entries,
+                not_recommended_entries=(
+                    not_recommended_entries
+                ),
+                constraint_excluded_entries=(
+                    constraint_excluded_entries
+                ),
                 selected_entry=selected_entry,
             )
         )

@@ -97,6 +97,21 @@ def evaluate_agent_starter_technical_feasibility(
     ]
 
     if compatibility_assessment is None:
+        if requirement_assessments:
+            return AgentStarterTechnicalFeasibilityAssessment(
+                architecture_id=candidate.architecture_id,
+                goal=candidate.goal,
+                technical_feasibility=TechnicalFeasibility.FEASIBLE,
+                reasons=[
+                    (
+                        "All candidate-specific technical "
+                        "requirements are satisfied by the "
+                        "available evidence."
+                    ),
+                ],
+                supporting_evidence=satisfied_evidence,
+            )
+
         return AgentStarterTechnicalFeasibilityAssessment(
             architecture_id=candidate.architecture_id,
             goal=candidate.goal,

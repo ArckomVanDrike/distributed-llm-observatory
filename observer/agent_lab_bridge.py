@@ -35,6 +35,17 @@ from observer.core.agent_lab_run_history import (
 from observer.core.agent_lab_temporal_comparison import (
     compare_temporal_agent_observations,
 )
+from observer.core.agent_starter_catalog_bank import (
+    AgentStarterCatalogBank,
+    AgentStarterCatalogBankError,
+)
+from observer.core.agent_starter_questionnaire import (
+    build_agent_starter_question_set,
+)
+from observer.core.agent_starter_unified_pipeline import (
+    run_agent_starter_unified_pipeline,
+)
+from schemas.agent_starter import AgentStarterIntake
 
 
 @dataclass(frozen=True)
@@ -42,6 +53,9 @@ class AgentLabBridgeConfig:
     observer_id: str
     region_code: str
     history_root: Path
+    catalog_root: Path = Path(
+        "catalog/agent-starter"
+    )
 
 
 RunnerFactory = Callable[
@@ -84,6 +98,13 @@ def make_handler(
                 )
                 return
 
+            if (
+                parsed.path
+                == "/v1/agent-starter/runtime-options"
+            ):
+                self._handle_agent_starter_runtime_options()
+                return
+
             if parsed.path == "/v1/agent-tests":
                 self._handle_agent_test_history()
                 return
@@ -113,6 +134,20 @@ def make_handler(
 
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
+
+            if (
+                parsed.path
+                == "/v1/agent-starter/questions"
+            ):
+                self._handle_agent_starter_questions()
+                return
+
+            if (
+                parsed.path
+                == "/v1/agent-starter/recommend"
+            ):
+                self._handle_agent_starter_recommendation()
+                return
 
             if parsed.path == "/v1/agent-tests":
                 self._handle_agent_test()
@@ -191,6 +226,131 @@ def make_handler(
                 )
 
             return payload
+
+        def _handle_agent_starter_questions(
+            self,
+        ) -> None:
+            try:
+                payload = self._read_json_body()
+
+                intake = (
+                    AgentStarterIntake.model_validate(
+                        payload
+                    )
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            question_set = (
+                build_agent_starter_question_set(
+                    intake
+                )
+            )
+
+            self._send_json(
+                200,
+                question_set.model_dump(
+                    mode="json",
+                ),
+            )
+
+        def _handle_agent_starter_runtime_options(
+            self,
+        ) -> None:
+            try:
+                snapshot = AgentStarterCatalogBank(
+                    root=config.catalog_root,
+                ).load_snapshot(
+                    "catalog-v0-2.json",
+                )
+            except AgentStarterCatalogBankError as exc:
+                self._send_json(
+                    500,
+                    {
+                        "error": "catalog_unavailable",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            runtimes = sorted(
+                {
+                    runtime
+                    for entry in snapshot.entries
+                    for runtime in entry.supported_runtimes
+                }
+            )
+
+            self._send_json(
+                200,
+                {
+                    "schema_version": "0.1",
+                    "catalog_snapshot_id": (
+                        snapshot.snapshot_id
+                    ),
+                    "runtimes": runtimes,
+                },
+            )
+
+        def _handle_agent_starter_recommendation(
+            self,
+        ) -> None:
+            try:
+                payload = self._read_json_body()
+
+                intake = (
+                    AgentStarterIntake.model_validate(
+                        payload
+                    )
+                )
+
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "error": "bad_request",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            try:
+                snapshot = AgentStarterCatalogBank(
+                    root=config.catalog_root,
+                ).load_snapshot(
+                    "catalog-v0-2.json",
+                )
+            except AgentStarterCatalogBankError as exc:
+                self._send_json(
+                    500,
+                    {
+                        "error": "catalog_unavailable",
+                        "message": str(exc),
+                    },
+                )
+                return
+
+            report = (
+                run_agent_starter_unified_pipeline(
+                    intake=intake,
+                    catalog_snapshot=snapshot,
+                )
+            )
+
+            self._send_json(
+                200,
+                report.model_dump(
+                    mode="json",
+                ),
+            )
 
         def _handle_agent_test_history(
             self,

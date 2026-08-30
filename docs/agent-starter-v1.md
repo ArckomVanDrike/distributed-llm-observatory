@@ -2,13 +2,13 @@
 
 ## Status
 
-Design specification.
+Implemented v1 specification.
 
 This document defines the functional and decision-making contract for
-Agent Starter v1 before implementation.
+the implemented Agent Starter v1 workflow.
 
-Agent Starter must remain deterministic, explainable, evidence-aware,
-and separate technical feasibility from product recommendation.
+Agent Starter remains deterministic, explainable, evidence-aware,
+and separates technical feasibility from product recommendation.
 
 ---
 

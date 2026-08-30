@@ -5,6 +5,29 @@ import {
 } from './app-view'
 
 import {
+  fetchAgentStarterQuestions,
+  fetchAgentStarterRecommendation,
+  fetchAgentStarterRuntimeOptions,
+  isAgentStarterGoal,
+} from './agent-starter-bridge'
+
+import type {
+  AgentStarterEvidenceInput,
+  AgentStarterGoal,
+  AgentStarterQuestionSet,
+  AgentStarterRecommendation,
+} from './agent-starter-bridge'
+
+import {
+  createAgentStarterEnvironmentDraft,
+} from './agent-starter-page'
+
+import type {
+  AgentStarterEnvironmentDraft,
+  AgentStarterPageState,
+} from './agent-starter-page'
+
+import {
   executeAgentTest,
 } from './agent-test-flow'
 
@@ -115,6 +138,32 @@ let agentTestResult:
   AgentTestBridgeResponse | null = null
 
 let agentTestError: string | null = null
+
+let agentStarterState: AgentStarterPageState =
+  'landing'
+
+let agentStarterGoal: AgentStarterGoal | null =
+  null
+
+let agentStarterEvidence:
+  AgentStarterEvidenceInput[] = []
+
+let agentStarterQuestionSet:
+  AgentStarterQuestionSet | null = null
+
+let agentStarterError: string | null = null
+
+let agentStarterEnvironment:
+  AgentStarterEnvironmentDraft =
+    createAgentStarterEnvironmentDraft()
+
+let agentStarterRecommendation:
+  AgentStarterRecommendation | null = null
+
+let agentStarterRuntimeOptions: string[] = []
+let agentStarterRuntimeOptionsError:
+  string | null = null
+let agentStarterRuntimeOptionsLoaded = false
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
@@ -553,6 +602,18 @@ function render(): void {
           observatoryGeographicMaxSkewInput,
         error: observatoryError,
       },
+      agentStarter: {
+        state: agentStarterState,
+        goal: agentStarterGoal,
+        evidence: agentStarterEvidence,
+        questionSet: agentStarterQuestionSet,
+        error: agentStarterError,
+        environment: agentStarterEnvironment,
+        recommendation: agentStarterRecommendation,
+        runtimeOptions: agentStarterRuntimeOptions,
+        runtimeOptionsError:
+          agentStarterRuntimeOptionsError,
+      },
       agentTest: {
         state: agentTestState,
         baseUrl: agentBaseUrl,
@@ -575,6 +636,10 @@ function render(): void {
 
   if (route === 'agent-lab-test') {
     bindAgentTestEvents()
+  }
+
+  if (route === 'agent-lab-starter') {
+    bindAgentStarterEvents()
   }
 
   if (route === 'observatory') {
@@ -730,6 +795,507 @@ async function refreshAgentTestHistory(): Promise<void> {
   }
 
   render()
+}
+
+
+async function ensureAgentStarterRuntimeOptions():
+  Promise<void> {
+  if (agentStarterRuntimeOptionsLoaded) {
+    return
+  }
+
+  try {
+    const result =
+      await fetchAgentStarterRuntimeOptions(
+        (request) => fetch(request),
+      )
+
+    agentStarterRuntimeOptions =
+      result.runtimes
+
+    agentStarterRuntimeOptionsError = null
+    agentStarterRuntimeOptionsLoaded = true
+  } catch (error) {
+    agentStarterRuntimeOptions = []
+    agentStarterRuntimeOptionsError =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load runtime options.'
+  }
+}
+
+
+async function refreshAgentStarterQuestions(): Promise<void> {
+  if (agentStarterGoal === null) {
+    return
+  }
+
+  const goal = agentStarterGoal
+
+  agentStarterState = 'loading'
+  agentStarterQuestionSet = null
+  agentStarterError = null
+
+  render()
+
+  try {
+    const questionSet =
+      await fetchAgentStarterQuestions(
+        (
+          request,
+          init,
+        ) => fetch(request, init),
+        {
+          goal,
+          evidence: agentStarterEvidence,
+          hardware_profile: null,
+          execution_environment: null,
+        },
+      )
+
+    agentStarterQuestionSet = questionSet
+
+    if (questionSet.questions.length === 0) {
+      agentStarterState = 'complete'
+      await ensureAgentStarterRuntimeOptions()
+    } else {
+      agentStarterState = 'question'
+    }
+  } catch (error) {
+    agentStarterQuestionSet = null
+    agentStarterState = 'error'
+    agentStarterError =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load Agent Starter questions.'
+  }
+
+  render()
+}
+
+
+function resetAgentStarter(): void {
+  agentStarterState = 'landing'
+  agentStarterGoal = null
+  agentStarterEvidence = []
+  agentStarterQuestionSet = null
+  agentStarterError = null
+  agentStarterEnvironment =
+    createAgentStarterEnvironmentDraft()
+  agentStarterRecommendation = null
+
+  render()
+}
+
+
+function isAgentStarterDeviceClass(
+  value: string,
+): value is AgentStarterEnvironmentDraft['deviceClass'] {
+  return (
+    value === 'desktop'
+    || value === 'laptop'
+    || value === 'phone'
+    || value === 'tablet'
+    || value === 'unknown'
+  )
+}
+
+
+function isAgentStarterPlatform(
+  value: string,
+): value is AgentStarterEnvironmentDraft['platform'] {
+  return (
+    value === 'linux'
+    || value === 'windows'
+    || value === 'macos'
+    || value === 'android'
+    || value === 'ios'
+    || value === 'unknown'
+  )
+}
+
+
+function isAgentStarterInterface(
+  value: string,
+): value is AgentStarterEnvironmentDraft['interface'] {
+  return (
+    value === 'native'
+    || value === 'browser'
+    || value === 'unknown'
+  )
+}
+
+
+async function requestAgentStarterRecommendation():
+  Promise<void> {
+  if (agentStarterGoal === null) {
+    return
+  }
+
+  const memoryText =
+    agentStarterEnvironment.memoryGiB.trim()
+
+  let totalMemoryBytes: number | null = null
+
+  if (memoryText.length > 0) {
+    const memoryGiB = Number(memoryText)
+
+    if (
+      !Number.isFinite(memoryGiB)
+      || memoryGiB <= 0
+    ) {
+      agentStarterState = 'complete'
+      agentStarterError =
+        'Memory must be a positive number of GiB.'
+      render()
+      return
+    }
+
+    totalMemoryBytes =
+      Math.round(
+        memoryGiB * 1024 ** 3,
+      )
+  }
+
+  const runtimes =
+    agentStarterEnvironment.runtimes
+
+  const hardwareLimitations: string[] = []
+
+  if (totalMemoryBytes === null) {
+    hardwareLimitations.push(
+      'Total memory was not provided.',
+    )
+  }
+
+  const environmentLimitations: string[] = []
+
+  if (runtimes === null) {
+    environmentLimitations.push(
+      'Runtime inventory was not provided.',
+    )
+  }
+
+  if (
+    agentStarterEnvironment.interface === 'browser'
+  ) {
+    environmentLimitations.push(
+      'Browser access may not expose the complete execution environment.',
+    )
+  }
+
+  agentStarterState = 'recommending'
+  agentStarterError = null
+  agentStarterRecommendation = null
+
+  render()
+
+  try {
+    agentStarterRecommendation =
+      await fetchAgentStarterRecommendation(
+        (
+          request,
+          init,
+        ) => fetch(request, init),
+        {
+          goal: agentStarterGoal,
+          evidence: agentStarterEvidence,
+          hardware_profile: {
+            device_class:
+              agentStarterEnvironment.deviceClass,
+            source: 'manual',
+            total_memory_bytes:
+              totalMemoryBytes,
+            limitations:
+              hardwareLimitations,
+          },
+          execution_environment: {
+            platform:
+              agentStarterEnvironment.platform,
+            interface:
+              agentStarterEnvironment.interface,
+            available_runtimes:
+              runtimes,
+            accelerator_access: 'unknown',
+            filesystem_access: 'unknown',
+            limitations:
+              environmentLimitations,
+          },
+        },
+      )
+
+    agentStarterState = 'result'
+    agentStarterError = null
+  } catch (error) {
+    agentStarterRecommendation = null
+    agentStarterState = 'complete'
+    agentStarterError =
+      error instanceof Error
+        ? error.message
+        : (
+            'Unable to generate '
+            + 'Agent Starter recommendation.'
+          )
+  }
+
+  render()
+}
+
+
+function bindAgentStarterEvents(): void {
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-goal]',
+    )
+    .forEach((goalButton) => {
+      goalButton.addEventListener(
+        'click',
+        () => {
+          const goal =
+            goalButton.dataset.agentStarterGoal
+
+          if (
+            goal === undefined
+            || !isAgentStarterGoal(goal)
+          ) {
+            return
+          }
+
+          agentStarterGoal = goal
+          agentStarterEvidence = []
+          agentStarterQuestionSet = null
+          agentStarterError = null
+          agentStarterEnvironment =
+            createAgentStarterEnvironmentDraft()
+          agentStarterRecommendation = null
+
+          void refreshAgentStarterQuestions()
+        },
+      )
+    })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-answer]',
+    )
+    .forEach((answerButton) => {
+      answerButton.addEventListener(
+        'click',
+        () => {
+          const answer =
+            answerButton.dataset.agentStarterAnswer
+
+          const key =
+            answerButton.dataset.agentStarterQuestionKey
+
+          const currentQuestion =
+            agentStarterQuestionSet
+              ?.questions[0]
+
+          if (
+            key === undefined
+            || currentQuestion === undefined
+            || key !== currentQuestion.key
+          ) {
+            return
+          }
+
+          let evidence:
+            AgentStarterEvidenceInput
+
+          if (answer === 'unknown') {
+            evidence = {
+              key,
+              source: 'unknown',
+              value: null,
+              reason:
+                'User indicated that this information is unknown.',
+            }
+          } else if (
+            answer === 'true'
+            || answer === 'false'
+          ) {
+            evidence = {
+              key,
+              source: 'declared',
+              value: answer === 'true',
+            }
+          } else {
+            return
+          }
+
+          agentStarterEvidence = [
+            ...agentStarterEvidence,
+            evidence,
+          ]
+
+          agentStarterQuestionSet = null
+          agentStarterError = null
+
+          void refreshAgentStarterQuestions()
+        },
+      )
+    })
+
+  document
+    .querySelector<HTMLButtonElement>(
+      '#generate-agent-starter-recommendation',
+    )
+    ?.addEventListener(
+      'click',
+      () => {
+        const deviceClass =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-device-class',
+          )
+
+        const platform =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-platform',
+          )
+
+        const executionInterface =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-interface',
+          )
+
+        const memory =
+          document.querySelector<HTMLInputElement>(
+            '#agent-starter-memory-gib',
+          )
+
+        if (
+          deviceClass === null
+          || platform === null
+          || executionInterface === null
+          || memory === null
+        ) {
+          return
+        }
+
+        if (
+          !isAgentStarterDeviceClass(
+            deviceClass.value,
+          )
+          || !isAgentStarterPlatform(
+            platform.value,
+          )
+          || !isAgentStarterInterface(
+            executionInterface.value,
+          )
+        ) {
+          agentStarterError =
+            'Invalid execution environment selection.'
+          agentStarterState = 'complete'
+          render()
+          return
+        }
+
+        agentStarterEnvironment = {
+          deviceClass: deviceClass.value,
+          platform: platform.value,
+          interface:
+            executionInterface.value,
+          memoryGiB: memory.value,
+          runtimes:
+            agentStarterEnvironment.runtimes,
+        }
+
+        void requestAgentStarterRecommendation()
+      },
+    )
+
+  const runtimeButtons =
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-runtime]',
+    )
+
+  const refreshRuntimeButtons = (): void => {
+    runtimeButtons.forEach((button) => {
+      const runtime =
+        button.dataset.agentStarterRuntime
+
+      let selected = false
+
+      if (runtime === '__unknown__') {
+        selected =
+          agentStarterEnvironment.runtimes === null
+      } else if (runtime === '__none__') {
+        selected =
+          agentStarterEnvironment.runtimes !== null
+          && agentStarterEnvironment.runtimes.length === 0
+      } else if (runtime !== undefined) {
+        selected =
+          agentStarterEnvironment.runtimes
+            ?.includes(runtime)
+          ?? false
+      }
+
+      button.classList.toggle(
+        'is-selected',
+        selected,
+      )
+
+      button.setAttribute(
+        'aria-pressed',
+        String(selected),
+      )
+    })
+  }
+
+  runtimeButtons.forEach((button) => {
+    button.addEventListener(
+      'click',
+      () => {
+        const runtime =
+          button.dataset.agentStarterRuntime
+
+        if (runtime === undefined) {
+          return
+        }
+
+        if (runtime === '__unknown__') {
+          agentStarterEnvironment.runtimes = null
+        } else if (runtime === '__none__') {
+          agentStarterEnvironment.runtimes = []
+        } else {
+          const current =
+            agentStarterEnvironment.runtimes
+            ?? []
+
+          if (current.includes(runtime)) {
+            const next =
+              current.filter(
+                (item) => item !== runtime,
+              )
+
+            agentStarterEnvironment.runtimes =
+              next.length === 0
+                ? null
+                : next
+          } else {
+            agentStarterEnvironment.runtimes = [
+              ...current,
+              runtime,
+            ]
+          }
+        }
+
+        refreshRuntimeButtons()
+      },
+    )
+  })
+
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      '[data-agent-starter-change-goal]',
+    )
+    .forEach((button) => {
+      button.addEventListener(
+        'click',
+        resetAgentStarter,
+      )
+    })
 }
 
 

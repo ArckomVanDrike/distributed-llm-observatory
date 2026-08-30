@@ -167,3 +167,157 @@ def test_concrete_stack_pipeline_resolves_and_classifies_candidates():
         .selected_entry
         is None
     )
+
+
+def test_concrete_stack_pipeline_preserves_paid_external_service_classification():
+    from observer.core.agent_starter_catalog_pipeline import (
+        run_agent_starter_catalog_matching,
+    )
+    from observer.core.agent_starter_concrete_stack_pipeline import (
+        run_agent_starter_concrete_stack_pipeline,
+    )
+    from schemas.agent_starter import (
+        AgentStarterRequirement,
+        ConstraintStrength,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogSnapshot,
+    )
+
+    assessment = _assessment(
+        "local-coding-agent",
+        RecommendationVerdict.RECOMMENDED,
+    )
+
+    constraint_evidence = AgentStarterEvidence(
+        key="paid_external_services_allowed",
+        source=EvidenceSource.DECLARED,
+        value=False,
+    )
+
+    plan = AgentStarterPlan(
+        goal=AgentStarterGoal.CODING,
+        requirements=[
+            AgentStarterRequirement(
+                key="paid_external_services_allowed",
+                value=False,
+                strength=ConstraintStrength.HARD,
+                evidence=[
+                    constraint_evidence,
+                ],
+            ),
+        ],
+        candidate_assessments=[
+            assessment,
+        ],
+    )
+
+    def catalog_entry(
+        identifier: str,
+        *,
+        pricing: str,
+    ) -> AgentStarterCatalogEntry:
+        return AgentStarterCatalogEntry.model_validate(
+            {
+                "schema_version": "0.2",
+                "identifier": identifier,
+                "component_type": "llm",
+                "vendor": "Example Vendor",
+                "family": "Example",
+                "version": "1.0",
+                "capabilities": [
+                    "coding",
+                ],
+                "deployment_modes": [
+                    "remote",
+                ],
+                "license": "example-license",
+                "pricing_class": "free",
+                "access_options": [
+                    {
+                        "deployment_mode": "remote",
+                        "access_kind": "external_service",
+                        "pricing": pricing,
+                    },
+                ],
+                "sources": [
+                    f"https://example.invalid/{identifier}",
+                ],
+                "verified_at": datetime(
+                    2026,
+                    8,
+                    29,
+                    tzinfo=timezone.utc,
+                ),
+            }
+        )
+
+    free_service = catalog_entry(
+        "free-service",
+        pricing="free",
+    )
+    unknown_service = catalog_entry(
+        "unknown-service",
+        pricing="provider_dependent",
+    )
+    paid_service = catalog_entry(
+        "paid-service",
+        pricing="usage_based",
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        schema_version="0.2",
+        snapshot_id="catalog-v0-2-cost-test",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            tzinfo=timezone.utc,
+        ),
+        entries=[
+            free_service,
+            unknown_service,
+            paid_service,
+        ],
+    )
+
+    catalog_result = run_agent_starter_catalog_matching(
+        plan=plan,
+        snapshot=snapshot,
+    )
+
+    classification = (
+        run_agent_starter_concrete_stack_pipeline(
+            catalog_result
+        )
+    )
+
+    component = (
+        classification
+        .resolution
+        .stacks[0]
+        .components[0]
+    )
+
+    assert [
+        entry.identifier
+        for entry in component.matched_entries
+    ] == [
+        "free-service",
+    ]
+
+    assert [
+        entry.identifier
+        for entry in component.indeterminate_entries
+    ] == [
+        "unknown-service",
+    ]
+
+    assert [
+        entry.identifier
+        for entry in component.constraint_excluded_entries
+    ] == [
+        "paid-service",
+    ]
+
+    assert component.selected_entry == free_service

@@ -67,21 +67,27 @@ export function renderAgentLabPage(): string {
         <article class="agent-lab-workflow-card">
           <div>
             <p class="section-label">
-              In development
+              Core v1 complete
             </p>
 
             <h2>Agent Starter</h2>
 
             <p>
-              Profile the capabilities of your device
-              and understand what kind of local agent
-              stack it can reasonably support.
+              Turn goals, constraints, hardware evidence,
+              and explicit preferences into evidence-backed
+              agent architecture and stack recommendations.
+            </p>
+
+            <p>
+              Public browser workflow available.
             </p>
 
             <ul>
-              <li>Hardware and capability profiling</li>
-              <li>Desktop and mobile-aware guidance</li>
-              <li>Agent stack recommendations</li>
+              <li>Adaptive guidance across five goals</li>
+              <li>Hard constraints and soft preferences</li>
+              <li>Technical feasibility assessment</li>
+              <li>Concrete stack recommendations</li>
+              <li>Why / Why Not evidence</li>
             </ul>
           </div>
 

@@ -49,6 +49,9 @@ def build_agent_starter_concrete_stacks(
                 goal=catalog_result.plan.goal,
                 assessment=assessment,
                 architecture_result=architecture_result,
+                plan_requirements=list(
+                    catalog_result.plan.requirements
+                ),
             )
         )
 

@@ -225,3 +225,142 @@ def test_concrete_stack_records_architecture_snapshot_and_components():
         == "agent-starter-catalog-v0-1"
     )
     assert stack.components == [component]
+
+
+def test_concrete_stack_component_preserves_non_matching_result_classes():
+    from schemas.agent_starter_stack import (
+        AgentStarterConcreteStackComponent,
+    )
+
+    indeterminate = _concrete_stack_catalog_entry(
+        "unknown-cost-model"
+    )
+    excluded = _concrete_stack_catalog_entry(
+        "paid-service-model"
+    )
+
+    component = AgentStarterConcreteStackComponent(
+        requirement=_concrete_stack_requirement(),
+        matched_entries=[],
+        indeterminate_entries=[
+            indeterminate,
+        ],
+        constraint_excluded_entries=[
+            excluded,
+        ],
+        selected_entry=None,
+    )
+
+    assert component.matched_entries == []
+    assert component.indeterminate_entries == [
+        indeterminate,
+    ]
+    assert component.constraint_excluded_entries == [
+        excluded,
+    ]
+    assert component.selected_entry is None
+
+
+def test_concrete_stack_component_rejects_matched_indeterminate_overlap():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_stack import (
+        AgentStarterConcreteStackComponent,
+    )
+
+    entry = _concrete_stack_catalog_entry(
+        "duplicate-model"
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterConcreteStackComponent(
+            requirement=_concrete_stack_requirement(),
+            matched_entries=[
+                entry,
+            ],
+            indeterminate_entries=[
+                entry,
+            ],
+            selected_entry=None,
+        )
+
+
+def test_concrete_stack_component_rejects_indeterminate_excluded_overlap():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_stack import (
+        AgentStarterConcreteStackComponent,
+    )
+
+    entry = _concrete_stack_catalog_entry(
+        "duplicate-model"
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterConcreteStackComponent(
+            requirement=_concrete_stack_requirement(),
+            matched_entries=[],
+            indeterminate_entries=[
+                entry,
+            ],
+            constraint_excluded_entries=[
+                entry,
+            ],
+            selected_entry=None,
+        )
+
+
+def test_concrete_stack_component_preserves_hardware_compatibility_classes():
+    from schemas.agent_starter_stack import (
+        AgentStarterConcreteStackComponent,
+    )
+
+    constrained = _concrete_stack_catalog_entry(
+        "constrained-model"
+    )
+    not_recommended = _concrete_stack_catalog_entry(
+        "not-recommended-model"
+    )
+
+    component = AgentStarterConcreteStackComponent(
+        requirement=_concrete_stack_requirement(),
+        matched_entries=[],
+        constrained_entries=[constrained],
+        not_recommended_entries=[not_recommended],
+        selected_entry=None,
+    )
+
+    assert component.matched_entries == []
+    assert component.constrained_entries == [constrained]
+    assert component.indeterminate_entries == []
+    assert component.not_recommended_entries == [
+        not_recommended,
+    ]
+    assert component.constraint_excluded_entries == []
+    assert component.selected_entry is None
+
+
+def test_concrete_stack_component_rejects_new_result_class_overlap():
+    import pytest
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_stack import (
+        AgentStarterConcreteStackComponent,
+    )
+
+    entry = _concrete_stack_catalog_entry(
+        "duplicate-hardware-result"
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="only one concrete stack result class",
+    ):
+        AgentStarterConcreteStackComponent(
+            requirement=_concrete_stack_requirement(),
+            matched_entries=[entry],
+            constrained_entries=[entry],
+            selected_entry=None,
+        )

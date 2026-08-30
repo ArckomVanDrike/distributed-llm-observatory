@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from schemas.agent_starter_catalog import (
     AgentStarterCatalogComponentType,
     AgentStarterCatalogEntry,
@@ -383,7 +385,7 @@ def test_catalog_query_match_rejects_entries_of_different_component_type():
     with pytest.raises(
         ValidationError,
         match=(
-            "Matched catalog entries must have the "
+            "Catalog query result entries must have the "
             "component type requested by the query"
         ),
     ):
@@ -554,3 +556,543 @@ def test_catalog_entry_retains_extended_recommendation_metadata():
         "it",
     ]
     assert entry.streaming_support is True
+
+
+def _catalog_cost_metadata_payload(
+    **overrides,
+):
+    payload = {
+        "schema_version": "0.1",
+        "identifier": "example-model",
+        "component_type": "llm",
+        "vendor": "Example",
+        "family": "Example",
+        "version": "1.0",
+        "capabilities": [
+            "text_generation",
+        ],
+        "deployment_modes": [
+            "on_device",
+        ],
+        "supported_runtimes": [
+            "ollama",
+        ],
+        "resource_profile": {},
+        "context_characteristics": {},
+        "language_support": [
+            "en",
+        ],
+        "streaming_support": True,
+        "license": "example-license",
+        "pricing_class": "free",
+        "privacy_implications": [],
+        "sources": [
+            "https://example.com/model",
+        ],
+        "verified_at": (
+            "2026-08-29T20:00:00+00:00"
+        ),
+    }
+
+    payload.update(overrides)
+
+    return payload
+
+
+def test_catalog_cost_metadata_is_backward_compatible_with_v0_1():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload()
+    )
+
+    assert entry.schema_version == "0.1"
+    assert entry.release_status.value == "unknown"
+    assert entry.license_cost.value == "unknown"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "unknown",
+    ]
+
+    assert entry.pricing_notes is None
+
+
+def test_catalog_cost_metadata_represents_free_stable_component():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            release_status="stable",
+            license_cost="free",
+            access_pricing=[
+                "free",
+            ],
+            pricing_notes=(
+                "The component can be obtained without "
+                "a paid license or service subscription."
+            ),
+        )
+    )
+
+    assert entry.schema_version == "0.2"
+    assert entry.release_status.value == "stable"
+    assert entry.license_cost.value == "free"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "free",
+    ]
+
+
+def test_catalog_cost_metadata_represents_paid_service_access():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="provider-api-model",
+            deployment_modes=[
+                "remote",
+            ],
+            release_status="stable",
+            license="proprietary",
+            pricing_class="paid",
+            license_cost="paid",
+            access_pricing=[
+                "usage_based",
+            ],
+            pricing_notes=(
+                "Remote access is billed according "
+                "to provider usage."
+            ),
+        )
+    )
+
+    assert entry.license_cost.value == "paid"
+
+    assert [
+        pricing.value
+        for pricing in entry.access_pricing
+    ] == [
+        "usage_based",
+    ]
+
+
+def test_catalog_cost_metadata_represents_experimental_preview():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="experimental-model",
+            release_status="experimental_preview",
+            license_cost="restricted",
+            access_pricing=[
+                "provider_dependent",
+            ],
+            pricing_notes=(
+                "Pricing depends on the selected "
+                "deployment or provider."
+            ),
+        )
+    )
+
+    assert (
+        entry.release_status.value
+        == "experimental_preview"
+    )
+    assert entry.license_cost.value == "restricted"
+
+
+def test_catalog_snapshot_accepts_v0_2_entries():
+    from datetime import datetime, timezone
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogSnapshot,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            release_status="stable",
+            license_cost="free",
+            access_pricing=[
+                "free",
+            ],
+        )
+    )
+
+    snapshot = AgentStarterCatalogSnapshot(
+        schema_version="0.2",
+        snapshot_id="agent-starter-catalog-v0-2",
+        generated_at=datetime(
+            2026,
+            8,
+            29,
+            20,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        entries=[
+            entry,
+        ],
+    )
+
+    assert snapshot.schema_version == "0.2"
+    assert snapshot.entries == [
+        entry,
+    ]
+
+
+def test_catalog_v0_2_pairs_deployment_and_access_pricing():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+        )
+    )
+
+    assert len(entry.access_options) == 2
+
+    local, hosted = entry.access_options
+
+    assert local.deployment_mode == "on_device"
+    assert local.access_kind.value == "self_hosted"
+    assert local.pricing.value == "free"
+
+    assert hosted.deployment_mode == "remote"
+    assert hosted.access_kind.value == "external_service"
+    assert hosted.pricing.value == "usage_based"
+
+
+def test_catalog_v0_2_represents_remote_self_hosting_separately():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+            ],
+        )
+    )
+
+    option = entry.access_options[0]
+
+    assert option.deployment_mode == "remote"
+    assert option.access_kind.value == "self_hosted"
+    assert option.pricing.value == "free"
+
+
+def test_catalog_v0_2_preserves_provider_dependent_service_access():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "provider_dependent",
+                    "notes": (
+                        "Cost depends on the selected "
+                        "external provider."
+                    ),
+                },
+            ],
+        )
+    )
+
+    option = entry.access_options[0]
+
+    assert option.access_kind.value == "external_service"
+    assert option.pricing.value == "provider_dependent"
+    assert option.notes == (
+        "Cost depends on the selected external provider."
+    )
+
+
+def test_catalog_v0_1_defaults_to_no_structured_access_options():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload()
+    )
+
+    assert entry.schema_version == "0.1"
+    assert entry.access_options == []
+
+
+def test_catalog_query_match_preserves_indeterminate_entries():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="unknown-cost-service",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "unknown",
+                },
+            ],
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="remote-coding-agent",
+        catalog_snapshot_id="catalog-v0-2-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+        indeterminate_entries=[entry],
+    )
+
+    assert match.matched_entries == []
+    assert match.indeterminate_entries == [entry]
+    assert match.constraint_excluded_entries == []
+
+
+def test_catalog_query_match_preserves_constraint_excluded_entries():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            identifier="paid-service",
+            access_options=[
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                },
+            ],
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="remote-coding-agent",
+        catalog_snapshot_id="catalog-v0-2-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+            required_capabilities=["coding"],
+        ),
+        matched_entries=[],
+        constraint_excluded_entries=[entry],
+    )
+
+    assert match.matched_entries == []
+    assert match.indeterminate_entries == []
+    assert match.constraint_excluded_entries == [entry]
+
+
+def test_catalog_query_match_rejects_entry_in_multiple_result_classes():
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="duplicate-result-entry",
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        AgentStarterCatalogQueryMatch(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-test",
+            query=AgentStarterCatalogQuery(
+                component_type=AgentStarterCatalogComponentType.LLM,
+            ),
+            matched_entries=[entry],
+            indeterminate_entries=[entry],
+        )
+
+
+def test_catalog_v0_2_access_options_preserve_path_specific_model_profiles():
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                    "model_profile": {
+                        "model_id": "example-7b-q4",
+                        "parameter_count": 7_000_000_000,
+                        "quantization": "q4",
+                        "runtime": "llama.cpp",
+                        "execution_location": "on_device",
+                    },
+                },
+                {
+                    "deployment_mode": "remote",
+                    "access_kind": "external_service",
+                    "pricing": "usage_based",
+                    "model_profile": {
+                        "model_id": "example-remote",
+                        "execution_location": "remote",
+                    },
+                },
+            ],
+        )
+    )
+
+    local, remote = entry.access_options
+
+    assert local.model_profile is not None
+    assert local.model_profile.model_id == "example-7b-q4"
+    assert local.model_profile.parameter_count == 7_000_000_000
+    assert local.model_profile.quantization == "q4"
+    assert (
+        local.model_profile.execution_location
+        is ExecutionLocation.ON_DEVICE
+    )
+
+    assert remote.model_profile is not None
+    assert remote.model_profile.model_id == "example-remote"
+    assert (
+        remote.model_profile.execution_location
+        is ExecutionLocation.REMOTE
+    )
+
+
+def test_catalog_v0_2_access_option_allows_unknown_model_profile():
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            schema_version="0.2",
+            access_options=[
+                {
+                    "deployment_mode": "on_device",
+                    "access_kind": "self_hosted",
+                    "pricing": "free",
+                },
+            ],
+        )
+    )
+
+    assert entry.access_options[0].model_profile is None
+
+
+def test_catalog_query_match_preserves_hardware_compatibility_classes():
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    constrained = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="constrained-model",
+        )
+    )
+    not_recommended = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="not-recommended-model",
+        )
+    )
+
+    match = AgentStarterCatalogQueryMatch(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-test",
+        query=AgentStarterCatalogQuery(
+            component_type=AgentStarterCatalogComponentType.LLM,
+        ),
+        constrained_entries=[constrained],
+        not_recommended_entries=[not_recommended],
+    )
+
+    assert match.matched_entries == []
+    assert match.constrained_entries == [constrained]
+    assert match.indeterminate_entries == []
+    assert match.not_recommended_entries == [
+        not_recommended,
+    ]
+    assert match.constraint_excluded_entries == []
+
+
+def test_catalog_query_match_rejects_new_result_class_overlap():
+    from pydantic import ValidationError
+
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    entry = AgentStarterCatalogEntry.model_validate(
+        _catalog_cost_metadata_payload(
+            identifier="duplicate-hardware-result",
+        )
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="only one query result class",
+    ):
+        AgentStarterCatalogQueryMatch(
+            architecture_id="local-coding-agent",
+            catalog_snapshot_id="catalog-test",
+            query=AgentStarterCatalogQuery(
+                component_type=AgentStarterCatalogComponentType.LLM,
+            ),
+            constrained_entries=[entry],
+            not_recommended_entries=[entry],
+        )

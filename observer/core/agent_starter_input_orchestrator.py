@@ -16,6 +16,7 @@ _HARD_REQUIREMENT_KEYS = (
     "raw_audio_must_stay_local",
     "transcript_must_stay_local",
     "offline_required",
+    "free_components_only",
 )
 
 _SOFT_PREFERENCE_KEYS = (
@@ -35,6 +36,22 @@ def _declared_true_evidence(
             evidence.key == key
             and evidence.source is EvidenceSource.DECLARED
             and evidence.value is True
+        )
+    ]
+
+
+def _declared_false_evidence(
+    intake: AgentStarterIntake,
+    *,
+    key: str,
+) -> list[AgentStarterEvidence]:
+    return [
+        evidence
+        for evidence in intake.evidence
+        if (
+            evidence.key == key
+            and evidence.source is EvidenceSource.DECLARED
+            and evidence.value is False
         )
     ]
 
@@ -59,6 +76,21 @@ def derive_agent_starter_requirements(
                 value=True,
                 strength=ConstraintStrength.HARD,
                 evidence=supporting_evidence,
+            )
+        )
+
+    paid_services_disallowed = _declared_false_evidence(
+        intake,
+        key="paid_external_services_allowed",
+    )
+
+    if paid_services_disallowed:
+        requirements.append(
+            AgentStarterRequirement(
+                key="paid_external_services_allowed",
+                value=False,
+                strength=ConstraintStrength.HARD,
+                evidence=paid_services_disallowed,
             )
         )
 
@@ -437,4 +469,5 @@ def prepare_agent_starter_input(
         evidence=build_agent_starter_user_evidence(intake),
         requirements=derive_agent_starter_requirements(intake),
         hardware_profile=intake.hardware_profile,
+        execution_environment=intake.execution_environment,
     )

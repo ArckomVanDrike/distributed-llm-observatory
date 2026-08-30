@@ -364,3 +364,143 @@ def test_concrete_stack_builder_composes_voice_stt_and_tts_components():
         "stt-a",
         "tts-a",
     ]
+
+
+def test_concrete_stack_builder_preserves_non_matching_result_classes():
+    from datetime import datetime, timezone
+
+    from observer.core.agent_starter_concrete_stack_builder import (
+        build_agent_starter_concrete_stack,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        CandidateArchitectureAssessment,
+        EvidenceSource,
+        RecommendationConfidence,
+        RecommendationVerdict,
+        TechnicalFeasibility,
+    )
+    from schemas.agent_starter_catalog import (
+        AgentStarterCatalogArchitectureResult,
+        AgentStarterCatalogComponentType,
+        AgentStarterCatalogEntry,
+        AgentStarterCatalogQuery,
+        AgentStarterCatalogQueryMatch,
+    )
+
+    assessment = CandidateArchitectureAssessment(
+        architecture_id="local-coding-agent",
+        technical_feasibility=TechnicalFeasibility.FEASIBLE,
+        recommendation=RecommendationVerdict.RECOMMENDED,
+        confidence=RecommendationConfidence.HIGH,
+        technical_reasons=[
+            "The coding architecture is technically feasible.",
+        ],
+        recommendation_reasons=[
+            "The coding architecture satisfies the requirements.",
+        ],
+        supporting_evidence=[
+            AgentStarterEvidence(
+                key="candidate_uses_llm",
+                source=EvidenceSource.DERIVED,
+                value=True,
+                reason=(
+                    "The coding architecture requires "
+                    "a language model."
+                ),
+            ),
+        ],
+    )
+
+    def entry(identifier: str) -> AgentStarterCatalogEntry:
+        return AgentStarterCatalogEntry(
+            identifier=identifier,
+            component_type=AgentStarterCatalogComponentType.LLM,
+            vendor="Example Vendor",
+            family="Example",
+            version="1.0",
+            capabilities=[
+                "coding",
+            ],
+            license="example-license",
+            pricing_class="free",
+            sources=[
+                f"https://example.invalid/{identifier}",
+            ],
+            verified_at=datetime(
+                2026,
+                8,
+                29,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+    constrained = entry(
+        "constrained-model",
+    )
+    indeterminate = entry(
+        "unknown-cost-model",
+    )
+    not_recommended = entry(
+        "not-recommended-model",
+    )
+    excluded = entry(
+        "paid-service-model",
+    )
+
+    architecture_result = AgentStarterCatalogArchitectureResult(
+        architecture_id="local-coding-agent",
+        catalog_snapshot_id="catalog-v0-2-test",
+        query_matches=[
+            AgentStarterCatalogQueryMatch(
+                architecture_id="local-coding-agent",
+                catalog_snapshot_id="catalog-v0-2-test",
+                query=AgentStarterCatalogQuery(
+                    component_type=(
+                        AgentStarterCatalogComponentType.LLM
+                    ),
+                    required_capabilities=[
+                        "coding",
+                    ],
+                ),
+                matched_entries=[],
+                constrained_entries=[
+                    constrained,
+                ],
+                indeterminate_entries=[
+                    indeterminate,
+                ],
+                not_recommended_entries=[
+                    not_recommended,
+                ],
+                constraint_excluded_entries=[
+                    excluded,
+                ],
+            ),
+        ],
+    )
+
+    stack = build_agent_starter_concrete_stack(
+        goal=AgentStarterGoal.CODING,
+        assessment=assessment,
+        architecture_result=architecture_result,
+    )
+
+    component = stack.components[0]
+
+    assert component.constrained_entries == [
+        constrained,
+    ]
+    assert component.not_recommended_entries == [
+        not_recommended,
+    ]
+
+    assert component.matched_entries == []
+    assert component.indeterminate_entries == [
+        indeterminate,
+    ]
+    assert component.constraint_excluded_entries == [
+        excluded,
+    ]
+    assert component.selected_entry is None

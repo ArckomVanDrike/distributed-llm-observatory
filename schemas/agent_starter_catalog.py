@@ -25,8 +25,51 @@ class AgentStarterCatalogComponentType(str, Enum):
     SUPPORTING_TOOL = "supporting_tool"
 
 
+class AgentStarterCatalogReleaseStatus(str, Enum):
+    STABLE = "stable"
+    PREVIEW = "preview"
+    EXPERIMENTAL_PREVIEW = "experimental_preview"
+    DEPRECATED = "deprecated"
+    UNKNOWN = "unknown"
+
+
+class AgentStarterCatalogLicenseCost(str, Enum):
+    FREE = "free"
+    PAID = "paid"
+    RESTRICTED = "restricted"
+    UNKNOWN = "unknown"
+
+
+class AgentStarterCatalogAccessPricing(str, Enum):
+    FREE = "free"
+    FREEMIUM = "freemium"
+    USAGE_BASED = "usage_based"
+    SUBSCRIPTION = "subscription"
+    ENTERPRISE = "enterprise"
+    PROVIDER_DEPENDENT = "provider_dependent"
+    UNKNOWN = "unknown"
+
+
+class AgentStarterCatalogAccessKind(str, Enum):
+    SELF_HOSTED = "self_hosted"
+    EXTERNAL_SERVICE = "external_service"
+
+
+class AgentStarterCatalogAccessOption(BaseModel):
+    schema_version: Literal["0.2"] = "0.2"
+
+    deployment_mode: str = Field(min_length=1)
+    access_kind: AgentStarterCatalogAccessKind
+    pricing: AgentStarterCatalogAccessPricing
+    model_profile: ModelProfile | None = None
+    notes: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+
 class AgentStarterCatalogEntry(BaseModel):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.1"
 
     identifier: str = Field(min_length=1)
     component_type: AgentStarterCatalogComponentType
@@ -52,6 +95,31 @@ class AgentStarterCatalogEntry(BaseModel):
 
     license: str = Field(min_length=1)
     pricing_class: str = Field(min_length=1)
+
+    release_status: AgentStarterCatalogReleaseStatus = (
+        AgentStarterCatalogReleaseStatus.UNKNOWN
+    )
+    license_cost: AgentStarterCatalogLicenseCost = (
+        AgentStarterCatalogLicenseCost.UNKNOWN
+    )
+    access_pricing: list[
+        AgentStarterCatalogAccessPricing
+    ] = Field(
+        default_factory=lambda: [
+            AgentStarterCatalogAccessPricing.UNKNOWN
+        ],
+    )
+    pricing_notes: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    access_options: list[
+        AgentStarterCatalogAccessOption
+    ] = Field(
+        default_factory=list,
+    )
+
     privacy_implications: list[str] = Field(
         default_factory=list,
     )
@@ -76,7 +144,7 @@ class AgentStarterCatalogEntry(BaseModel):
 
 
 class AgentStarterCatalogSnapshot(BaseModel):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.1"
 
     snapshot_id: str = Field(min_length=1)
     generated_at: datetime
@@ -135,22 +203,91 @@ class AgentStarterCatalogQueryMatch(BaseModel):
     architecture_id: str = Field(min_length=1)
     catalog_snapshot_id: str = Field(min_length=1)
     query: AgentStarterCatalogQuery
+
     matched_entries: list[AgentStarterCatalogEntry] = Field(
+        default_factory=list,
+    )
+    constrained_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    indeterminate_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    not_recommended_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    constraint_excluded_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
         default_factory=list,
     )
 
     @model_validator(mode="after")
-    def validate_matched_component_types(
+    def validate_result_component_types(
         self,
     ) -> AgentStarterCatalogQueryMatch:
+        result_entries = [
+            *self.matched_entries,
+            *self.constrained_entries,
+            *self.indeterminate_entries,
+            *self.not_recommended_entries,
+            *self.constraint_excluded_entries,
+        ]
+
         if any(
             entry.component_type is not self.query.component_type
-            for entry in self.matched_entries
+            for entry in result_entries
         ):
             raise ValueError(
-                "Matched catalog entries must have the "
+                "Catalog query result entries must have the "
                 "component type requested by the query."
             )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_result_class_exclusivity(
+        self,
+    ) -> AgentStarterCatalogQueryMatch:
+        result_class_ids = [
+            {
+                entry.identifier
+                for entry in self.matched_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constrained_entries
+            },
+            {
+                entry.identifier
+                for entry in self.indeterminate_entries
+            },
+            {
+                entry.identifier
+                for entry in self.not_recommended_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constraint_excluded_entries
+            },
+        ]
+
+        identifiers_seen: set[str] = set()
+
+        for result_ids in result_class_ids:
+            if identifiers_seen & result_ids:
+                raise ValueError(
+                    "A catalog entry may appear in only one "
+                    "query result class."
+                )
+
+            identifiers_seen.update(result_ids)
 
         return self
 

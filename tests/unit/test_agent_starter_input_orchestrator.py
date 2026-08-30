@@ -1668,3 +1668,148 @@ def test_does_not_derive_non_decision_active_complexity_preference():
     )
 
     assert derive_agent_starter_requirements(intake) == []
+
+
+def test_free_components_only_becomes_hard_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        ConstraintStrength,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="free_components_only",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    requirements = derive_agent_starter_requirements(
+        intake
+    )
+
+    requirement = next(
+        item
+        for item in requirements
+        if item.key == "free_components_only"
+    )
+
+    assert requirement.value is True
+    assert requirement.strength is ConstraintStrength.HARD
+
+
+def test_disallowing_paid_external_services_becomes_hard_requirement():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        ConstraintStrength,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="paid_external_services_allowed",
+                source=EvidenceSource.DECLARED,
+                value=False,
+            ),
+        ],
+    )
+
+    requirements = derive_agent_starter_requirements(
+        intake
+    )
+
+    requirement = next(
+        item
+        for item in requirements
+        if (
+            item.key
+            == "paid_external_services_allowed"
+        )
+    )
+
+    assert requirement.value is False
+    assert requirement.strength is ConstraintStrength.HARD
+
+
+def test_allowing_paid_external_services_does_not_create_constraint():
+    from observer.core.agent_starter_input_orchestrator import (
+        derive_agent_starter_requirements,
+    )
+    from schemas.agent_starter import (
+        AgentStarterEvidence,
+        AgentStarterGoal,
+        AgentStarterIntake,
+        EvidenceSource,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        evidence=[
+            AgentStarterEvidence(
+                key="paid_external_services_allowed",
+                source=EvidenceSource.DECLARED,
+                value=True,
+            ),
+        ],
+    )
+
+    requirements = derive_agent_starter_requirements(
+        intake
+    )
+
+    assert "paid_external_services_allowed" not in {
+        requirement.key
+        for requirement in requirements
+    }
+
+
+def test_prepare_agent_starter_input_preserves_execution_environment():
+    from observer.core.agent_starter_input_orchestrator import (
+        prepare_agent_starter_input,
+    )
+    from schemas.agent_starter import (
+        AgentStarterGoal,
+        AgentStarterIntake,
+    )
+    from schemas.execution_environment import (
+        ExecutionAccessStatus,
+        ExecutionEnvironment,
+        ExecutionInterface,
+        ExecutionPlatform,
+    )
+
+    environment = ExecutionEnvironment(
+        platform=ExecutionPlatform.ANDROID,
+        interface=ExecutionInterface.NATIVE,
+        available_runtimes=[
+            "llama.cpp",
+        ],
+        accelerator_access=ExecutionAccessStatus.LIMITED,
+        filesystem_access=ExecutionAccessStatus.AVAILABLE,
+    )
+
+    intake = AgentStarterIntake(
+        goal=AgentStarterGoal.CODING,
+        execution_environment=environment,
+    )
+
+    prepared = prepare_agent_starter_input(intake)
+
+    assert intake.execution_environment == environment
+    assert prepared.execution_environment == environment

@@ -3,6 +3,14 @@ import {
 } from './agent-lab-page'
 
 import {
+  renderAgentStarterPage,
+} from './agent-starter-page'
+
+import type {
+  AgentStarterPageOptions,
+} from './agent-starter-page'
+
+import {
   renderAgentTestPage,
 } from './agent-test-page'
 
@@ -32,29 +40,8 @@ import type {
 
 export interface AppViewOptions {
   agentTest?: AgentTestPageOptions
+  agentStarter?: AgentStarterPageOptions
   observatory?: ObservatoryPageOptions
-}
-
-function renderAgentStarterPage(): string {
-  return `
-    <main class="agent-starter-page">
-      <section class="hero">
-        <p class="hero-label">Agent Lab</p>
-
-        <h1>Agent Starter</h1>
-
-        <p class="section-label">
-          In development
-        </p>
-
-        <p class="hero-copy">
-          Profile device capabilities and receive
-          practical guidance for building a local
-          agent stack.
-        </p>
-      </section>
-    </main>
-  `
 }
 
 export function renderAppView(
@@ -90,7 +77,9 @@ export function renderAppView(
   if (route === 'agent-lab-starter') {
     return renderAppShell(
       route,
-      renderAgentStarterPage(),
+      renderAgentStarterPage(
+        options.agentStarter,
+      ),
     )
   }
 

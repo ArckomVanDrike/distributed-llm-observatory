@@ -41,7 +41,67 @@ class AgentStarterConcreteStackComponent(BaseModel):
     matched_entries: list[AgentStarterCatalogEntry] = Field(
         default_factory=list,
     )
+    constrained_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    indeterminate_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    not_recommended_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
+    constraint_excluded_entries: list[
+        AgentStarterCatalogEntry
+    ] = Field(
+        default_factory=list,
+    )
     selected_entry: AgentStarterCatalogEntry | None = None
+
+    @model_validator(mode="after")
+    def validate_result_class_exclusivity(
+        self,
+    ) -> AgentStarterConcreteStackComponent:
+        result_class_ids = [
+            {
+                entry.identifier
+                for entry in self.matched_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constrained_entries
+            },
+            {
+                entry.identifier
+                for entry in self.indeterminate_entries
+            },
+            {
+                entry.identifier
+                for entry in self.not_recommended_entries
+            },
+            {
+                entry.identifier
+                for entry in self.constraint_excluded_entries
+            },
+        ]
+
+        identifiers_seen: set[str] = set()
+
+        for result_ids in result_class_ids:
+            if identifiers_seen & result_ids:
+                raise ValueError(
+                    "A catalog entry may appear in only one "
+                    "concrete stack result class."
+                )
+
+            identifiers_seen.update(result_ids)
+
+        return self
 
     @model_validator(mode="after")
     def validate_selected_entry(

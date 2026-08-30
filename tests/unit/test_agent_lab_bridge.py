@@ -2039,3 +2039,393 @@ def test_agent_lab_bridge_accepts_zero_geographic_pair_max_skew(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_returns_coding_starter_questions(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/questions"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "coding",
+                    "evidence": [],
+                    "hardware_profile": None,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert payload["goal"] == "coding"
+
+        assert [
+            question["key"]
+            for question in payload["questions"]
+        ] == [
+            "offline_required",
+            "free_components_only",
+            "paid_external_services_allowed",
+            "source_code_must_stay_local",
+            "prefer_local_execution",
+            "modify_files",
+            "run_tests",
+        ]
+
+        assert all(
+            question["kind"] == "boolean"
+            for question in payload["questions"]
+        )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_omits_answered_starter_question(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/questions"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "coding",
+                    "evidence": [
+                        {
+                            "key": "offline_required",
+                            "source": "declared",
+                            "value": True,
+                        },
+                    ],
+                    "hardware_profile": None,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+
+        assert [
+            question["key"]
+            for question in payload["questions"]
+        ] == [
+            "free_components_only",
+            "paid_external_services_allowed",
+            "source_code_must_stay_local",
+            "prefer_local_execution",
+            "modify_files",
+            "run_tests",
+        ]
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_suppresses_irrelevant_starter_question(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/questions"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "automation",
+                    "evidence": [
+                        {
+                            "key": (
+                                "destructive_or_high_impact_actions"
+                            ),
+                            "source": "declared",
+                            "value": False,
+                        },
+                    ],
+                    "hardware_profile": None,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+
+        assert [
+            question["key"]
+            for question in payload["questions"]
+        ] == [
+            "offline_required",
+            "free_components_only",
+            "paid_external_services_allowed",
+            "workflow_deterministic",
+            "availability_24_7_required",
+        ]
+
+        assert "human_approval_required" not in {
+            question["key"]
+            for question in payload["questions"]
+        }
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_rejects_invalid_starter_intake(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/questions"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "definitely-not-a-goal",
+                    "evidence": [],
+                    "hardware_profile": None,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with pytest.raises(HTTPError) as error:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert error.value.code == 400
+
+        payload = json.loads(
+            error.value.read().decode("utf-8")
+        )
+
+        assert payload["error"] == "bad_request"
+        assert payload["message"]
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_returns_agent_starter_recommendation(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/recommend"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "coding",
+                    "evidence": [
+                        {
+                            "key": (
+                                "source_code_must_stay_local"
+                            ),
+                            "source": "declared",
+                            "value": True,
+                        },
+                        {
+                            "key": "offline_required",
+                            "source": "declared",
+                            "value": False,
+                        },
+                    ],
+                    "hardware_profile": {
+                        "device_class": "laptop",
+                        "source": "manual",
+                        "total_memory_bytes": (
+                            8 * 1024**3
+                        ),
+                    },
+                    "execution_environment": {
+                        "platform": "linux",
+                        "interface": "native",
+                        "available_runtimes": [
+                            "llama.cpp",
+                        ],
+                    },
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+
+        assert (
+            payload["context"]["prepared"]["goal"]
+            == "coding"
+        )
+
+        assert (
+            payload["context"]
+            ["catalog_snapshot"]
+            ["snapshot_id"]
+            == "agent-starter-catalog-v0-2"
+        )
+
+        assert isinstance(
+            payload["candidate_explanations"],
+            list,
+        )
+
+        assert isinstance(
+            payload["recommended_architecture_ids"],
+            list,
+        )
+
+        assert isinstance(
+            payload["alternative_architecture_ids"],
+            list,
+        )
+
+        assert isinstance(
+            payload[
+                "possible_but_not_recommended_architecture_ids"
+            ],
+            list,
+        )
+
+        assert isinstance(
+            payload["not_recommended_architecture_ids"],
+            list,
+        )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_returns_agent_starter_runtime_options(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/runtime-options"
+            ),
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+        assert (
+            payload["catalog_snapshot_id"]
+            == "agent-starter-catalog-v0-2"
+        )
+
+        runtimes = payload["runtimes"]
+
+        assert runtimes == sorted(runtimes)
+        assert len(runtimes) == len(set(runtimes))
+
+        assert "llama.cpp" in runtimes
+        assert "ollama" in runtimes
+        assert "transformers" in runtimes
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

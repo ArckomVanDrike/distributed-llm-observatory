@@ -10,18 +10,25 @@ from schemas.agent_starter_catalog import (
 from schemas.agent_starter_result import (
     AgentStarterCatalogMatchingResult,
 )
+from schemas.execution_environment import ExecutionEnvironment
+from schemas.hardware import HardwareProfile
 
 
 def run_agent_starter_catalog_matching(
     *,
     plan: AgentStarterPlan,
     snapshot: AgentStarterCatalogSnapshot,
+    hardware_profile: HardwareProfile | None = None,
+    execution_environment: ExecutionEnvironment | None = None,
 ) -> AgentStarterCatalogMatchingResult:
     architecture_results = (
         match_agent_starter_candidates_to_catalog(
             goal=plan.goal,
             assessments=list(plan.candidate_assessments),
             snapshot=snapshot,
+            plan_requirements=list(plan.requirements),
+            hardware_profile=hardware_profile,
+            execution_environment=execution_environment,
         )
     )
 

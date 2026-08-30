@@ -8,6 +8,7 @@ from observer.core.agent_starter_stack_requirement_builder import (
 )
 from schemas.agent_starter import (
     AgentStarterGoal,
+    AgentStarterRequirement,
     CandidateArchitectureAssessment,
 )
 from schemas.agent_starter_catalog import (
@@ -19,11 +20,15 @@ def build_agent_starter_catalog_queries(
     *,
     goal: AgentStarterGoal,
     assessment: CandidateArchitectureAssessment,
+    plan_requirements: list[
+        AgentStarterRequirement
+    ] | None = None,
 ) -> list[AgentStarterCatalogQuery]:
     if goal is AgentStarterGoal.CODING:
         requirements = build_agent_starter_stack_requirements(
             goal=goal,
             assessment=assessment,
+            plan_requirements=plan_requirements,
         )
 
         return [
@@ -37,6 +42,7 @@ def build_agent_starter_catalog_queries(
         requirements = build_agent_starter_stack_requirements(
             goal=goal,
             assessment=assessment,
+            plan_requirements=plan_requirements,
         )
 
         return [
@@ -50,6 +56,7 @@ def build_agent_starter_catalog_queries(
         requirements = build_agent_starter_stack_requirements(
             goal=goal,
             assessment=assessment,
+            plan_requirements=plan_requirements,
         )
 
         return [
@@ -63,6 +70,7 @@ def build_agent_starter_catalog_queries(
         requirements = build_agent_starter_stack_requirements(
             goal=goal,
             assessment=assessment,
+            plan_requirements=plan_requirements,
         )
 
         return [
@@ -76,6 +84,7 @@ def build_agent_starter_catalog_queries(
         requirements = build_agent_starter_stack_requirements(
             goal=goal,
             assessment=assessment,
+            plan_requirements=plan_requirements,
         )
 
         return [

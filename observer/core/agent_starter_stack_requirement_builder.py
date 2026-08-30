@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from schemas.agent_starter import (
     AgentStarterGoal,
+    AgentStarterRequirement,
     CandidateArchitectureAssessment,
+    ConstraintStrength,
 )
 from schemas.agent_starter_catalog import (
     AgentStarterCatalogComponentType,
@@ -12,11 +14,33 @@ from schemas.agent_starter_stack import (
 )
 
 
+def _required_pricing_class(
+    plan_requirements: list[AgentStarterRequirement],
+) -> str | None:
+    free_only_required = any(
+        requirement.key == "free_components_only"
+        and requirement.value is True
+        and requirement.strength is ConstraintStrength.HARD
+        for requirement in plan_requirements
+    )
+
+    if free_only_required:
+        return "free"
+
+    return None
+
+
 def build_agent_starter_stack_requirements(
     *,
     goal: AgentStarterGoal,
     assessment: CandidateArchitectureAssessment,
+    plan_requirements: list[
+        AgentStarterRequirement
+    ] | None = None,
 ) -> list[AgentStarterStackRequirement]:
+    required_pricing_class = _required_pricing_class(
+        list(plan_requirements or [])
+    )
     if goal is AgentStarterGoal.AUTOMATION:
         llm_evidence = [
             evidence
@@ -41,6 +65,7 @@ def build_agent_starter_stack_requirements(
                 component_type=(
                     AgentStarterCatalogComponentType.LLM
                 ),
+                required_pricing_class=required_pricing_class,
                 supporting_evidence=[
                     llm_evidence[0],
                 ],
@@ -91,6 +116,7 @@ def build_agent_starter_stack_requirements(
                 component_type=(
                     AgentStarterCatalogComponentType.LLM
                 ),
+                required_pricing_class=required_pricing_class,
                 supporting_evidence=[
                     llm_evidence[0],
                 ],
@@ -176,6 +202,7 @@ def build_agent_starter_stack_requirements(
                 component_type=(
                     AgentStarterCatalogComponentType.STT
                 ),
+                required_pricing_class=required_pricing_class,
                 supporting_evidence=[
                     stt_evidence[0],
                 ],
@@ -188,6 +215,7 @@ def build_agent_starter_stack_requirements(
                 component_type=(
                     AgentStarterCatalogComponentType.TTS
                 ),
+                required_pricing_class=required_pricing_class,
                 supporting_evidence=[
                     tts_evidence[0],
                 ],
@@ -239,6 +267,7 @@ def build_agent_starter_stack_requirements(
                 component_type=(
                     AgentStarterCatalogComponentType.LLM
                 ),
+                required_pricing_class=required_pricing_class,
                 supporting_evidence=[
                     llm_evidence[0],
                 ],
@@ -279,6 +308,7 @@ def build_agent_starter_stack_requirements(
             required_capabilities=[
                 "coding",
             ],
+            required_pricing_class=required_pricing_class,
             supporting_evidence=[
                 llm_evidence[0],
             ],
