@@ -17,6 +17,12 @@ dependencies = [
     "pydantic>=2.0,<3.0",
 ]
 
+[project.urls]
+Homepage = "https://arckomvandrike.github.io/distributed-llm-observatory/"
+Repository = "https://github.com/ArckomVanDrike/distributed-llm-observatory"
+Issues = "https://github.com/ArckomVanDrike/distributed-llm-observatory/issues"
+Documentation = "https://github.com/ArckomVanDrike/distributed-llm-observatory/tree/main/docs"
+
 [project.scripts]
 dllo = "observer.cli:main"
 
