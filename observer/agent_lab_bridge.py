@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -85,10 +86,17 @@ def _default_runner_factory(
 def make_handler(
     config: AgentLabBridgeConfig,
     *,
+    collector_static_root: Path | None = None,
     runner_factory: RunnerFactory = (
         _default_runner_factory
     ),
 ):
+    collector_root = (
+        collector_static_root.resolve()
+        if collector_static_root is not None
+        else None
+    )
+
     class AgentLabBridgeHandler(
         BaseHTTPRequestHandler
     ):
@@ -131,6 +139,22 @@ def make_handler(
             ):
                 self._handle_geographic_observation_pairs(
                     parsed.query
+                )
+                return
+
+            if (
+                parsed.path == "/"
+                and collector_root is not None
+            ):
+                self._send_collector_index()
+                return
+
+            if (
+                parsed.path.startswith("/assets/")
+                and collector_root is not None
+            ):
+                self._send_collector_asset(
+                    parsed.path,
                 )
                 return
 
@@ -1132,6 +1156,102 @@ def make_handler(
                 },
             )
 
+        def _send_collector_asset(
+            self,
+            request_path: str,
+        ) -> None:
+            assert collector_root is not None
+
+            relative_path = request_path.lstrip("/")
+            asset_path = (
+                collector_root
+                / relative_path
+            ).resolve()
+
+            if not asset_path.is_relative_to(
+                collector_root
+            ):
+                self._send_json(
+                    404,
+                    {
+                        "error": "not_found",
+                    },
+                )
+                return
+
+            if not asset_path.is_file():
+                self._send_json(
+                    404,
+                    {
+                        "error": "not_found",
+                    },
+                )
+                return
+
+            try:
+                body = asset_path.read_bytes()
+            except OSError:
+                self._send_json(
+                    404,
+                    {
+                        "error": "not_found",
+                    },
+                )
+                return
+
+            content_type, _ = mimetypes.guess_type(
+                asset_path.name
+            )
+
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                content_type
+                or "application/octet-stream",
+            )
+            self.send_header(
+                "Content-Length",
+                str(len(body)),
+            )
+            self.send_header(
+                "Cache-Control",
+                "no-store",
+            )
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _send_collector_index(self) -> None:
+            assert collector_root is not None
+
+            index_path = collector_root / "index.html"
+
+            try:
+                body = index_path.read_bytes()
+            except OSError:
+                self._send_json(
+                    404,
+                    {
+                        "error": "collector_not_found",
+                    },
+                )
+                return
+
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                "text/html; charset=utf-8",
+            )
+            self.send_header(
+                "Content-Length",
+                str(len(body)),
+            )
+            self.send_header(
+                "Cache-Control",
+                "no-store",
+            )
+            self.end_headers()
+            self.wfile.write(body)
+
         def _send_json(
             self,
             status: int,
@@ -1173,6 +1293,7 @@ def serve(
     *,
     host: str = "127.0.0.1",
     port: int = 8766,
+    collector_static_root: Path | None = None,
 ) -> None:
     if host not in {
         "127.0.0.1",
@@ -1186,7 +1307,10 @@ def serve(
 
     server = ThreadingHTTPServer(
         (host, port),
-        make_handler(config),
+        make_handler(
+            config,
+            collector_static_root=collector_static_root,
+        ),
     )
 
     print(

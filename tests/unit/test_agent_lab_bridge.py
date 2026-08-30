@@ -47,12 +47,17 @@ def make_config(
 
 def run_test_server(
     config: AgentLabBridgeConfig,
+    *,
+    collector_static_root: Path | None = None,
 ):
     from http.server import ThreadingHTTPServer
 
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0),
-        make_handler(config),
+        make_handler(
+            config,
+            collector_static_root=collector_static_root,
+        ),
     )
 
     thread = Thread(
@@ -2472,6 +2477,125 @@ def test_agent_starter_runtime_options_uses_default_packaged_catalog(
         assert len(payload["runtimes"]) == 11
         assert "ollama" in payload["runtimes"]
         assert "transformers" in payload["runtimes"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_serves_collector_index(
+    tmp_path: Path,
+):
+    collector_root = tmp_path / "collector"
+    collector_root.mkdir()
+    (collector_root / "index.html").write_text(
+        "<html><body>DLLO Collector</body></html>"
+    )
+
+    config = make_config(tmp_path)
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/",
+            timeout=2,
+        ) as response:
+            body = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert response.headers["Content-Type"] == (
+            "text/html; charset=utf-8"
+        )
+        assert "DLLO Collector" in body
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_serves_collector_asset(
+    tmp_path: Path,
+):
+    collector_root = tmp_path / "collector"
+    assets_root = collector_root / "assets"
+    assets_root.mkdir(parents=True)
+
+    (collector_root / "index.html").write_text(
+        "<html></html>"
+    )
+    (assets_root / "app.js").write_text(
+        "console.log('dllo')"
+    )
+
+    config = make_config(tmp_path)
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        with urlopen(
+            f"http://{host}:{port}/assets/app.js",
+            timeout=2,
+        ) as response:
+            body = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert "javascript" in (
+            response.headers["Content-Type"]
+        )
+        assert body == "console.log('dllo')"
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_rejects_static_path_traversal(
+    tmp_path: Path,
+):
+    collector_root = tmp_path / "collector"
+    assets_root = collector_root / "assets"
+    assets_root.mkdir(parents=True)
+
+    (collector_root / "index.html").write_text(
+        "<html></html>"
+    )
+
+    secret = tmp_path / "secret.txt"
+    secret.write_text("must-not-be-served")
+
+    config = make_config(tmp_path)
+    server, thread = run_test_server(
+        config,
+        collector_static_root=collector_root,
+    )
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            f"http://{host}:{port}"
+            "/assets/../../secret.txt"
+        )
+
+        with pytest.raises(HTTPError) as exc_info:
+            urlopen(
+                request,
+                timeout=2,
+            )
+
+        assert exc_info.value.code == 404
+
     finally:
         server.shutdown()
         server.server_close()
