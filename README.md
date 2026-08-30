@@ -411,38 +411,44 @@ Compatibility is evaluated before workloads requiring unavailable capabilities a
 
 DLLO requires **Python 3.10+**.
 
-Clone the repository:
+### Install the Python package
+
+Install DLLO from PyPI:
+
+```bash
+pip install distributed-llm-observatory
+```
+
+Verify the installation:
+
+```bash
+dllo --help
+```
+
+This installs the DLLO Python package and command-line interface.
+
+The prebuilt browser Public Preview is distributed separately through the GitHub release bundle.
+
+### Development setup
+
+To contribute to DLLO or run the repository version:
 
 ```bash
 git clone https://github.com/ArckomVanDrike/distributed-llm-observatory.git
 cd distributed-llm-observatory
-```
 
-Create and activate a virtual environment:
-
-```bash
 python -m venv .venv
 source .venv/bin/activate
-```
 
-Install DLLO and development dependencies:
-
-```bash
 pip install -e ".[dev]"
 ```
 
-Run the test suite:
+Run validation:
 
 ```bash
 pytest -q
-```
-
-Run Ruff:
-
-```bash
 ruff check .
 ```
-
 
 ### Browser Public Preview
 
@@ -461,7 +467,7 @@ python -m observer.cli agent-lab-bridge \
 
 The bridge listens on `127.0.0.1:8766` by default.
 
-In a second terminal, install the browser dependencies and start the development server:
+In a second terminal:
 
 ```bash
 cd web/collector
@@ -474,8 +480,6 @@ Then open:
 ```text
 http://127.0.0.1:5173/#/agent-lab/starter
 ```
-
-The browser workflow exposes Agent Starter through the local bridge, including adaptive questioning, environment evidence, catalog-backed runtime selection, architecture assessment, and concrete stack recommendations.
 
 To verify the browser-side implementation:
 
