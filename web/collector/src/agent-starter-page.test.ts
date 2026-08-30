@@ -137,3 +137,118 @@ describe('renderAgentStarterPage', () => {
     )
   })
 })
+
+
+it('renders the execution environment step after requirements', () => {
+  const html = renderAgentStarterPage({
+    state: 'complete',
+    goal: 'coding',
+    evidence: [],
+    questionSet: {
+      schema_version: '0.1',
+      goal: 'coding',
+      questions: [],
+    },
+    error: null,
+    environment: {
+      deviceClass: 'laptop',
+      platform: 'linux',
+      interface: 'native',
+      memoryGiB: '16',
+      runtimes: 'llama.cpp',
+    },
+    recommendation: null,
+  })
+
+  expect(html).toContain(
+    'Step 3 · Environment',
+  )
+  expect(html).toContain(
+    'Where will this agent run?',
+  )
+  expect(html).toContain(
+    'id="agent-starter-memory-gib"',
+  )
+  expect(html).toContain(
+    'id="generate-agent-starter-recommendation"',
+  )
+  expect(html).toContain(
+    'Unknown does not mean incompatible.',
+  )
+})
+
+
+it('renders an evidence-backed final recommendation', () => {
+  const entry = {
+    identifier: 'model-a',
+    vendor: 'Example Vendor',
+    family: 'Example Model',
+    version: '1',
+  }
+
+  const html = renderAgentStarterPage({
+    state: 'result',
+    goal: 'coding',
+    evidence: [],
+    questionSet: {
+      schema_version: '0.1',
+      goal: 'coding',
+      questions: [],
+    },
+    error: null,
+    recommendation: {
+      schema_version: '0.1',
+      catalogSnapshotId:
+        'agent-starter-catalog-v0-2',
+      recommendedArchitectureIds: [
+        'local-coding-agent',
+      ],
+      alternativeArchitectureIds: [],
+      possibleButNotRecommendedArchitectureIds: [],
+      notRecommendedArchitectureIds: [],
+      blockerKeys: [],
+      unknownEvidenceKeys: [],
+      candidates: [
+        {
+          architectureId:
+            'local-coding-agent',
+          verdict: 'recommended',
+          why: [
+            'Fits the declared requirements.',
+          ],
+          whyNot: [],
+          components: [
+            {
+              componentType: 'model',
+              matchedEntries: [entry],
+              constrainedEntries: [],
+              indeterminateEntries: [],
+              notRecommendedEntries: [],
+              constraintExcludedEntries: [],
+              selectedEntry: entry,
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  expect(html).toContain(
+    'Step 4 · Recommendation',
+  )
+  expect(html).toContain(
+    'Recommendation ready.',
+  )
+  expect(html).toContain(
+    'Local Coding Agent',
+  )
+  expect(html).toContain(
+    'Example Model',
+  )
+  expect(html).toContain(
+    'Selected',
+  )
+  expect(html).toContain(
+    'agent-starter-catalog-v0-2',
+  )
+})

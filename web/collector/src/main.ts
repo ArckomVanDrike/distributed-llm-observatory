@@ -6,6 +6,7 @@ import {
 
 import {
   fetchAgentStarterQuestions,
+  fetchAgentStarterRecommendation,
   isAgentStarterGoal,
 } from './agent-starter-bridge'
 
@@ -13,9 +14,15 @@ import type {
   AgentStarterEvidenceInput,
   AgentStarterGoal,
   AgentStarterQuestionSet,
+  AgentStarterRecommendation,
 } from './agent-starter-bridge'
 
+import {
+  createAgentStarterEnvironmentDraft,
+} from './agent-starter-page'
+
 import type {
+  AgentStarterEnvironmentDraft,
   AgentStarterPageState,
 } from './agent-starter-page'
 
@@ -144,6 +151,13 @@ let agentStarterQuestionSet:
   AgentStarterQuestionSet | null = null
 
 let agentStarterError: string | null = null
+
+let agentStarterEnvironment:
+  AgentStarterEnvironmentDraft =
+    createAgentStarterEnvironmentDraft()
+
+let agentStarterRecommendation:
+  AgentStarterRecommendation | null = null
 
 let agentTestHistory:
   AgentTestHistoryResponse | null = null
@@ -588,6 +602,8 @@ function render(): void {
         evidence: agentStarterEvidence,
         questionSet: agentStarterQuestionSet,
         error: agentStarterError,
+        environment: agentStarterEnvironment,
+        recommendation: agentStarterRecommendation,
       },
       agentTest: {
         state: agentTestState,
@@ -826,6 +842,186 @@ function resetAgentStarter(): void {
   agentStarterEvidence = []
   agentStarterQuestionSet = null
   agentStarterError = null
+  agentStarterEnvironment =
+    createAgentStarterEnvironmentDraft()
+  agentStarterRecommendation = null
+
+  render()
+}
+
+
+function isAgentStarterDeviceClass(
+  value: string,
+): value is AgentStarterEnvironmentDraft['deviceClass'] {
+  return (
+    value === 'desktop'
+    || value === 'laptop'
+    || value === 'phone'
+    || value === 'tablet'
+    || value === 'unknown'
+  )
+}
+
+
+function isAgentStarterPlatform(
+  value: string,
+): value is AgentStarterEnvironmentDraft['platform'] {
+  return (
+    value === 'linux'
+    || value === 'windows'
+    || value === 'macos'
+    || value === 'android'
+    || value === 'ios'
+    || value === 'unknown'
+  )
+}
+
+
+function isAgentStarterInterface(
+  value: string,
+): value is AgentStarterEnvironmentDraft['interface'] {
+  return (
+    value === 'native'
+    || value === 'browser'
+    || value === 'unknown'
+  )
+}
+
+
+function parseAgentStarterRuntimes(
+  value: string,
+): string[] | null {
+  const runtimes =
+    value
+      .split(',')
+      .map((runtime) => runtime.trim())
+      .filter(
+        (runtime) => runtime.length > 0,
+      )
+
+  if (runtimes.length === 0) {
+    return null
+  }
+
+  return Array.from(
+    new Set(runtimes),
+  )
+}
+
+
+async function requestAgentStarterRecommendation():
+  Promise<void> {
+  if (agentStarterGoal === null) {
+    return
+  }
+
+  const memoryText =
+    agentStarterEnvironment.memoryGiB.trim()
+
+  let totalMemoryBytes: number | null = null
+
+  if (memoryText.length > 0) {
+    const memoryGiB = Number(memoryText)
+
+    if (
+      !Number.isFinite(memoryGiB)
+      || memoryGiB <= 0
+    ) {
+      agentStarterState = 'complete'
+      agentStarterError =
+        'Memory must be a positive number of GiB.'
+      render()
+      return
+    }
+
+    totalMemoryBytes =
+      Math.round(
+        memoryGiB * 1024 ** 3,
+      )
+  }
+
+  const runtimes =
+    parseAgentStarterRuntimes(
+      agentStarterEnvironment.runtimes,
+    )
+
+  const hardwareLimitations: string[] = []
+
+  if (totalMemoryBytes === null) {
+    hardwareLimitations.push(
+      'Total memory was not provided.',
+    )
+  }
+
+  const environmentLimitations: string[] = []
+
+  if (runtimes === null) {
+    environmentLimitations.push(
+      'Runtime inventory was not provided.',
+    )
+  }
+
+  if (
+    agentStarterEnvironment.interface === 'browser'
+  ) {
+    environmentLimitations.push(
+      'Browser access may not expose the complete execution environment.',
+    )
+  }
+
+  agentStarterState = 'recommending'
+  agentStarterError = null
+  agentStarterRecommendation = null
+
+  render()
+
+  try {
+    agentStarterRecommendation =
+      await fetchAgentStarterRecommendation(
+        (
+          request,
+          init,
+        ) => fetch(request, init),
+        {
+          goal: agentStarterGoal,
+          evidence: agentStarterEvidence,
+          hardware_profile: {
+            device_class:
+              agentStarterEnvironment.deviceClass,
+            source: 'manual',
+            total_memory_bytes:
+              totalMemoryBytes,
+            limitations:
+              hardwareLimitations,
+          },
+          execution_environment: {
+            platform:
+              agentStarterEnvironment.platform,
+            interface:
+              agentStarterEnvironment.interface,
+            available_runtimes:
+              runtimes,
+            accelerator_access: 'unknown',
+            filesystem_access: 'unknown',
+            limitations:
+              environmentLimitations,
+          },
+        },
+      )
+
+    agentStarterState = 'result'
+    agentStarterError = null
+  } catch (error) {
+    agentStarterRecommendation = null
+    agentStarterState = 'complete'
+    agentStarterError =
+      error instanceof Error
+        ? error.message
+        : (
+            'Unable to generate '
+            + 'Agent Starter recommendation.'
+          )
+  }
 
   render()
 }
@@ -854,6 +1050,9 @@ function bindAgentStarterEvents(): void {
           agentStarterEvidence = []
           agentStarterQuestionSet = null
           agentStarterError = null
+          agentStarterEnvironment =
+            createAgentStarterEnvironmentDraft()
+          agentStarterRecommendation = null
 
           void refreshAgentStarterQuestions()
         },
@@ -922,6 +1121,79 @@ function bindAgentStarterEvents(): void {
         },
       )
     })
+
+  document
+    .querySelector<HTMLButtonElement>(
+      '#generate-agent-starter-recommendation',
+    )
+    ?.addEventListener(
+      'click',
+      () => {
+        const deviceClass =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-device-class',
+          )
+
+        const platform =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-platform',
+          )
+
+        const executionInterface =
+          document.querySelector<HTMLSelectElement>(
+            '#agent-starter-interface',
+          )
+
+        const memory =
+          document.querySelector<HTMLInputElement>(
+            '#agent-starter-memory-gib',
+          )
+
+        const runtimes =
+          document.querySelector<HTMLInputElement>(
+            '#agent-starter-runtimes',
+          )
+
+        if (
+          deviceClass === null
+          || platform === null
+          || executionInterface === null
+          || memory === null
+          || runtimes === null
+        ) {
+          return
+        }
+
+        if (
+          !isAgentStarterDeviceClass(
+            deviceClass.value,
+          )
+          || !isAgentStarterPlatform(
+            platform.value,
+          )
+          || !isAgentStarterInterface(
+            executionInterface.value,
+          )
+        ) {
+          agentStarterError =
+            'Invalid execution environment selection.'
+          agentStarterState = 'complete'
+          render()
+          return
+        }
+
+        agentStarterEnvironment = {
+          deviceClass: deviceClass.value,
+          platform: platform.value,
+          interface:
+            executionInterface.value,
+          memoryGiB: memory.value,
+          runtimes: runtimes.value,
+        }
+
+        void requestAgentStarterRecommendation()
+      },
+    )
 
   document
     .querySelectorAll<HTMLButtonElement>(

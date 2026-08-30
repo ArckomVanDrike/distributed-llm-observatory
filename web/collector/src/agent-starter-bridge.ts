@@ -16,11 +16,49 @@ export interface AgentStarterEvidenceInput {
   reason?: string
 }
 
+export type AgentStarterDeviceClass =
+  | 'desktop'
+  | 'laptop'
+  | 'phone'
+  | 'tablet'
+  | 'unknown'
+
+export type AgentStarterExecutionPlatform =
+  | 'linux'
+  | 'windows'
+  | 'macos'
+  | 'android'
+  | 'ios'
+  | 'unknown'
+
+export type AgentStarterExecutionInterface =
+  | 'native'
+  | 'browser'
+  | 'unknown'
+
+export interface AgentStarterHardwareProfileInput {
+  device_class: AgentStarterDeviceClass
+  source: 'manual' | 'browser_limited'
+  total_memory_bytes: number | null
+  limitations: string[]
+}
+
+export interface AgentStarterExecutionEnvironmentInput {
+  platform: AgentStarterExecutionPlatform
+  interface: AgentStarterExecutionInterface
+  available_runtimes: string[] | null
+  accelerator_access: 'unknown'
+  filesystem_access: 'unknown'
+  limitations: string[]
+}
+
 export interface AgentStarterIntakeRequest {
   goal: AgentStarterGoal
   evidence: AgentStarterEvidenceInput[]
-  hardware_profile: null
-  execution_environment: null
+  hardware_profile:
+    AgentStarterHardwareProfileInput | null
+  execution_environment:
+    AgentStarterExecutionEnvironmentInput | null
 }
 
 export interface AgentStarterQuestion {
@@ -193,6 +231,348 @@ export async function fetchAgentStarterQuestions(
   }
 
   return parseAgentStarterQuestionSet(
+    await response.json(),
+  )
+}
+
+
+export interface AgentStarterCatalogEntryView {
+  identifier: string
+  vendor: string
+  family: string
+  version: string
+}
+
+export interface AgentStarterStackComponentView {
+  componentType: string
+  matchedEntries: AgentStarterCatalogEntryView[]
+  constrainedEntries: AgentStarterCatalogEntryView[]
+  indeterminateEntries: AgentStarterCatalogEntryView[]
+  notRecommendedEntries: AgentStarterCatalogEntryView[]
+  constraintExcludedEntries:
+    AgentStarterCatalogEntryView[]
+  selectedEntry: AgentStarterCatalogEntryView | null
+}
+
+export interface AgentStarterCandidateView {
+  architectureId: string
+  verdict: string
+  why: string[]
+  whyNot: string[]
+  components: AgentStarterStackComponentView[]
+}
+
+export interface AgentStarterRecommendation {
+  schema_version: '0.1'
+  catalogSnapshotId: string
+
+  recommendedArchitectureIds: string[]
+  alternativeArchitectureIds: string[]
+  possibleButNotRecommendedArchitectureIds: string[]
+  notRecommendedArchitectureIds: string[]
+
+  candidates: AgentStarterCandidateView[]
+
+  blockerKeys: string[]
+  unknownEvidenceKeys: string[]
+}
+
+function parseStringArray(
+  value: unknown,
+  errorMessage: string,
+): string[] {
+  if (
+    !Array.isArray(value)
+    || value.some(
+      (item) => typeof item !== 'string',
+    )
+  ) {
+    throw new Error(errorMessage)
+  }
+
+  return value as string[]
+}
+
+function parseCatalogEntry(
+  value: unknown,
+): AgentStarterCatalogEntryView {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Starter catalog entry.',
+    )
+  }
+
+  const {
+    identifier,
+    vendor,
+    family,
+    version,
+  } = value
+
+  if (
+    typeof identifier !== 'string'
+    || typeof vendor !== 'string'
+    || typeof family !== 'string'
+    || typeof version !== 'string'
+  ) {
+    throw new Error(
+      'Invalid Agent Starter catalog entry.',
+    )
+  }
+
+  return {
+    identifier,
+    vendor,
+    family,
+    version,
+  }
+}
+
+function parseCatalogEntries(
+  value: unknown,
+): AgentStarterCatalogEntryView[] {
+  if (!Array.isArray(value)) {
+    throw new Error(
+      'Invalid Agent Starter catalog entry list.',
+    )
+  }
+
+  return value.map(parseCatalogEntry)
+}
+
+function parseStackComponent(
+  value: unknown,
+): AgentStarterStackComponentView {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Starter stack component.',
+    )
+  }
+
+  const requirement = value.requirement
+
+  if (
+    !isRecord(requirement)
+    || typeof requirement.component_type !== 'string'
+  ) {
+    throw new Error(
+      'Invalid Agent Starter stack requirement.',
+    )
+  }
+
+  const selectedRaw = value.selected_entry
+
+  let selectedEntry:
+    AgentStarterCatalogEntryView | null = null
+
+  if (selectedRaw !== null) {
+    selectedEntry = parseCatalogEntry(
+      selectedRaw,
+    )
+  }
+
+  return {
+    componentType: requirement.component_type,
+    matchedEntries:
+      parseCatalogEntries(
+        value.matched_entries,
+      ),
+    constrainedEntries:
+      parseCatalogEntries(
+        value.constrained_entries,
+      ),
+    indeterminateEntries:
+      parseCatalogEntries(
+        value.indeterminate_entries,
+      ),
+    notRecommendedEntries:
+      parseCatalogEntries(
+        value.not_recommended_entries,
+      ),
+    constraintExcludedEntries:
+      parseCatalogEntries(
+        value.constraint_excluded_entries,
+      ),
+    selectedEntry,
+  }
+}
+
+function parseCandidate(
+  value: unknown,
+): AgentStarterCandidateView {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Starter candidate explanation.',
+    )
+  }
+
+  const assessment = value.assessment
+  const stack = value.concrete_stack
+
+  if (
+    !isRecord(assessment)
+    || typeof assessment.architecture_id !== 'string'
+    || typeof assessment.recommendation !== 'string'
+    || !isRecord(stack)
+    || !Array.isArray(stack.components)
+  ) {
+    throw new Error(
+      'Invalid Agent Starter candidate explanation.',
+    )
+  }
+
+  return {
+    architectureId:
+      assessment.architecture_id,
+    verdict:
+      assessment.recommendation,
+    why: parseStringArray(
+      value.why,
+      'Invalid Agent Starter why explanation.',
+    ),
+    whyNot: parseStringArray(
+      value.why_not,
+      'Invalid Agent Starter why-not explanation.',
+    ),
+    components:
+      stack.components.map(
+        parseStackComponent,
+      ),
+  }
+}
+
+function parseKeyProjection(
+  value: unknown,
+  errorMessage: string,
+): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(errorMessage)
+  }
+
+  return value.map((item) => {
+    if (
+      !isRecord(item)
+      || typeof item.key !== 'string'
+    ) {
+      throw new Error(errorMessage)
+    }
+
+    return item.key
+  })
+}
+
+export function parseAgentStarterRecommendation(
+  value: unknown,
+): AgentStarterRecommendation {
+  if (!isRecord(value)) {
+    throw new Error(
+      'Invalid Agent Starter recommendation response.',
+    )
+  }
+
+  const context = value.context
+
+  if (!isRecord(context)) {
+    throw new Error(
+      'Invalid Agent Starter recommendation context.',
+    )
+  }
+
+  const snapshot =
+    context.catalog_snapshot
+
+  if (
+    !isRecord(snapshot)
+    || typeof snapshot.snapshot_id !== 'string'
+  ) {
+    throw new Error(
+      'Invalid Agent Starter catalog provenance.',
+    )
+  }
+
+  if (
+    value.schema_version !== '0.1'
+    || !Array.isArray(
+      value.candidate_explanations,
+    )
+  ) {
+    throw new Error(
+      'Invalid Agent Starter recommendation response.',
+    )
+  }
+
+  return {
+    schema_version: '0.1',
+
+    catalogSnapshotId:
+      snapshot.snapshot_id,
+
+    recommendedArchitectureIds:
+      parseStringArray(
+        value.recommended_architecture_ids,
+        'Invalid recommended architecture list.',
+      ),
+
+    alternativeArchitectureIds:
+      parseStringArray(
+        value.alternative_architecture_ids,
+        'Invalid alternative architecture list.',
+      ),
+
+    possibleButNotRecommendedArchitectureIds:
+      parseStringArray(
+        value
+          .possible_but_not_recommended_architecture_ids,
+        'Invalid possible-but-not-recommended list.',
+      ),
+
+    notRecommendedArchitectureIds:
+      parseStringArray(
+        value.not_recommended_architecture_ids,
+        'Invalid not-recommended architecture list.',
+      ),
+
+    candidates:
+      value.candidate_explanations.map(
+        parseCandidate,
+      ),
+
+    blockerKeys:
+      parseKeyProjection(
+        value.blockers,
+        'Invalid Agent Starter blocker projection.',
+      ),
+
+    unknownEvidenceKeys:
+      parseKeyProjection(
+        value.unknown_evidence,
+        'Invalid Agent Starter unknown evidence projection.',
+      ),
+  }
+}
+
+export async function fetchAgentStarterRecommendation(
+  fetchImpl: AgentStarterFetch,
+  intake: AgentStarterIntakeRequest,
+): Promise<AgentStarterRecommendation> {
+  const response = await fetchImpl(
+    '/v1/agent-starter/recommend',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(intake),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Agent Starter recommendation request failed with HTTP ${response.status}.`,
+    )
+  }
+
+  return parseAgentStarterRecommendation(
     await response.json(),
   )
 }

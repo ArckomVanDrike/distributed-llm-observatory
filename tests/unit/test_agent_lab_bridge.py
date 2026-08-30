@@ -2278,3 +2278,112 @@ def test_agent_lab_bridge_rejects_invalid_starter_intake(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_agent_lab_bridge_returns_agent_starter_recommendation(
+    tmp_path: Path,
+):
+    config = make_config(tmp_path)
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        request = Request(
+            (
+                f"http://{host}:{port}"
+                "/v1/agent-starter/recommend"
+            ),
+            data=json.dumps(
+                {
+                    "goal": "coding",
+                    "evidence": [
+                        {
+                            "key": (
+                                "source_code_must_stay_local"
+                            ),
+                            "source": "declared",
+                            "value": True,
+                        },
+                        {
+                            "key": "offline_required",
+                            "source": "declared",
+                            "value": False,
+                        },
+                    ],
+                    "hardware_profile": {
+                        "device_class": "laptop",
+                        "source": "manual",
+                        "total_memory_bytes": (
+                            8 * 1024**3
+                        ),
+                    },
+                    "execution_environment": {
+                        "platform": "linux",
+                        "interface": "native",
+                        "available_runtimes": [
+                            "llama.cpp",
+                        ],
+                    },
+                }
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urlopen(
+            request,
+            timeout=2,
+        ) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        assert response.status == 200
+        assert payload["schema_version"] == "0.1"
+
+        assert (
+            payload["context"]["prepared"]["goal"]
+            == "coding"
+        )
+
+        assert (
+            payload["context"]
+            ["catalog_snapshot"]
+            ["snapshot_id"]
+            == "agent-starter-catalog-v0-2"
+        )
+
+        assert isinstance(
+            payload["candidate_explanations"],
+            list,
+        )
+
+        assert isinstance(
+            payload["recommended_architecture_ids"],
+            list,
+        )
+
+        assert isinstance(
+            payload["alternative_architecture_ids"],
+            list,
+        )
+
+        assert isinstance(
+            payload[
+                "possible_but_not_recommended_architecture_ids"
+            ],
+            list,
+        )
+
+        assert isinstance(
+            payload["not_recommended_architecture_ids"],
+            list,
+        )
+
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
