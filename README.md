@@ -443,6 +443,48 @@ Run Ruff:
 ruff check .
 ```
 
+
+### Browser Public Preview
+
+The browser interface requires Node.js and npm in addition to the Python setup above.
+
+Start the local Agent Lab bridge from the repository root:
+
+```bash
+mkdir -p data/agent-runs
+
+python -m observer.cli agent-lab-bridge \
+  --observer-id local-observer \
+  --region-code local \
+  --history-root data/agent-runs
+```
+
+The bridge listens on `127.0.0.1:8766` by default.
+
+In a second terminal, install the browser dependencies and start the development server:
+
+```bash
+cd web/collector
+npm ci
+npm run dev
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5173/#/agent-lab/starter
+```
+
+The browser workflow exposes Agent Starter through the local bridge, including adaptive questioning, environment evidence, catalog-backed runtime selection, architecture assessment, and concrete stack recommendations.
+
+To verify the browser-side implementation:
+
+```bash
+cd web/collector
+npm test
+npm run build
+```
+
 ---
 
 ## Repository structure
