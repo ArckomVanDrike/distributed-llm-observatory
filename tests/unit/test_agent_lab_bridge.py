@@ -2429,3 +2429,50 @@ def test_agent_lab_bridge_returns_agent_starter_runtime_options(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_default_agent_starter_catalog_root_is_packaged_resource(
+    tmp_path: Path,
+) -> None:
+    config = AgentLabBridgeConfig(
+        observer_id="observer-test",
+        region_code="CL-LL",
+        history_root=tmp_path / "history",
+    )
+
+    catalog_path = config.catalog_root / "catalog-v0-2.json"
+
+    assert catalog_path.is_file()
+
+
+def test_agent_starter_runtime_options_uses_default_packaged_catalog(
+    tmp_path: Path,
+) -> None:
+    config = AgentLabBridgeConfig(
+        observer_id="observer-test",
+        region_code="CL-LL",
+        history_root=tmp_path / "history",
+    )
+
+    server, thread = run_test_server(config)
+
+    try:
+        host, port = server.server_address
+
+        import json
+        from urllib.request import urlopen
+
+        with urlopen(
+            f"http://{host}:{port}/v1/agent-starter/runtime-options"
+        ) as response:
+            assert response.status == 200
+            payload = json.load(response)
+
+        assert payload["catalog_snapshot_id"] == "agent-starter-catalog-v0-2"
+        assert len(payload["runtimes"]) == 11
+        assert "ollama" in payload["runtimes"]
+        assert "transformers" in payload["runtimes"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

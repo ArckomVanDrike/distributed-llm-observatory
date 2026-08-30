@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from http.server import (
     BaseHTTPRequestHandler,
     ThreadingHTTPServer,
 )
+from importlib.resources import files
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
@@ -48,13 +49,21 @@ from observer.core.agent_starter_unified_pipeline import (
 from schemas.agent_starter import AgentStarterIntake
 
 
+def _default_agent_starter_catalog_root() -> Path:
+    return Path(
+        str(
+            files("observer.resources.agent_starter")
+        )
+    )
+
+
 @dataclass(frozen=True)
 class AgentLabBridgeConfig:
     observer_id: str
     region_code: str
     history_root: Path
-    catalog_root: Path = Path(
-        "catalog/agent-starter"
+    catalog_root: Path = field(
+        default_factory=_default_agent_starter_catalog_root
     )
 
 

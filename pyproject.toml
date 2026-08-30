@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Open-source framework for building agent configurations, testing AI agents, and comparing reproducible AI-system observations."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "Apache-2.0"
 authors = [
     { name = "Distributed LLM Observatory Contributors" }
 ]
@@ -48,6 +48,9 @@ select = [
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.setuptools.package-data]
+"observer.resources.agent_starter" = ["*.json"]
 
 [tool.setuptools.packages.find]
 where = ["."]
