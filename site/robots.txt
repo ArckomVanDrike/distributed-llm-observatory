@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://arckomvandrike.github.io/distributed-llm-observatory/sitemap.xml
