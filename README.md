@@ -223,7 +223,7 @@ The principal DLLO v1 building blocks are operational.
 | Persistent Agent Lab history | **Operational** |
 | Consumer Probe foundations | **Operational / evolving** |
 
-Current development is focused on public packaging, broader observation coverage, richer catalogs, user experience, and distributed observation workflows.
+Current development is focused on external testing, broader observation coverage, richer catalogs, user experience, and distributed observation workflows.
 
 See [`docs/roadmap.md`](docs/roadmap.md).
 
