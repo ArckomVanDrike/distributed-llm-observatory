@@ -5651,10 +5651,14 @@ def test_agent_lab_bridge_invokes_server(
         *,
         host,
         port,
+        collector_static_root,
     ):
         captured["config"] = config
         captured["host"] = host
         captured["port"] = port
+        captured["collector_static_root"] = (
+            collector_static_root
+        )
 
     monkeypatch.setattr(
         cli_module,
@@ -5695,6 +5699,7 @@ def test_agent_lab_bridge_invokes_server(
 
     assert captured["host"] == "127.0.0.1"
     assert captured["port"] == 9877
+    assert captured["collector_static_root"] is None
 
 
 def test_main_dispatches_agent_lab_bridge(
@@ -5734,4 +5739,58 @@ def test_main_dispatches_agent_lab_bridge(
     assert captured["command"] == "agent-lab-bridge"
     assert captured["history_root"] == Path(
         "data/agent-runs"
+    )
+
+
+def test_agent_lab_bridge_passes_collector_static_root(
+    tmp_path: Path,
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_serve_agent_lab_bridge(
+        config,
+        *,
+        host,
+        port,
+        collector_static_root,
+    ):
+        captured["config"] = config
+        captured["host"] = host
+        captured["port"] = port
+        captured["collector_static_root"] = (
+            collector_static_root
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "serve_agent_lab_bridge",
+        fake_serve_agent_lab_bridge,
+        raising=False,
+    )
+
+    collector_root = tmp_path / "collector-dist"
+
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "agent-lab-bridge",
+            "--observer-id",
+            "observer-test",
+            "--region-code",
+            "CL-Los-Lagos",
+            "--history-root",
+            str(tmp_path / "agent-runs"),
+            "--collector-static-root",
+            str(collector_root),
+        ]
+    )
+
+    result = cli_module.agent_lab_bridge(args)
+
+    assert result == 0
+    assert (
+        captured["collector_static_root"]
+        == collector_root
     )
