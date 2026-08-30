@@ -211,7 +211,7 @@ Agent Starter uses explicit catalog snapshots.
 Current repository catalog:
 
 ```text
-catalog/agent-starter/catalog-v0-1.json
+catalog/agent-starter/catalog-v0-2.json
 ```
 
 The catalog currently contains a deliberately small set of model/runtime components suitable for validating the matching pipeline.
@@ -455,7 +455,7 @@ The repository uses automated Python and browser-side tests to protect:
 - final reports;
 - browser data flows.
 
-The Agent Starter v1 completion milestone was merged to `main` with the complete repository test gate passing.
+The Agent Starter v1 implementation has passed the complete repository test gate.
 
 ---
 
@@ -527,19 +527,25 @@ The public presentation must describe implemented behavior rather than mock futu
 
 ## Agent Starter public interface
 
-**Planned**
+**Status: Complete for Public Preview**
 
-The Agent Starter v1 decision core is complete.
+The Agent Starter v1 decision core is exposed through a dedicated browser workflow backed by the local Agent Lab bridge.
 
-A dedicated user-facing interface remains to be exposed over the existing pipeline.
+The public workflow currently includes:
 
-Potential interfaces include:
+- goal selection across the five supported Agent Starter goals;
+- adaptive questioning;
+- explicit UNKNOWN handling;
+- hardware and execution-environment input;
+- catalog-backed runtime selection;
+- architecture and technical-feasibility assessment;
+- concrete stack resolution;
+- Why / Why Not explanations;
+- final evidence-backed recommendation output.
 
-- browser workflow;
-- CLI workflow;
-- structured local API boundary.
+The interface preserves the same explicit evidence provenance and conservative decision semantics as the core pipeline.
 
-The interface should preserve the same explicit evidence and decision semantics as the core pipeline.
+A dedicated CLI workflow may be added later, but it is not required for the current browser-based Public Preview.
 
 ---
 
