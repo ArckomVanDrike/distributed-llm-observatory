@@ -575,6 +575,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Agent Lab bridge TCP port",
     )
 
+    agent_lab_bridge_parser.add_argument(
+        "--collector-static-root",
+        type=Path,
+        default=None,
+        help=(
+            "Optional production Collector build "
+            "directory to serve from the Agent Lab bridge"
+        ),
+    )
+
     # -----------------------------------------------------
     # Agent Lab protocol test
     # -----------------------------------------------------
@@ -2002,6 +2012,9 @@ def agent_lab_bridge(
             bridge_config,
             host=args.host,
             port=args.port,
+            collector_static_root=(
+                args.collector_static_root
+            ),
         )
 
         return 0
