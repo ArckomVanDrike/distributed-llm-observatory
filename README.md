@@ -549,6 +549,22 @@ DLLO is an **observation, evaluation, and agent-engineering framework**.
 
 ---
 
+## Community
+
+The Observatory needs observers.
+
+Join the DLLO community to discuss observations, agents, reproducibility, benchmarks, development, and experiments from different regions around the world.
+
+**Discord:** https://discord.gg/2DHxx4aqVA
+
+**GitHub Discussions:**  
+https://github.com/ArckomVanDrike/distributed-llm-observatory/discussions
+
+One observer can measure one point.  
+A community of observers can begin to map the world.
+
+---
+
 ## Contributing
 
 Contributions, testing, criticism, new benchmark ideas, and external observations are welcome.
