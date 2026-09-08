@@ -1,3 +1,5 @@
+<img width="1717" height="916" alt="DLLO v0 1 0 — Public Preview" src="https://github.com/user-attachments/assets/b509988a-cf6c-40cb-90d8-7c0d47504876" />
+
 # Distributed LLM Observatory
 
 **Build agents. Test agents. Observe how AI systems change.**
